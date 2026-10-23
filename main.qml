@@ -21,6 +21,11 @@ Window {
         passwordField.text = ""
     }
 
+    // Quicker e-ink updates while typing. Applied with callLater because moving focus
+    // from one field to the other briefly leaves neither focused.
+    readonly property bool typing: usernameField.activeFocus || passwordField.activeFocus
+    onTypingChanged: Qt.callLater(() => eink.setDynamicUpdates(root.typing))
+
     // Big, flat, black-on-white button that suits e-ink
     component PbButton: Rectangle {
         property alias text: label.text
