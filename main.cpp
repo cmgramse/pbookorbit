@@ -27,8 +27,11 @@ int main(int argc, char *argv[])
     // focus, and every redraw is a slow e-ink update. Keep the cursor solid instead.
     app.styleHints()->setCursorFlashTime(0);
 
-    // /mnt/ext1/system/config on the device, ./system/config in the emulator
-    BookOrbitClient client(QString::fromUtf8(CONFIGPATH "/bookorbit.ini"));
+    // /mnt/ext1/system/config on the device, ./system/config in the emulator.
+    // BOOKORBIT_SETTINGS points automated tests at their own file, so they don't touch the
+    // saved login.
+    BookOrbitClient client(qEnvironmentVariable("BOOKORBIT_SETTINGS",
+                                                QString::fromUtf8(CONFIGPATH "/bookorbit.ini")));
 
     Eink eink;
     diagnostics::Log diagnosticsLog;
