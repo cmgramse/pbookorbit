@@ -1,14 +1,14 @@
 <RCC>
     <qresource prefix="/">
-        <file>main.qml</file>
-        <file>AppHeader.qml</file>
-        <file>IconButton.qml</file>
-        <file>units.js</file>
-        <file>LoginPage.qml</file>
-        <file>PillButton.qml</file>
-        <file>SectionHeading.qml</file>
-        <file>PopupMenu.qml</file>
-        <file>PopupMenuItem.qml</file>
+        <file>qml/main.qml</file>
+        <file>qml/AppHeader.qml</file>
+        <file>qml/IconButton.qml</file>
+        <file>qml/units.js</file>
+        <file>qml/LoginPage.qml</file>
+        <file>qml/PillButton.qml</file>
+        <file>qml/SectionHeading.qml</file>
+        <file>qml/PopupMenu.qml</file>
+        <file>qml/PopupMenuItem.qml</file>
         <file>images/bookorbit-logo.png</file>
     </qresource>
 </RCC>

@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>
     engine.addImageProvider("theme", new ThemeImageProvider);
-    engine.load(QUrl("qrc:/main.qml"));
+    engine.load(QUrl("qrc:/qml/main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
 
