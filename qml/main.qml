@@ -12,8 +12,18 @@ Window {
 
     // Quicker e-ink updates while typing. Applied with callLater because moving focus
     // from one field to the other briefly leaves neither focused.
-    readonly property bool typing: loginPage.visible && loginPage.typing
+    readonly property bool typing: (loginPage.visible && loginPage.typing)
+                                   || (searchPage.visible && searchPage.typing)
     onTypingChanged: Qt.callLater(() => eink.setDynamicUpdates(root.typing))
+
+    // Search page open over everything else
+    property bool searching: false
+
+    function openSearch() {
+        menu.visible = false
+        searching = true
+        searchPage.open()
+    }
 
     // The book list is the only page for now, so home just goes back to its top
     function goHome() {
@@ -28,7 +38,9 @@ Window {
         anchors.right: parent.right
         title: "PocketBook × BookOrbit"
         menuOpen: menu.visible
+        showSearch: bookOrbit.signedIn
         onHomeClicked: root.goHome()
+        onSearchClicked: root.openSearch()
         onMenuClicked: menu.visible = !menu.visible
     }
 
@@ -129,6 +141,7 @@ Window {
             text: "Sign out"
             onClicked: {
                 menu.visible = false
+                root.searching = false
                 bookOrbit.signOut()
             }
         }
@@ -137,5 +150,17 @@ Window {
             showSeparator: false
             onClicked: Qt.quit()
         }
+    }
+
+    SearchPage {
+        id: searchPage
+        anchors.fill: parent
+        visible: root.searching
+        headerHeight: header.height
+        // TODO: real recent searches; sample terms until the search logic exists
+        recentSearches: ["door", "the faith"]
+        onBack: root.searching = false
+        // TODO: run the search
+        onSearch: (text) => diagnostics.log("search: " + text)
     }
 }

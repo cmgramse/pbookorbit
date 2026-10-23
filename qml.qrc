@@ -9,6 +9,7 @@
         <file>qml/SectionHeading.qml</file>
         <file>qml/PopupMenu.qml</file>
         <file>qml/PopupMenuItem.qml</file>
+        <file>qml/SearchPage.qml</file>
         <file>images/bookorbit-logo.png</file>
     </qresource>
 </RCC>
