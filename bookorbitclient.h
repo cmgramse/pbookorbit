@@ -1,5 +1,7 @@
 #pragma once
 
+#include "booklistmodel.h"
+
 #include <QJsonDocument>
 #include <QHash>
 #include <QList>
@@ -7,7 +9,6 @@
 #include <QObject>
 #include <QSettings>
 #include <QStringList>
-#include <QVariantList>
 #include <functional>
 
 class QNetworkReply;
@@ -25,7 +26,7 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
-    Q_PROPERTY(QVariantList books READ books NOTIFY booksChanged)
+    Q_PROPERTY(BookListModel *books READ books CONSTANT)
     Q_PROPERTY(int totalBooks READ totalBooks NOTIFY booksChanged)
     Q_PROPERTY(bool hasMoreBooks READ hasMoreBooks NOTIFY booksChanged)
 
@@ -40,9 +41,9 @@ public:
     bool signedIn() const { return m_signedIn; }
     bool busy() const { return m_pending > 0; }
     QString error() const { return m_error; }
-    QVariantList books() const { return m_books; }
+    BookListModel *books() { return &m_books; }
     int totalBooks() const { return m_totalBooks; }
-    bool hasMoreBooks() const { return m_books.size() < m_totalBooks; }
+    bool hasMoreBooks() const { return m_books.count() < m_totalBooks; }
 
     // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
@@ -105,7 +106,7 @@ private:
     bool m_signedIn = false;
     int m_pending = 0;
     QString m_error;
-    QVariantList m_books;
+    BookListModel m_books;
     int m_totalBooks = 0;
     QString m_sortField = "addedAt";
     QStringList m_formats;

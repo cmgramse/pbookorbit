@@ -153,13 +153,18 @@ void BookOrbitClient::loadBooksPage(int page)
         const QJsonObject result = doc.object();
         if (page == 0)
             m_books.clear();
+        QVariantList books;
+        // Sections are never empty, so the first book always starts one
+        QString previousSection = m_books.last().value("section").toString();
         for (const QJsonValue &item : result.value("items").toArray()) {
             QVariantMap book = decorateBook(item.toObject().toVariantMap());
             // First row of a section: carries the letter or date box
             const QString section = book.value("section").toString();
-            book.insert("sectionStart", m_books.isEmpty() || m_books.last().toMap().value("section").toString() != section);
-            m_books.append(book);
+            book.insert("sectionStart", section != previousSection);
+            previousSection = section;
+            books.append(book);
         }
+        m_books.append(books);
         m_totalBooks = result.value("total").toInt();
         m_loadedPage = page;
         emit booksChanged();

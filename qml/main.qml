@@ -133,9 +133,11 @@ Window {
             Text {
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                visible: bookOrbit.error !== "" || bookOrbit.busy
+                // Busy only until the first books arrive: later pages load as the list
+                // scrolls, and a line appearing above the rows would shift them
+                visible: bookOrbit.error !== "" || (bookOrbit.busy && bookList.count === 0)
                 topPadding: Units.dp(8)
-                text: bookOrbit.busy ? "Working…" : bookOrbit.error
+                text: bookOrbit.busy && bookList.count === 0 ? "Working…" : bookOrbit.error
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -151,8 +153,7 @@ Window {
         onMovementEnded: eink.leaveA2()
         onVisibleChanged: if (!visible) eink.leaveA2()
         delegate: BookRow {
-            required property var modelData
-            book: modelData
+            required book
         }
     }
 
