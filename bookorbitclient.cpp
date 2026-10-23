@@ -13,6 +13,9 @@
 // TODO: make the server configurable
 static const char *DEFAULT_SERVER_URL = "https://books.example.com";
 
+// Books per request to /books/query; more pages load as the list scrolls
+static const int BOOKS_PAGE_SIZE = 40;
+
 BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     : QObject(parent)
     , m_settings(settingsPath, QSettings::IniFormat)
@@ -49,8 +52,8 @@ void BookOrbitClient::signIn(const QString &username, const QString &password)
     };
     // Returns NativeCredentials plus the user: {accessToken, refreshToken, sessionId, user, ...}
     send("POST", "/auth/login", QJsonDocument(body),
-        [this](const QJsonDocument &doc) {
-            applyCredentials(doc.object());
+        [this](const QByteArray &data) {
+            applyCredentials(QJsonDocument::fromJson(data).object());
             m_settings.setValue("username", m_username);
             m_settings.sync();
             refreshBooks();
@@ -63,47 +66,110 @@ void BookOrbitClient::signOut()
     // Revoke the session on the server; the local sign-out doesn't wait for it
     if (!m_refreshToken.isEmpty()) {
         send("POST", "/auth/logout", QJsonDocument(QJsonObject{{"refreshToken", m_refreshToken}}),
-             [](const QJsonDocument &) {}, [](int, const QString &) {});
+             [](const QByteArray &) {}, [](int, const QString &) {});
     }
     clearSession();
     setError(QString());
 }
 
+void BookOrbitClient::setBookQuery(const QString &sortField, const QStringList &formats)
+{
+    m_sortField = sortField;
+    m_formats = formats;
+    refreshBooks();
+}
+
 void BookOrbitClient::refreshBooks()
 {
-    // Same query the web client sends: returns {items: [...], total, page, size}
+    m_queryGeneration++;
+    m_loadingPage = false;
+    loadBooksPage(0);
+}
+
+void BookOrbitClient::loadMoreBooks()
+{
+    if (!m_loadingPage && hasMoreBooks())
+        loadBooksPage(m_loadedPage + 1);
+}
+
+void BookOrbitClient::loadBooksPage(int page)
+{
+    // Same query the web client sends: returns {items: [...], total, page, size}. Pages
+    // count from 0, as in the web client: page 1 is the second page.
+    // Recently read and date added put the newest first; the A-Z sorts go ascending.
+    const bool newestFirst = m_sortField == "addedAt" || m_sortField == "lastReadAt";
     QJsonObject query{
-        {"sort", QJsonArray{QJsonObject{{"field", "addedAt"}, {"dir", "desc"}}}},
-        {"pagination", QJsonObject{{"page", 1}, {"size", 20}}},
+        {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", newestFirst ? "desc" : "asc"}}}},
+        {"pagination", QJsonObject{{"page", page}, {"size", BOOKS_PAGE_SIZE}}},
     };
-    call("POST", "/books/query", QJsonDocument(query), [this](const QJsonDocument &doc) {
-        const QJsonObject page = doc.object();
-        m_books = page.value("items").toArray().toVariantList();
-        m_totalBooks = page.value("total").toInt();
+    if (!m_formats.isEmpty()) {
+        query.insert("filter", QJsonObject{
+            {"type", "group"},
+            {"join", "AND"},
+            {"rules", QJsonArray{QJsonObject{
+                {"type", "rule"},
+                {"field", "format"},
+                {"operator", "includesAny"},
+                {"value", QJsonArray::fromStringList(m_formats)},
+            }}},
+        });
+    }
+
+    m_loadingPage = true;
+    const int generation = m_queryGeneration;
+    callJson("POST", "/books/query", QJsonDocument(query), [this, page, generation](const QJsonDocument &doc) {
+        if (generation != m_queryGeneration)
+            return;   // the sort or filter changed since this was asked for
+        m_loadingPage = false;
+        const QJsonObject result = doc.object();
+        if (page == 0)
+            m_books.clear();
+        m_books += result.value("items").toArray().toVariantList();
+        m_totalBooks = result.value("total").toInt();
+        m_loadedPage = page;
         emit booksChanged();
     });
 }
 
+void BookOrbitClient::callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                               std::function<void(const QJsonDocument &)> onSuccess)
+{
+    call(method, path, body,
+        [this, onSuccess](const QByteArray &data) {
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+            if (parseError.error != QJsonParseError::NoError) {
+                setError("Unexpected response from server: " + parseError.errorString());
+                return;
+            }
+            onSuccess(doc);
+        },
+        [this](int, const QString &message) {
+            m_loadingPage = false;
+            setError(message);
+        });
+}
+
 void BookOrbitClient::call(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           JsonHandler onSuccess, bool retried)
+                           DataHandler onSuccess, ErrorHandler onError, bool retried)
 {
     if (m_refreshing) {
         m_afterRefresh.append([=]() {
             if (m_signedIn)
-                call(method, path, body, onSuccess, retried);
+                call(method, path, body, onSuccess, onError, retried);
         });
         return;
     }
     if (m_accessToken.isEmpty()) {
         if (m_refreshToken.isEmpty()) {
-            setError("Not signed in");
+            onError(0, "Not signed in");
             return;
         }
         // Saved session, but no access token yet this run (or the last refresh failed,
         // e.g. offline): get one first. No retry if that fails, so no loop.
         refreshSession([=]() {
             if (m_signedIn && !m_accessToken.isEmpty())
-                call(method, path, body, onSuccess, retried);
+                call(method, path, body, onSuccess, onError, retried);
         });
         return;
     }
@@ -112,11 +178,11 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
             // Access tokens last about 15 minutes: get a new one and try once more
             refreshSession([=]() {
                 if (m_signedIn)
-                    call(method, path, body, onSuccess, true);
+                    call(method, path, body, onSuccess, onError, true);
             });
             return;
         }
-        setError(message);
+        onError(status, message);
     }, true);
 }
 
@@ -135,8 +201,8 @@ void BookOrbitClient::refreshSession(std::function<void()> then)
     };
     // Returns NativeCredentials with a new refresh token; the old one stops working
     send("POST", "/auth/refresh", QJsonDocument(QJsonObject{{"refreshToken", m_refreshToken}}),
-        [this, finish](const QJsonDocument &doc) {
-            applyCredentials(doc.object());
+        [this, finish](const QByteArray &data) {
+            applyCredentials(QJsonDocument::fromJson(data).object());
             finish();
         },
         [this, finish](int status, const QString &message) {
@@ -153,7 +219,7 @@ void BookOrbitClient::refreshSession(std::function<void()> then)
 }
 
 void BookOrbitClient::send(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           JsonHandler onSuccess, ErrorHandler onError, bool withToken)
+                           DataHandler onSuccess, ErrorHandler onError, bool withToken)
 {
 #ifndef EMULATOR
     // On the device, ask the system to bring up Wi-Fi first (shows its own dialog)
@@ -203,13 +269,7 @@ void BookOrbitClient::send(const QByteArray &method, const QString &path, const 
             return;
         }
 
-        QJsonParseError parseError;
-        const QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
-        if (parseError.error != QJsonParseError::NoError) {
-            onError(status, "Unexpected response from server: " + parseError.errorString());
-            return;
-        }
-        onSuccess(doc);
+        onSuccess(data);
     });
 }
 
@@ -230,6 +290,8 @@ void BookOrbitClient::clearSession()
     m_settings.sync();
     m_books.clear();
     m_totalBooks = 0;
+    m_loadedPage = -1;
+    m_queryGeneration++;
     emit booksChanged();
     setSignedIn(false);
 }

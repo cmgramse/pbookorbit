@@ -56,9 +56,24 @@ Window {
 
     // Signed in: the home page. Sub-toolbar with filter and sort, the book list, and a
     // footer for BookOrbit's views, after the Libby app.
-    // TODO: apply the filter and sort to the book list, and give the views content
+    // TODO: give the views other than Library content
     readonly property var filterOptions: ["All titles", "Ebooks", "Audiobooks"]
+    // File formats for each filter option (BookOrbit's EBOOK_FORMAT_LIST, AUDIO_FORMAT_LIST)
+    readonly property var filterFormats: [
+        [],
+        ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"],
+        ["m4b", "mp3", "m4a", "opus", "ogg", "flac"]
+    ]
     readonly property var sortOptions: ["Date added", "Title", "Author", "Recently read"]
+    // BookOrbit sort field for each sort option
+    readonly property var sortFields: ["addedAt", "title", "author", "lastReadAt"]
+
+    function applyBookQuery() {
+        bookOrbit.setBookQuery(sortFields[sortIndex], filterFormats[filterIndex])
+        bookList.positionViewAtBeginning()
+    }
+    onFilterIndexChanged: applyBookQuery()
+    onSortIndexChanged: applyBookQuery()
     property int filterIndex: 0
     property int sortIndex: 0
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
@@ -93,6 +108,12 @@ Window {
         // No bounce at the ends: on e-ink it is only extra redraws
         boundsBehavior: Flickable.StopAtBounds
         model: bookOrbit.books
+
+        // Load the next page while there is still a screenful to go
+        onContentYChanged: {
+            if (contentY + 2 * height > contentHeight)
+                bookOrbit.loadMoreBooks()
+        }
 
         // Filter and sort bar, and any status line, scroll away with the books
         header: Column {
@@ -170,7 +191,13 @@ Window {
             { label: "Series", icon: "e3_filter_seria_bold" },
             { label: "Authors", icon: "e3_filter_author" }
         ]
-        onTabClicked: (index) => currentIndex = index
+        onTabClicked: (index) => {
+            // Tapping the current view's tab again goes back to the top of its list
+            if (index === currentIndex)
+                bookList.positionViewAtBeginning()
+            else
+                currentIndex = index
+        }
     }
 
     // While a filter or sort menu is open the whole window fades, as in Libby; a tap
