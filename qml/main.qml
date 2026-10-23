@@ -115,10 +115,11 @@ Window {
                 bookOrbit.loadMoreBooks()
         }
 
-        // Filter and sort bar, and any status line, scroll away with the books
+        // Filter and sort bar, and any status line, scroll away with the books. The first
+        // row sits right under the bar, as in the system library.
         header: Column {
             width: ListView.view.width
-            bottomPadding: Units.dp(8)
+            bottomPadding: status.visible ? Units.dp(8) : 0
 
             SubToolbar {
                 width: parent.width
@@ -131,6 +132,7 @@ Window {
                 onSortClicked: root.toggleDropdown(sortMenu)
             }
             Text {
+                id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
                 // Busy only until the first books arrive: later pages load as the list
