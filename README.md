@@ -5,7 +5,7 @@ in with a normal BookOrbit account and lists the 20 most recently added books.
 
 ```sh
 ./pb.sh run apps/bookorbit    # emulator
-./pb.sh arm apps/bookorbit    # device -> build/bookorbit/arm/bookorbit.app
+./pb.sh arm apps/bookorbit    # device -> build/bookorbit/<sdk>/arm/bookorbit.app
 ```
 
 The server is currently fixed at `https://books.example.com` (`DEFAULT_SERVER_URL` in
@@ -16,13 +16,13 @@ The server is currently fixed at `https://books.example.com` (`DEFAULT_SERVER_UR
 Use the same username and password as the BookOrbit website. The app opens a session for
 the device, shown as "PocketBook <model>" in the account's session list. The password is
 not saved. The session's refresh token is saved to `bookorbit.ini` in the system config
-folder: `/mnt/ext1/system/config` on the device, `build/bookorbit/pc/system/config` in the
+folder: `/mnt/ext1/system/config` on the device, `build/bookorbit/<sdk>/pc/system/config` in the
 emulator. Signing out revokes the session on the server.
 
 ## Diagnostics
 
 The app writes `bookorbit.log` to the root of the device's USB storage
-(`build/bookorbit/pc/system/mnt/ext1` in the emulator). The log is cleared each time the app
+(`build/bookorbit/<sdk>/pc/system/mnt/ext1` in the emulator). The log is cleared each time the app
 starts. Every 10 seconds it records the frames rendered, memory use (`VmRSS`) and thread
 count. It also logs every request with its status and time, every Wi-Fi connect, and each
 time the book list switches A2 on or off while it scrolls (see `eink.h`).
