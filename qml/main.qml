@@ -134,7 +134,7 @@ Window {
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(1)
         anchors.right: parent.right
-        anchors.rightMargin: Units.dp(11)
+        anchors.rightMargin: Units.dp(9)   // 20px from the screen edge
 
         PopupMenuItem {
             visible: bookOrbit.signedIn

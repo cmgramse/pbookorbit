@@ -12,7 +12,7 @@ Item {
     signal clicked()
 
     width: parent ? parent.width : 0
-    height: Units.dp(58)
+    height: Units.dp(50)   // 109px
     // Content width, so the menu can grow to fit its widest row
     implicitWidth: label.anchors.leftMargin + label.implicitWidth + label.anchors.rightMargin
 
@@ -23,8 +23,8 @@ Item {
         visible: mouse.pressed
     }
     Image {
-        // Icon centred dp(31) from the row's left edge, as in the library app's menu
-        x: Units.dp(31) - width / 2
+        // Icon centred 58px from the row's left edge, as in the library app's menu
+        x: Units.dp(26) - width / 2
         anchors.verticalCenter: parent.verticalCenter
         visible: item.icon !== ""
         source: item.icon === "" ? "" : "image://theme/" + item.icon + (mouse.pressed ? "@inverted" : "")
@@ -32,9 +32,10 @@ Item {
     Text {
         id: label
         anchors.left: parent.left
-        anchors.leftMargin: item.icon !== "" ? Units.dp(60) : Units.dp(21)
+        // Label at 112px with an icon, 39px without
+        anchors.leftMargin: item.icon !== "" ? Units.dp(52) : Units.dp(18)
         anchors.right: parent.right
-        anchors.rightMargin: Units.dp(11)
+        anchors.rightMargin: Units.dp(10)   // 21px
         anchors.verticalCenter: parent.verticalCenter
         color: mouse.pressed ? "white" : "black"
         font.pointSize: 9
@@ -46,7 +47,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.leftMargin: Units.dp(4)
+        anchors.leftMargin: Units.dp(4)    // 8px
         anchors.rightMargin: Units.dp(4)
         height: 1
         color: "#7f7f7f"

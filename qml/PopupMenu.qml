@@ -10,9 +10,9 @@ Rectangle {
     id: menu
     default property alias items: column.data
 
-    // At least dp(258) (the Sudoku menu, whose rows are short), otherwise as wide as the
+    // At least 484px (the Sudoku menu, whose rows are short), otherwise as wide as the
     // widest visible row (the library menu)
-    width: Math.max(Units.dp(258), contentWidth + 2 * (border.width + padding))
+    width: Math.max(Units.dp(222), contentWidth + 2 * (border.width + padding))
     readonly property real contentWidth: {
         let widest = 0
         for (const row of column.children) {
@@ -22,9 +22,9 @@ Rectangle {
         return widest
     }
     height: column.height + 2 * (border.width + padding)
-    readonly property int padding: Units.dp(8)
-    radius: Units.dp(11)
-    border.width: Units.dp(5)
+    readonly property int padding: Units.dp(8)  // 16px
+    radius: Units.dp(9)  // 20px
+    border.width: Units.dp(4)  // 9px
     border.color: "black"
     color: "white"
 

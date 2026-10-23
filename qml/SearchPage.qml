@@ -50,7 +50,7 @@ Rectangle {
         IconButton {
             id: backButton
             // Chevron with a little space either side; the search box starts after it
-            x: Units.dp(8)
+            x: Units.dp(7)   // 15px
             anchors.verticalCenter: parent.verticalCenter
             icon: "back"
             pressedIcon: "back_inv"
@@ -63,8 +63,8 @@ Rectangle {
         // on its left, like the rest of the toolbar.
         Rectangle {
             id: searchBox
-            readonly property int thickBorder: Units.dp(2.5)
-            x: backButton.x + backButton.width + Units.dp(8)
+            readonly property int thickBorder: Units.dp(2)   // 5px
+            x: backButton.x + backButton.width + Units.dp(7)
             width: parent.width - x
             height: parent.height
             border.width: searchField.activeFocus ? thickBorder : 0
@@ -115,7 +115,7 @@ Rectangle {
         id: recentHeading
         anchors.top: header.bottom
         width: parent.width
-        height: Units.dp(65)
+        height: Units.dp(56)   // 122px
 
         Text {
             anchors.centerIn: parent
@@ -142,7 +142,7 @@ Rectangle {
 
         delegate: Item {
             width: ListView.view.width
-            height: Units.dp(65)
+            height: Units.dp(56)
 
             Rectangle {
                 anchors.fill: parent
@@ -151,9 +151,9 @@ Rectangle {
             }
             Text {
                 anchors.left: parent.left
-                anchors.leftMargin: Units.dp(49)
+                anchors.leftMargin: Units.dp(42)   // 92px
                 anchors.right: parent.right
-                anchors.rightMargin: Units.dp(30)
+                anchors.rightMargin: Units.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
                 text: modelData
                 color: rowMouse.pressed ? "white" : "black"
@@ -165,8 +165,8 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: Units.dp(30)
-                anchors.rightMargin: Units.dp(30)
+                anchors.leftMargin: Units.dp(26)   // 57px
+                anchors.rightMargin: Units.dp(26)
                 height: 1
                 color: "#7f7f7f"
             }
