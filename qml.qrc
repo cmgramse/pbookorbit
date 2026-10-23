@@ -1,5 +1,10 @@
 <RCC>
     <qresource prefix="/">
         <file>main.qml</file>
+        <file>AppHeader.qml</file>
+        <file>IconButton.qml</file>
+        <file>units.js</file>
+        <file>PopupMenu.qml</file>
+        <file>PopupMenuItem.qml</file>
     </qresource>
 </RCC>

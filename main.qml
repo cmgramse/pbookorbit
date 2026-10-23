@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import "units.js" as Units
 
 Window {
     id: root
@@ -26,14 +27,20 @@ Window {
     readonly property bool typing: usernameField.activeFocus || passwordField.activeFocus
     onTypingChanged: Qt.callLater(() => eink.setDynamicUpdates(root.typing))
 
+    // The book list is the only page for now, so home just goes back to its top
+    function goHome() {
+        menu.visible = false
+        bookList.positionViewAtBeginning()
+    }
+
     // Big, flat, black-on-white button that suits e-ink
     component PbButton: Rectangle {
         property alias text: label.text
         signal clicked()
 
-        implicitWidth: 360; implicitHeight: 100
-        radius: 12
-        border.width: 3
+        implicitWidth: Units.dp(190); implicitHeight: Units.dp(52)
+        radius: Units.dp(6)
+        border.width: Units.dp(2)
         color: mouse.pressed ? "black" : "white"
         opacity: enabled ? 1 : 0.4
 
@@ -46,16 +53,25 @@ Window {
         MouseArea { id: mouse; anchors.fill: parent; onClicked: parent.clicked() }
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 40
-        spacing: 24
+    AppHeader {
+        id: header
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        title: "PocketBook × BookOrbit"
+        menuOpen: menu.visible
+        onHomeClicked: root.goHome()
+        onMenuClicked: menu.visible = !menu.visible
+    }
 
-        Text {
-            text: "BookOrbit"
-            font.pointSize: 14
-            font.bold: true
-        }
+    ColumnLayout {
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Units.dp(20)
+        spacing: Units.dp(12)
+
         Text {
             text: bookOrbit.signedIn ? bookOrbit.username + " @ " + bookOrbit.serverUrl
                                      : bookOrbit.serverUrl
@@ -74,7 +90,7 @@ Window {
         // Signed out: the same username and password as the BookOrbit website
         ColumnLayout {
             visible: !bookOrbit.signedIn
-            spacing: 24
+            spacing: Units.dp(12)
             Layout.fillWidth: true
 
             TextField {
@@ -116,9 +132,10 @@ Window {
             boundsBehavior: Flickable.StopAtBounds
             model: bookOrbit.books
 
-            // Fast black-and-white updates for just the list while it scrolls
+            // Fast black-and-white updates for just the list while it scrolls. A2 takes
+            // screen coordinates, hence mapToGlobal (as in the SDK's qml_test example).
             onMovementStarted: {
-                const pos = mapToItem(null, 0, 0)
+                const pos = mapToGlobal(0, 0)
                 eink.enterA2ForFlick(pos.x, pos.y, width, height)
             }
             // Sent once the momentum has stopped, not when the finger lifts
@@ -126,7 +143,7 @@ Window {
             onVisibleChanged: if (!visible) eink.leaveA2()
             delegate: Column {
                 width: ListView.view.width
-                bottomPadding: 16
+                bottomPadding: Units.dp(8)
                 Text {
                     width: parent.width
                     text: modelData.title
@@ -145,20 +162,48 @@ Window {
         }
         Item { visible: !bookOrbit.signedIn; Layout.fillHeight: true }
 
-        RowLayout {
-            spacing: 24
-            PbButton {
-                visible: bookOrbit.signedIn
-                text: "Refresh"
-                enabled: !bookOrbit.busy
-                onClicked: bookOrbit.refreshBooks()
+        PbButton {
+            visible: bookOrbit.signedIn
+            text: "Refresh"
+            enabled: !bookOrbit.busy
+            onClicked: bookOrbit.refreshBooks()
+        }
+    }
+
+    // Header menu: drops down from the menu button. As in the system apps, the page
+    // below the header fades while it is open; a tap there closes it.
+    Rectangle {
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: menu.visible
+        color: Qt.rgba(1, 1, 1, 0.6)
+        MouseArea {
+            anchors.fill: parent
+            onClicked: menu.visible = false
+        }
+    }
+    PopupMenu {
+        id: menu
+        visible: false
+        anchors.top: header.bottom
+        anchors.topMargin: Units.dp(1)
+        anchors.right: parent.right
+        anchors.rightMargin: Units.dp(11)
+
+        PopupMenuItem {
+            visible: bookOrbit.signedIn
+            text: "Sign out"
+            onClicked: {
+                menu.visible = false
+                bookOrbit.signOut()
             }
-            PbButton {
-                visible: bookOrbit.signedIn
-                text: "Sign out"
-                onClicked: bookOrbit.signOut()
-            }
-            PbButton { text: "Exit"; onClicked: Qt.quit() }
+        }
+        PopupMenuItem {
+            text: "Exit"
+            showSeparator: false
+            onClicked: Qt.quit()
         }
     }
 }

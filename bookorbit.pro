@@ -2,8 +2,8 @@ TARGET = bookorbit.app
 QT += quick network
 CONFIG += c++17 qtquickcompiler
 
-SOURCES += main.cpp bookorbitclient.cpp diagnostics.cpp eink.cpp
-HEADERS += bookorbitclient.h diagnostics.h eink.h
+SOURCES += main.cpp bookorbitclient.cpp diagnostics.cpp eink.cpp themeimageprovider.cpp
+HEADERS += bookorbitclient.h diagnostics.h eink.h themeimageprovider.h
 RESOURCES += qml.qrc
 
 contains(PLATFORM, arm) {

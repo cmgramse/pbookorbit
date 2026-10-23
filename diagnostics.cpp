@@ -3,6 +3,7 @@
 #include <inkview.h>
 #include <QDateTime>
 #include <QFile>
+#include <QtLogging>
 #include <QQuickWindow>
 #include <QTimer>
 #include <atomic>
@@ -32,6 +33,14 @@ void log(const QString &message)
     } else {
         fputs(line.constData(), stderr);
     }
+}
+
+void captureQtMessages()
+{
+    qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &message) {
+        if (type != QtDebugMsg && type != QtInfoMsg)
+            log("Qt: " + message);
+    });
 }
 
 // VmRSS and Threads from /proc/self/status
