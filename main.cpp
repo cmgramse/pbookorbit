@@ -1,5 +1,6 @@
 #include <inkview.h>
 #include <QFont>
+#include <QFontInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -51,6 +52,8 @@ int main(int argc, char *argv[])
     diagnostics::log(QString("screen %1x%2, panel height %3, dpi %4, scale %5")
                          .arg(ScreenWidth()).arg(ScreenHeight()).arg(PanelHeight())
                          .arg(get_screen_dpi()).arg(get_screen_scale_factor()));
+    diagnostics::log(QString("font %1, Qt using %2")
+                         .arg(QString::fromUtf8(iv_get_default_font(FONT_FAMILY)), QFontInfo(app.font()).family()));
     client.start();
     return app.exec();
 }
