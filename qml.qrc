@@ -4,7 +4,11 @@
         <file>AppHeader.qml</file>
         <file>IconButton.qml</file>
         <file>units.js</file>
+        <file>LoginPage.qml</file>
+        <file>PillButton.qml</file>
+        <file>SectionHeading.qml</file>
         <file>PopupMenu.qml</file>
         <file>PopupMenuItem.qml</file>
+        <file>images/bookorbit-logo.png</file>
     </qresource>
 </RCC>

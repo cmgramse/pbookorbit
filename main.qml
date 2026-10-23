@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import "units.js" as Units
@@ -11,46 +10,15 @@ Window {
     height: windowHeight
     color: "white"
 
-    function signIn() {
-        if (bookOrbit.busy || usernameField.text === "" || passwordField.text === "")
-            return
-        // PbButton doesn't take focus, so the field would keep it and the system keyboard
-        // would stay up: move focus off the fields and close the keyboard first
-        root.contentItem.forceActiveFocus()
-        Qt.inputMethod.hide()
-        bookOrbit.signIn(usernameField.text, passwordField.text)
-        passwordField.text = ""
-    }
-
     // Quicker e-ink updates while typing. Applied with callLater because moving focus
     // from one field to the other briefly leaves neither focused.
-    readonly property bool typing: usernameField.activeFocus || passwordField.activeFocus
+    readonly property bool typing: loginPage.visible && loginPage.typing
     onTypingChanged: Qt.callLater(() => eink.setDynamicUpdates(root.typing))
 
     // The book list is the only page for now, so home just goes back to its top
     function goHome() {
         menu.visible = false
         bookList.positionViewAtBeginning()
-    }
-
-    // Big, flat, black-on-white button that suits e-ink
-    component PbButton: Rectangle {
-        property alias text: label.text
-        signal clicked()
-
-        implicitWidth: Units.dp(190); implicitHeight: Units.dp(52)
-        radius: Units.dp(6)
-        border.width: Units.dp(2)
-        color: mouse.pressed ? "black" : "white"
-        opacity: enabled ? 1 : 0.4
-
-        Text {
-            id: label
-            anchors.centerIn: parent
-            color: mouse.pressed ? "white" : "black"
-            font.pointSize: 9
-        }
-        MouseArea { id: mouse; anchors.fill: parent; onClicked: parent.clicked() }
     }
 
     AppHeader {
@@ -64,21 +32,26 @@ Window {
         onMenuClicked: menu.visible = !menu.visible
     }
 
+    // Signed out
+    LoginPage {
+        id: loginPage
+        visible: !bookOrbit.signedIn
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+    }
+
+    // Signed in: the home page, with the most recently added books
     ColumnLayout {
+        visible: bookOrbit.signedIn
         anchors.top: header.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: Units.dp(20)
         spacing: Units.dp(12)
-
-        Text {
-            text: bookOrbit.signedIn ? bookOrbit.username + " @ " + bookOrbit.serverUrl
-                                     : bookOrbit.serverUrl
-            font.pointSize: 8
-            elide: Text.ElideRight
-            Layout.fillWidth: true
-        }
+        
         Text {
             visible: bookOrbit.error !== "" || bookOrbit.busy
             text: bookOrbit.busy ? "Working…" : bookOrbit.error
@@ -86,46 +59,12 @@ Window {
             wrapMode: Text.Wrap
             Layout.fillWidth: true
         }
-
-        // Signed out: the same username and password as the BookOrbit website
-        ColumnLayout {
-            visible: !bookOrbit.signedIn
-            spacing: Units.dp(12)
-            Layout.fillWidth: true
-
-            TextField {
-                id: usernameField
-                placeholderText: "Username"
-                text: bookOrbit.username
-                font.pointSize: 9
-                Layout.fillWidth: true
-            }
-            TextField {
-                id: passwordField
-                placeholderText: "Password"
-                echoMode: TextInput.Password
-                font.pointSize: 9
-                Layout.fillWidth: true
-                onAccepted: root.signIn()
-            }
-            PbButton {
-                text: "Sign in"
-                enabled: !bookOrbit.busy && usernameField.text !== "" && passwordField.text !== ""
-                onClicked: root.signIn()
-            }
-        }
-
-        // Signed in: the most recently added books
-        Text {
-            visible: bookOrbit.signedIn
+        SectionHeading {
             // No count until the first page has loaded
             text: "Recently added" + (bookOrbit.totalBooks ? " (" + bookOrbit.books.length + " of " + bookOrbit.totalBooks + ")" : "")
-            font.pointSize: 10
-            font.bold: true
         }
         ListView {
             id: bookList
-            visible: bookOrbit.signedIn
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -160,14 +99,6 @@ Window {
                     elide: Text.ElideRight
                 }
             }
-        }
-        Item { visible: !bookOrbit.signedIn; Layout.fillHeight: true }
-
-        PbButton {
-            visible: bookOrbit.signedIn
-            text: "Refresh"
-            enabled: !bookOrbit.busy
-            onClicked: bookOrbit.refreshBooks()
         }
     }
 
