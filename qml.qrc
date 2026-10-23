@@ -10,6 +10,10 @@
         <file>qml/PopupMenu.qml</file>
         <file>qml/PopupMenuItem.qml</file>
         <file>qml/SearchPage.qml</file>
+        <file>qml/SubToolbar.qml</file>
+        <file>qml/MenuHeading.qml</file>
+        <file>qml/RadioMenuItem.qml</file>
+        <file>qml/TabFooter.qml</file>
         <file>images/bookorbit-logo.png</file>
     </qresource>
 </RCC>
