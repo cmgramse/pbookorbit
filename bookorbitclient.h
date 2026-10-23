@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QJsonDocument>
+#include <QHash>
 #include <QList>
 #include <QNetworkAccessManager>
 #include <QObject>
@@ -58,6 +59,10 @@ public:
     // Appends the next page, if there is one and none is loading
     Q_INVOKABLE void loadMoreBooks();
 
+    // Authenticated GET for raw data such as cover thumbnails. Doesn't count as busy, so
+    // background downloads don't redraw the status line.
+    void download(const QString &path, DataHandler onSuccess, ErrorHandler onError);
+
 signals:
     void usernameChanged();
     void signedInChanged();
@@ -66,16 +71,24 @@ signals:
     void booksChanged();
 
 private:
-    // Sends a request; withToken adds the access token (login, refresh and logout go without)
+    // Sends a request; withToken adds the access token (login, refresh and logout go
+    // without); quiet requests don't count as busy
     void send(const QByteArray &method, const QString &path, const QJsonDocument &body,
-              DataHandler onSuccess, ErrorHandler onError, bool withToken = false);
+              DataHandler onSuccess, ErrorHandler onError, bool withToken = false,
+              bool quiet = false);
     // Sends a request with the access token, refreshing it once if the server rejects it
     void call(const QByteArray &method, const QString &path, const QJsonDocument &body,
-              DataHandler onSuccess, ErrorHandler onError, bool retried = false);
+              DataHandler onSuccess, ErrorHandler onError, bool quiet = false,
+              bool retried = false);
     // call() for JSON replies; errors go to the error property
     void callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
                   std::function<void(const QJsonDocument &)> onSuccess);
     void loadBooksPage(int page);
+    // Loads every author's sort name (GET /authors), then calls then
+    void loadAuthorSortNames(int page, std::function<void()> then);
+    // Adds the fields the book rows show: section, sectionLabel,
+    // statusText, seriesText, onDevice
+    QVariantMap decorateBook(const QVariantMap &book) const;
     // Swaps the refresh token for a new access token, then runs the callbacks queued meanwhile
     void refreshSession(std::function<void()> then);
     void applyCredentials(const QJsonObject &credentials);
@@ -100,6 +113,8 @@ private:
     bool m_loadingPage = false;
     // Bumped by every reload, so pages from an older query are dropped
     int m_queryGeneration = 0;
+    // Author name -> the name the server sorts by: its sortName, or the name if it has none
+    QHash<QString, QString> m_authorSortNames;
     bool m_refreshing = false;
     QList<std::function<void()>> m_afterRefresh;
 };

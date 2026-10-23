@@ -2,6 +2,7 @@
 #include "diagnostics.h"
 
 #include <inkview.h>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -83,7 +84,35 @@ void BookOrbitClient::refreshBooks()
 {
     m_queryGeneration++;
     m_loadingPage = false;
+    // Author sections need the names the server sorts by, which the book list doesn't have
+    if (m_sortField == "author") {
+        const int generation = m_queryGeneration;
+        m_authorSortNames.clear();
+        loadAuthorSortNames(0, [this, generation]() {
+            if (generation == m_queryGeneration)
+                loadBooksPage(0);
+        });
+        return;
+    }
     loadBooksPage(0);
+}
+
+void BookOrbitClient::loadAuthorSortNames(int page, std::function<void()> then)
+{
+    // {items: [{name, sortName, ...}], total, page, size}; at most 100 a page, from page 0
+    callJson("GET", QString("/authors?page=%1&size=100").arg(page), QJsonDocument(),
+        [this, page, then](const QJsonDocument &doc) {
+            const QJsonObject result = doc.object();
+            for (const QJsonValue &author : result.value("items").toArray()) {
+                const QString name = author["name"].toString();
+                const QString sortName = author["sortName"].toString();
+                m_authorSortNames.insert(name, sortName.isEmpty() ? name : sortName);
+            }
+            if (m_authorSortNames.size() < result.value("total").toInt() && !result.value("items").toArray().isEmpty())
+                loadAuthorSortNames(page + 1, then);
+            else
+                then();
+        });
 }
 
 void BookOrbitClient::loadMoreBooks()
@@ -124,11 +153,86 @@ void BookOrbitClient::loadBooksPage(int page)
         const QJsonObject result = doc.object();
         if (page == 0)
             m_books.clear();
-        m_books += result.value("items").toArray().toVariantList();
+        for (const QJsonValue &item : result.value("items").toArray()) {
+            QVariantMap book = decorateBook(item.toObject().toVariantMap());
+            // First row of a section: carries the letter or date box
+            const QString section = book.value("section").toString();
+            book.insert("sectionStart", m_books.isEmpty() || m_books.last().toMap().value("section").toString() != section);
+            m_books.append(book);
+        }
         m_totalBooks = result.value("total").toInt();
         m_loadedPage = page;
         emit booksChanged();
     });
+}
+
+QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
+{
+    QVariantMap row = book;
+
+    // Section: the first letter for the A-Z sorts (# for anything else), the day for the
+    // date sorts. Author sort goes by the first author's sort name (see below).
+    QString section;
+    if (m_sortField == "title" || m_sortField == "author") {
+        QString key = book.value("title").toString();
+        if (m_sortField == "author") {
+            // The server sorts by the first author's sort name ("Clark, Andy"), or the name
+            // itself when there isn't one ("Cixin Liu")
+            const QStringList authors = book.value("authors").toStringList();
+            key = authors.isEmpty() ? QString() : m_authorSortNames.value(authors.first(), authors.first());
+        }
+        const QChar first = key.isEmpty() ? QChar() : key.at(0).toUpper();
+        section = first.isLetter() && first.unicode() < 128 ? QString(first) : "#";
+        row.insert("sectionLabel", section);
+    } else {
+        // Grouped by day, labelled like the system library: "2026/10/23", or "Never"
+        const QString field = m_sortField == "lastReadAt" ? "lastReadAt" : "addedAt";
+        const QDateTime when = QDateTime::fromString(book.value(field).toString(), Qt::ISODateWithMs);
+        if (when.isValid()) {
+            const QDate date = when.toLocalTime().date();
+            section = date.toString("yyyy-MM-dd");
+            row.insert("sectionLabel", date.toString("yyyy/MM/dd"));
+        } else {
+            section = "never";
+            row.insert("sectionLabel", "Never");
+        }
+    }
+    row.insert("section", section);
+
+    // Third line, as in the system library: reading status and series, either of which
+    // may be missing. "19% read | The Rising World - 2", "Completed", "Discworld - 13".
+    // Progress (0-100) counts whatever the status, as in BookOrbit's web app: reading
+    // doesn't always set a status.
+    const QString status = book.value("readStatus").toMap().value("status").toString();
+    const double progress = book.value("readingProgress").toDouble();
+    QString statusText;
+    if (status == "read" || status == "skimmed" || progress >= 100) {
+        statusText = "Completed";
+    } else if (status == "on_hold") {
+        statusText = "On hold";
+    } else if (status == "abandoned") {
+        statusText = "Abandoned";
+    } else if (progress > 0) {
+        // Never "0%" or "100%" for a book that is part read
+        statusText = QString("%1% read").arg(qBound(1, qRound(progress), 99));
+    } else if (status == "reading" || status == "rereading") {
+        statusText = "Reading";
+    }
+    QString seriesText = book.value("seriesName").toString();
+    if (!seriesText.isEmpty() && !book.value("seriesIndex").isNull())
+        seriesText += " - " + book.value("seriesIndex").toString();
+    row.insert("statusText", statusText);
+    row.insert("seriesText", seriesText);
+
+    // TODO: real on-device detection. Until then, a fixed random answer per book (the
+    // same every run) so the row layout can be developed.
+    row.insert("onDevice", qHash(book.value("id").toInt()) % 3 != 0);
+    return row;
+}
+
+void BookOrbitClient::download(const QString &path, DataHandler onSuccess, ErrorHandler onError)
+{
+    call("GET", path, QJsonDocument(), onSuccess, onError, true);
 }
 
 void BookOrbitClient::callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
@@ -151,12 +255,12 @@ void BookOrbitClient::callJson(const QByteArray &method, const QString &path, co
 }
 
 void BookOrbitClient::call(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           DataHandler onSuccess, ErrorHandler onError, bool retried)
+                           DataHandler onSuccess, ErrorHandler onError, bool quiet, bool retried)
 {
     if (m_refreshing) {
         m_afterRefresh.append([=]() {
             if (m_signedIn)
-                call(method, path, body, onSuccess, onError, retried);
+                call(method, path, body, onSuccess, onError, quiet, retried);
         });
         return;
     }
@@ -169,7 +273,7 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
         // e.g. offline): get one first. No retry if that fails, so no loop.
         refreshSession([=]() {
             if (m_signedIn && !m_accessToken.isEmpty())
-                call(method, path, body, onSuccess, onError, retried);
+                call(method, path, body, onSuccess, onError, quiet, retried);
         });
         return;
     }
@@ -178,12 +282,12 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
             // Access tokens last about 15 minutes: get a new one and try once more
             refreshSession([=]() {
                 if (m_signedIn)
-                    call(method, path, body, onSuccess, onError, true);
+                    call(method, path, body, onSuccess, onError, quiet, true);
             });
             return;
         }
         onError(status, message);
-    }, true);
+    }, true, quiet);
 }
 
 void BookOrbitClient::refreshSession(std::function<void()> then)
@@ -219,7 +323,7 @@ void BookOrbitClient::refreshSession(std::function<void()> then)
 }
 
 void BookOrbitClient::send(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           DataHandler onSuccess, ErrorHandler onError, bool withToken)
+                           DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet)
 {
 #ifndef EMULATOR
     // On the device, ask the system to bring up Wi-Fi first (shows its own dialog)
@@ -232,22 +336,30 @@ void BookOrbitClient::send(const QByteArray &method, const QString &path, const 
 #endif
 
     QNetworkRequest request(QUrl(m_serverUrl + "/api/v1" + path));
-    request.setRawHeader("Accept", "application/json");
+    // Downloads (the only quiet requests) take whatever the server sends, e.g. a JPEG
+    request.setRawHeader("Accept", quiet ? "*/*" : "application/json");
     if (withToken)
         request.setRawHeader("Authorization", "Bearer " + m_accessToken.toUtf8());
     if (!body.isNull())
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     QNetworkReply *reply = m_nam.sendCustomRequest(request, method, body.isNull() ? QByteArray() : body.toJson(QJsonDocument::Compact));
-    m_pending++;
-    emit busyChanged();
+    if (!quiet) {
+        m_pending++;
+        emit busyChanged();
+    }
     QElapsedTimer timer;
     timer.start();
 
     connect(reply, &QNetworkReply::finished, this, [=]() {
         reply->deleteLater();
         // Clear busy only once the result (or error) has been applied
-        const auto done = qScopeGuard([this] { m_pending--; emit busyChanged(); });
+        const auto done = qScopeGuard([this, quiet] {
+            if (!quiet) {
+                m_pending--;
+                emit busyChanged();
+            }
+        });
 
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QByteArray data = reply->readAll();

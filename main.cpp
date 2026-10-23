@@ -9,6 +9,7 @@
 
 #include "bookorbitclient.h"
 #include "diagnostics.h"
+#include "covers.h"
 #include "eink.h"
 #include "themeimageprovider.h"
 
@@ -33,6 +34,8 @@ int main(int argc, char *argv[])
     BookOrbitClient client(qEnvironmentVariable("BOOKORBIT_SETTINGS",
                                                 QString::fromUtf8(CONFIGPATH "/bookorbit.ini")));
 
+    // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
+    Covers covers(&client, QString::fromUtf8(USERDATA "/cache/bookorbit-covers"));
     Eink eink;
     diagnostics::Log diagnosticsLog;
 
@@ -43,6 +46,7 @@ int main(int argc, char *argv[])
     // Leave room for the system status bar, as the SDK's browser-minimal example does
     engine.rootContext()->setContextProperty("windowHeight", ScreenHeight() - PanelHeight());
     engine.rootContext()->setContextProperty("bookOrbit", &client);
+    engine.rootContext()->setContextProperty("covers", &covers);
     engine.rootContext()->setContextProperty("eink", &eink);
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>

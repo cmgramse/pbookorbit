@@ -14,6 +14,7 @@
         <file>qml/MenuHeading.qml</file>
         <file>qml/RadioMenuItem.qml</file>
         <file>qml/TabFooter.qml</file>
+        <file>qml/BookRow.qml</file>
         <file>images/bookorbit-logo.png</file>
     </qresource>
 </RCC>

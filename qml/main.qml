@@ -150,32 +150,34 @@ Window {
         // Sent once the momentum has stopped, not when the finger lifts
         onMovementEnded: eink.leaveA2()
         onVisibleChanged: if (!visible) eink.leaveA2()
-        // ListView positions each row itself, so the side inset goes on the content inside
-        delegate: Item {
-            width: ListView.view.width
-            height: book.height
-
-            Column {
-                id: book
-                x: Units.dp(26)
-                width: parent.width - 2 * x
-                bottomPadding: Units.dp(8)
-                Text {
-                    width: parent.width
-                    text: modelData.title
-                    font.pointSize: 9
-                    font.bold: true
-                    elide: Text.ElideRight
-                }
-                Text {
-                    width: parent.width
-                    text: modelData.authors.join(", ")
-                          + (modelData.files.length ? "  ·  " + modelData.files.map(f => f.format).join(", ") : "")
-                    font.pointSize: 7
-                    elide: Text.ElideRight
-                }
-            }
+        delegate: BookRow {
+            required property var modelData
+            book: modelData
         }
+    }
+
+    // Scrollbar on the far right, as in the system library. Sized for the whole library, not
+    // just the pages loaded so far: rows are all the same height, so the full list is the
+    // header plus one row height per book.
+    // TODO: floating buttons at the bottom left and right that scroll a whole page, as in
+    // the system library (see TODO.md)
+    Rectangle {
+        id: scrollbar
+        readonly property real headerHeight: bookList.headerItem ? bookList.headerItem.height : 0
+        readonly property real rowHeight: bookList.count > 0
+                                          ? (bookList.contentHeight - headerHeight) / bookList.count : 0
+        readonly property real fullHeight: headerHeight + rowHeight * bookOrbit.totalBooks
+        readonly property real trackTop: bookList.y + Units.dp(7)
+        readonly property real trackHeight: bookList.height - 2 * Units.dp(7)
+        readonly property real scrolled: Math.max(0, Math.min(1,
+            (bookList.contentY - bookList.originY) / Math.max(1, fullHeight - bookList.height)))
+
+        visible: bookList.visible && rowHeight > 0 && fullHeight > bookList.height
+        x: parent.width - Units.dp(8)
+        width: Units.dp(4)
+        height: Math.max(Units.dp(10), trackHeight * bookList.height / Math.max(1, fullHeight))
+        y: trackTop + (trackHeight - height) * scrolled
+        color: "black"
     }
 
     TabFooter {
