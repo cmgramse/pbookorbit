@@ -21,16 +21,16 @@ BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     m_nam.setTransferTimeout(30000);
     m_username = m_settings.value("username").toString();
     m_refreshToken = m_settings.value("refreshToken").toString();
+    // A saved session counts as signed in straight away, so the app opens on the book list.
+    // If the server has since rejected it, the first request finds out and signs out.
+    m_signedIn = !m_refreshToken.isEmpty();
 }
 
 void BookOrbitClient::start()
 {
-    if (m_refreshToken.isEmpty())
-        return;
-    refreshSession([this]() {
-        if (m_signedIn)
-            refreshBooks();
-    });
+    // The first request gets an access token from the saved session
+    if (m_signedIn)
+        refreshBooks();
 }
 
 void BookOrbitClient::signIn(const QString &username, const QString &password)
@@ -95,7 +95,16 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
         return;
     }
     if (m_accessToken.isEmpty()) {
-        setError("Not signed in");
+        if (m_refreshToken.isEmpty()) {
+            setError("Not signed in");
+            return;
+        }
+        // Saved session, but no access token yet this run (or the last refresh failed,
+        // e.g. offline): get one first. No retry if that fails, so no loop.
+        refreshSession([=]() {
+            if (m_signedIn && !m_accessToken.isEmpty())
+                call(method, path, body, onSuccess, retried);
+        });
         return;
     }
     send(method, path, body, onSuccess, [=](int status, const QString &message) {

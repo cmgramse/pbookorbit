@@ -37,7 +37,7 @@ public:
     QVariantList books() const { return m_books; }
     int totalBooks() const { return m_totalBooks; }
 
-    // Resumes the saved session, if there is one, and loads the book list
+    // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
     Q_INVOKABLE void signIn(const QString &username, const QString &password);
     Q_INVOKABLE void signOut();

@@ -118,7 +118,8 @@ Window {
         // Signed in: the most recently added books
         Text {
             visible: bookOrbit.signedIn
-            text: "Recently added (" + bookOrbit.books.length + " of " + bookOrbit.totalBooks + ")"
+            // No count until the first page has loaded
+            text: "Recently added" + (bookOrbit.totalBooks ? " (" + bookOrbit.books.length + " of " + bookOrbit.totalBooks + ")" : "")
             font.pointSize: 10
             font.bold: true
         }
