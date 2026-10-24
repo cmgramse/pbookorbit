@@ -2,6 +2,25 @@
 
 static const int BOOK_ROLE = Qt::UserRole + 1;
 
+// What a row shows before its page arrives: nothing, but every field BookRow reads is there
+static const QVariantMap &placeholder()
+{
+    static const QVariantMap book{
+        {"loaded", false},
+        {"id", -1},
+        {"title", QString()},
+        {"authors", QStringList()},
+        {"statusText", QString()},
+        {"seriesText", QString()},
+        {"hasCover", false},
+        {"coverVersion", QString()},
+        {"onDevice", false},
+        {"sectionStart", false},
+        {"sectionLabel", QString()},
+    };
+    return book;
+}
+
 int BookListModel::rowCount(const QModelIndex &parent) const
 {
     return parent.isValid() ? 0 : m_books.size();
@@ -11,7 +30,8 @@ QVariant BookListModel::data(const QModelIndex &index, int role) const
 {
     if (role != BOOK_ROLE || !index.isValid() || index.row() >= m_books.size())
         return QVariant();
-    return m_books.at(index.row());
+    const QVariant &book = m_books.at(index.row());
+    return book.isValid() ? book : QVariant(placeholder());
 }
 
 QHash<int, QByteArray> BookListModel::roleNames() const
@@ -19,25 +39,44 @@ QHash<int, QByteArray> BookListModel::roleNames() const
     return {{BOOK_ROLE, "book"}};
 }
 
-QVariantMap BookListModel::last() const
+bool BookListModel::isLoaded(int row) const
 {
-    return m_books.isEmpty() ? QVariantMap() : m_books.last().toMap();
+    return row >= 0 && row < m_books.size() && m_books.at(row).isValid();
 }
 
-void BookListModel::append(const QVariantList &books)
+QVariantMap BookListModel::book(int row) const
 {
-    if (books.isEmpty())
-        return;
-    beginInsertRows(QModelIndex(), m_books.size(), m_books.size() + books.size() - 1);
-    m_books += books;
-    endInsertRows();
+    return isLoaded(row) ? m_books.at(row).toMap() : QVariantMap();
 }
 
-void BookListModel::clear()
+void BookListModel::reset(int count)
 {
-    if (m_books.isEmpty())
-        return;
     beginResetModel();
-    m_books.clear();
+    m_books = QVariantList(count);
     endResetModel();
+}
+
+void BookListModel::setBooks(int first, const QVariantList &books)
+{
+    const int last = qMin(first + int(books.size()), int(m_books.size())) - 1;
+    if (first < 0 || last < first)
+        return;
+    for (int row = first; row <= last; row++) {
+        QVariantMap book = books.at(row - first).toMap();
+        book.insert("loaded", true);
+        m_books[row] = book;
+    }
+    emit dataChanged(index(first), index(last));
+}
+
+void BookListModel::setField(int row, const QString &name, const QVariant &value)
+{
+    if (!isLoaded(row))
+        return;
+    QVariantMap book = m_books.at(row).toMap();
+    if (book.value(name) == value)
+        return;
+    book.insert(name, value);
+    m_books[row] = book;
+    emit dataChanged(index(row), index(row));
 }

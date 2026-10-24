@@ -7,7 +7,10 @@
   `bookorbitclient.cpp`). Record the books the app downloads, and possibly match the
   device's own library.
 - Views: Collections, Series and Authors in the footer still show the book list.
-- A–Z index for the letter sorts, to jump to a letter.
+- Libraries: the list shows the first library (`loadLibrary()` in `bookorbitclient.cpp`).
+  Choose one when the server has several.
+- Jump rail: dragging along it, and jumping by date for the date sorts (the jump-buckets
+  endpoint returns days or months for those).
 - Search: run searches and keep real recent searches (sample terms for now).
 - Make the server address configurable (`DEFAULT_SERVER_URL` in `bookorbitclient.cpp`).
 - Test data for reading status: the `app` test account has no reading progress or

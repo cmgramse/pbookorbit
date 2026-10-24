@@ -14,7 +14,7 @@
 // TODO: make the server configurable
 static const char *DEFAULT_SERVER_URL = "https://books.example.com";
 
-// Books per request to /books/query; more pages load as the list scrolls
+// Books per request for the book list; pages load as the list scrolls to them
 static const int BOOKS_PAGE_SIZE = 40;
 
 BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
@@ -83,53 +83,52 @@ void BookOrbitClient::setBookQuery(const QString &sortField, const QStringList &
 void BookOrbitClient::refreshBooks()
 {
     m_queryGeneration++;
-    m_loadingPage = false;
-    // Author sections need the names the server sorts by, which the book list doesn't have
-    if (m_sortField == "author") {
-        const int generation = m_queryGeneration;
-        m_authorSortNames.clear();
-        loadAuthorSortNames(0, [this, generation]() {
-            if (generation == m_queryGeneration)
-                loadBooksPage(0);
-        });
+    m_loadedPages.clear();
+    m_loadingPages.clear();
+    const int generation = m_queryGeneration;
+    loadLibrary([this, generation]() {
+        if (generation != m_queryGeneration)
+            return;
+        // The A-Z sorts need their sections first: they say which rows start one
+        if (letterSections()) {
+            loadJumpSections([this, generation]() {
+                if (generation == m_queryGeneration)
+                    loadBooksPage(0);
+            });
+        } else {
+            m_sectionStarts.clear();
+            m_jumpSections.clear();
+            emit jumpSectionsChanged();
+            loadBooksPage(0);
+        }
+    });
+}
+
+void BookOrbitClient::loadLibrary(std::function<void()> then)
+{
+    if (m_libraryId >= 0) {
+        then();
         return;
     }
-    loadBooksPage(0);
+    // [{id, name, bookCount, ...}] in the user's order.
+    // TODO: choose the library when there is more than one; this shows the first.
+    callJson("GET", "/libraries", QJsonDocument(), [this, then](const QJsonDocument &doc) {
+        const QJsonArray libraries = doc.array();
+        if (libraries.isEmpty()) {
+            setError("No libraries on this server");
+            return;
+        }
+        m_libraryId = libraries.first().toObject().value("id").toInt();
+        then();
+    });
 }
 
-void BookOrbitClient::loadAuthorSortNames(int page, std::function<void()> then)
+QJsonObject BookOrbitClient::bookQuery() const
 {
-    // {items: [{name, sortName, ...}], total, page, size}; at most 100 a page, from page 0
-    callJson("GET", QString("/authors?page=%1&size=100").arg(page), QJsonDocument(),
-        [this, page, then](const QJsonDocument &doc) {
-            const QJsonObject result = doc.object();
-            for (const QJsonValue &author : result.value("items").toArray()) {
-                const QString name = author["name"].toString();
-                const QString sortName = author["sortName"].toString();
-                m_authorSortNames.insert(name, sortName.isEmpty() ? name : sortName);
-            }
-            if (m_authorSortNames.size() < result.value("total").toInt() && !result.value("items").toArray().isEmpty())
-                loadAuthorSortNames(page + 1, then);
-            else
-                then();
-        });
-}
-
-void BookOrbitClient::loadMoreBooks()
-{
-    if (!m_loadingPage && hasMoreBooks())
-        loadBooksPage(m_loadedPage + 1);
-}
-
-void BookOrbitClient::loadBooksPage(int page)
-{
-    // Same query the web client sends: returns {items: [...], total, page, size}. Pages
-    // count from 0, as in the web client: page 1 is the second page.
-    // Recently read and date added put the newest first; the A-Z sorts go ascending.
+    // Recently read and date added put the newest first; the A-Z sorts go ascending
     const bool newestFirst = m_sortField == "addedAt" || m_sortField == "lastReadAt";
     QJsonObject query{
         {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", newestFirst ? "desc" : "asc"}}}},
-        {"pagination", QJsonObject{{"page", page}, {"size", BOOKS_PAGE_SIZE}}},
     };
     if (!m_formats.isEmpty()) {
         query.insert("filter", QJsonObject{
@@ -143,53 +142,95 @@ void BookOrbitClient::loadBooksPage(int page)
             }}},
         });
     }
+    return query;
+}
 
-    m_loadingPage = true;
+void BookOrbitClient::loadJumpSections(std::function<void()> then)
+{
+    // As BookOrbit's web client asks for its jump rail: the list query plus maxBuckets.
+    // Returns {buckets: [{key, label, index}], total, kind: "letter"}, index being the
+    // section's first row. Sections follow the server's own sort keys (an author's sort
+    // name, say), so they always match the list.
+    QJsonObject query = bookQuery();
+    query.insert("pagination", QJsonObject{{"page", 0}, {"size", BOOKS_PAGE_SIZE}});
+    query.insert("maxBuckets", 64);
+    callJson("POST", QString("/libraries/%1/books/jump-buckets").arg(m_libraryId), QJsonDocument(query),
+        [this, then](const QJsonDocument &doc) {
+            const QJsonObject result = doc.object();
+            m_sectionStarts.clear();
+            m_jumpSections.clear();
+            if (result.value("kind").toString() == "letter") {
+                for (const QJsonValue &bucket : result.value("buckets").toArray()) {
+                    const QString label = bucket["label"].toString();
+                    const int index = bucket["index"].toInt();
+                    m_sectionStarts.insert(index, label);
+                    m_jumpSections.append(QVariantMap{{"label", label}, {"index", index}});
+                }
+            }
+            emit jumpSectionsChanged();
+            then();
+        });
+}
+
+void BookOrbitClient::loadBooks(int first, int last)
+{
+    // Pages of a new query wait for its first page, which sizes the list
+    if (m_listGeneration != m_queryGeneration)
+        return;
+    first = qMax(0, first);
+    last = qMin(last, m_books.count() - 1);
+    for (int page = first / BOOKS_PAGE_SIZE; page <= last / BOOKS_PAGE_SIZE && last >= 0; page++) {
+        if (!m_loadedPages.contains(page) && !m_loadingPages.contains(page))
+            loadBooksPage(page);
+    }
+}
+
+void BookOrbitClient::loadBooksPage(int page)
+{
+    // Same query the web client sends: returns {items: [...], total, page, size}. Pages
+    // count from 0, as in the web client: page 1 is the second page.
+    QJsonObject query = bookQuery();
+    query.insert("pagination", QJsonObject{{"page", page}, {"size", BOOKS_PAGE_SIZE}});
+
+    m_loadingPages.insert(page);
     const int generation = m_queryGeneration;
-    callJson("POST", "/books/query", QJsonDocument(query), [this, page, generation](const QJsonDocument &doc) {
-        if (generation != m_queryGeneration)
-            return;   // the sort or filter changed since this was asked for
-        m_loadingPage = false;
-        const QJsonObject result = doc.object();
-        if (page == 0)
-            m_books.clear();
-        QVariantList books;
-        // Sections are never empty, so the first book always starts one
-        QString previousSection = m_books.last().value("section").toString();
-        for (const QJsonValue &item : result.value("items").toArray()) {
-            QVariantMap book = decorateBook(item.toObject().toVariantMap());
-            // First row of a section: carries the letter or date box
-            const QString section = book.value("section").toString();
-            book.insert("sectionStart", section != previousSection);
-            previousSection = section;
-            books.append(book);
-        }
-        m_books.append(books);
-        m_totalBooks = result.value("total").toInt();
-        m_loadedPage = page;
-        emit booksChanged();
-    });
+    callJson("POST", QString("/libraries/%1/books").arg(m_libraryId), QJsonDocument(query),
+        [this, page, generation](const QJsonDocument &doc) {
+            if (generation != m_queryGeneration)
+                return;   // the sort or filter changed since this was asked for
+            m_loadingPages.remove(page);
+            m_loadedPages.insert(page);
+            const QJsonObject result = doc.object();
+            // The first page of a new query replaces the list with one of the right length
+            if (m_listGeneration != generation) {
+                m_listGeneration = generation;
+                m_totalBooks = result.value("total").toInt();
+                m_books.reset(m_totalBooks);
+            }
+            QVariantList books;
+            for (const QJsonValue &item : result.value("items").toArray())
+                books.append(decorateBook(item.toObject().toVariantMap()));
+            const int first = page * BOOKS_PAGE_SIZE;
+            m_books.setBooks(first, books);
+            // Also the row after the page, whose section start depends on the last one here
+            updateSectionStarts(first, first + int(books.size()));
+            emit booksChanged();
+        },
+        [this, page, generation]() {
+            if (generation == m_queryGeneration)
+                m_loadingPages.remove(page);   // try again when it is next on screen
+        });
 }
 
 QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
 {
     QVariantMap row = book;
 
-    // Section: the first letter for the A-Z sorts (# for anything else), the day for the
-    // date sorts. Author sort goes by the first author's sort name (see below).
+    // Section, for the date sorts: the day. The A-Z sorts take theirs from the jump
+    // sections instead (see updateSectionStarts).
     QString section;
-    if (m_sortField == "title" || m_sortField == "author") {
-        QString key = book.value("title").toString();
-        if (m_sortField == "author") {
-            // The server sorts by the first author's sort name ("Clark, Andy"), or the name
-            // itself when there isn't one ("Cixin Liu")
-            const QStringList authors = book.value("authors").toStringList();
-            key = authors.isEmpty() ? QString() : m_authorSortNames.value(authors.first(), authors.first());
-        }
-        const QChar first = key.isEmpty() ? QChar() : key.at(0).toUpper();
-        section = first.isLetter() && first.unicode() < 128 ? QString(first) : "#";
-        row.insert("sectionLabel", section);
-    } else {
+    row.insert("sectionLabel", QString());
+    if (!letterSections()) {
         // Grouped by day, labelled like the system library: "2026/10/23", or "Never"
         const QString field = m_sortField == "lastReadAt" ? "lastReadAt" : "addedAt";
         const QDateTime when = QDateTime::fromString(book.value(field).toString(), Qt::ISODateWithMs);
@@ -203,6 +244,7 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
         }
     }
     row.insert("section", section);
+    row.insert("sectionStart", false);
 
     // Third line, as in the system library: reading status and series, either of which
     // may be missing. "19% read | The Rising World - 2", "Completed", "Discworld - 13".
@@ -235,27 +277,49 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
     return row;
 }
 
+void BookOrbitClient::updateSectionStarts(int first, int last)
+{
+    for (int row = qMax(0, first); row <= last && row < m_books.count(); row++) {
+        if (!m_books.isLoaded(row))
+            continue;
+        if (letterSections()) {
+            m_books.setField(row, "sectionStart", m_sectionStarts.contains(row));
+            m_books.setField(row, "sectionLabel", m_sectionStarts.value(row));
+        } else {
+            // A new day, if the row before is known to be a different one. Until that row
+            // loads, no box: its page fills this in.
+            const QString section = m_books.book(row).value("section").toString();
+            m_books.setField(row, "sectionStart", row == 0
+                || (m_books.isLoaded(row - 1) && m_books.book(row - 1).value("section").toString() != section));
+        }
+    }
+}
+
 void BookOrbitClient::download(const QString &path, DataHandler onSuccess, ErrorHandler onError)
 {
     call("GET", path, QJsonDocument(), onSuccess, onError, true);
 }
 
 void BookOrbitClient::callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                               std::function<void(const QJsonDocument &)> onSuccess)
+                               std::function<void(const QJsonDocument &)> onSuccess,
+                               std::function<void()> onFailed)
 {
     call(method, path, body,
-        [this, onSuccess](const QByteArray &data) {
+        [this, onSuccess, onFailed](const QByteArray &data) {
             QJsonParseError parseError;
             const QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
             if (parseError.error != QJsonParseError::NoError) {
                 setError("Unexpected response from server: " + parseError.errorString());
+                if (onFailed)
+                    onFailed();
                 return;
             }
             onSuccess(doc);
         },
-        [this](int, const QString &message) {
-            m_loadingPage = false;
+        [this, onFailed](int, const QString &message) {
             setError(message);
+            if (onFailed)
+                onFailed();
         });
 }
 
@@ -405,10 +469,16 @@ void BookOrbitClient::clearSession()
     m_refreshToken.clear();
     m_settings.remove("refreshToken");
     m_settings.sync();
-    m_books.clear();
+    m_books.reset(0);
     m_totalBooks = 0;
-    m_loadedPage = -1;
+    m_libraryId = -1;
+    m_loadedPages.clear();
+    m_loadingPages.clear();
     m_queryGeneration++;
+    m_listGeneration = -1;
+    m_sectionStarts.clear();
+    m_jumpSections.clear();
+    emit jumpSectionsChanged();
     emit booksChanged();
     setSignedIn(false);
 }

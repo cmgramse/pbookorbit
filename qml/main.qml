@@ -109,11 +109,27 @@ Window {
         boundsBehavior: Flickable.StopAtBounds
         model: bookOrbit.books
 
-        // Load the next page while there is still a screenful to go
-        onContentYChanged: {
-            if (contentY + 2 * height > contentHeight)
-                bookOrbit.loadMoreBooks()
+        // Load the books on screen, and a screenful either side, once scrolling pauses:
+        // a fast flick doesn't fetch every page it passes
+        function loadVisibleBooks() {
+            if (count === 0)
+                return
+            let first = indexAt(width / 2, contentY)
+            let last = indexAt(width / 2, contentY + height - 1)
+            if (first < 0)
+                first = 0   // the sub-toolbar is at the top
+            if (last < 0)
+                last = count - 1
+            const screenful = last - first + 1
+            bookOrbit.loadBooks(first - screenful, last + screenful)
         }
+        Timer {
+            id: loadTimer
+            interval: 150
+            onTriggered: bookList.loadVisibleBooks()
+        }
+        onContentYChanged: loadTimer.restart()
+        onCountChanged: loadTimer.restart()
 
         // Filter and sort bar, and any status line, scroll away with the books. The first
         // row sits right under the bar, as in the system library.
@@ -159,28 +175,82 @@ Window {
         }
     }
 
-    // Scrollbar on the far right, as in the system library. Sized for the whole library, not
-    // just the pages loaded so far: rows are all the same height, so the full list is the
-    // header plus one row height per book.
+    // Scrollbar on the far right, as in the system library. The list has a row for every
+    // book, loaded or not, so it covers the whole library.
     // TODO: floating buttons at the bottom left and right that scroll a whole page, as in
     // the system library (see TODO.md)
     Rectangle {
         id: scrollbar
-        readonly property real headerHeight: bookList.headerItem ? bookList.headerItem.height : 0
-        readonly property real rowHeight: bookList.count > 0
-                                          ? (bookList.contentHeight - headerHeight) / bookList.count : 0
-        readonly property real fullHeight: headerHeight + rowHeight * bookOrbit.totalBooks
         readonly property real trackTop: bookList.y + Units.dp(7)
         readonly property real trackHeight: bookList.height - 2 * Units.dp(7)
         readonly property real scrolled: Math.max(0, Math.min(1,
-            (bookList.contentY - bookList.originY) / Math.max(1, fullHeight - bookList.height)))
+            (bookList.contentY - bookList.originY) / Math.max(1, bookList.contentHeight - bookList.height)))
 
-        visible: bookList.visible && rowHeight > 0 && fullHeight > bookList.height
+        visible: bookList.visible && bookList.contentHeight > bookList.height
         x: parent.width - Units.dp(8)
         width: Units.dp(4)
-        height: Math.max(Units.dp(10), trackHeight * bookList.height / Math.max(1, fullHeight))
+        height: Math.max(Units.dp(10), trackHeight * bookList.height / Math.max(1, bookList.contentHeight))
         y: trackTop + (trackHeight - height) * scrolled
         color: "black"
+    }
+
+    // Jump rail, for the A-Z sorts: the whole alphabet down the right, between the rows and
+    // the scrollbar. Letters with books are bold; tapping one goes to its section. The
+    // system library has nothing like it.
+    Item {
+        id: jumpRail
+        readonly property var letters: ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
+                                        "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+        // Letter -> the row its section starts at
+        readonly property var starts: {
+            const starts = {}
+            for (const section of bookOrbit.jumpSections)
+                starts[section.label] = section.index
+            return starts
+        }
+        // 44px a letter, closer if the list is too short for that
+        readonly property int pitch: Math.min(Units.dp(20), Math.floor(height / letters.length))
+
+        visible: bookList.visible && bookOrbit.jumpSections.length > 0
+        x: parent.width - Units.dp(33)                 // the 71px right of the rows
+        width: Units.dp(33) - Units.dp(10)             // clear of the scrollbar
+        y: bookList.y + Units.dp(7)
+        height: bookList.height - 2 * Units.dp(7)
+
+        Column {
+            id: railLetters
+            anchors.verticalCenter: parent.verticalCenter
+            Repeater {
+                model: jumpRail.letters
+                Text {
+                    required property string modelData
+                    readonly property bool hasBooks: jumpRail.starts[modelData] !== undefined
+                    width: jumpRail.width
+                    height: jumpRail.pitch
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: modelData
+                    font.pointSize: 7
+                    font.bold: hasBooks
+                    color: hasBooks ? "black" : "#b4b4b4"
+                }
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: (mouse) => {
+                const letter = jumpRail.letters[Math.floor((mouse.y - railLetters.y) / jumpRail.pitch)]
+                const index = jumpRail.starts[letter]
+                if (index === undefined)
+                    return
+                // The first section shows the sub-toolbar too
+                if (index === 0)
+                    bookList.positionViewAtBeginning()
+                else
+                    bookList.positionViewAtIndex(index, ListView.Beginning)
+                bookList.loadVisibleBooks()
+            }
+        }
     }
 
     TabFooter {
