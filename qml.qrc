@@ -16,6 +16,6 @@
         <file>qml/TabFooter.qml</file>
         <file>qml/BookRow.qml</file>
         <file>qml/ListScrollbar.qml</file>
-        <file>images/bookorbit-logo.png</file>
+        <file>images/bookorbit-icon.png</file>
     </qresource>
 </RCC>

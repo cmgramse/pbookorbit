@@ -79,7 +79,7 @@ Item {
 
         Image {
             anchors.horizontalCenter: parent.horizontalCenter
-            source: "qrc:/images/bookorbit-logo.png"
+            source: "qrc:/images/bookorbit-icon.png"
             width: Units.dp(96)
             height: width
             sourceSize: Qt.size(width, height)
