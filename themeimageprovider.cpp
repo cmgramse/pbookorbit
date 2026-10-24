@@ -72,7 +72,8 @@ QImage ThemeImageProvider::requestImage(const QString &id, QSize *size, const QS
 
     if (size)
         *size = image.size();
-    if (requestedSize.isValid() && requestedSize != image.size())
+    // Scaled only to a real size: QML sends 0x0 (valid, but empty) for "its own size"
+    if (!requestedSize.isEmpty() && requestedSize != image.size())
         return image.scaled(requestedSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     return image;
 }

@@ -99,10 +99,27 @@ Rectangle {
                 // Not every theme has the transparent version
                 onStatusChanged: if (status === Image.Error) source = "image://theme/search"
             }
+            // Clears the box, once there is something in it. Under three characters the
+            // results give way to the recent searches, so clearing goes back to them.
+            IconButton {
+                id: clearButton
+                visible: searchField.text !== ""
+                anchors.right: parent.right
+                anchors.rightMargin: searchBox.thickBorder
+                anchors.verticalCenter: parent.verticalCenter
+                // The icon at 2/3 its own size (110px), the tap target still the full size
+                width: Units.dp(51)        // 111px
+                height: Units.dp(51)
+                iconSize: Units.dp(34)     // 74px
+                icon: "remove"
+                pressedIcon: "remove_inv"
+                fallbackText: "×"
+                onClicked: searchField.text = ""
+            }
             TextField {
                 id: searchField
                 anchors.left: searchIcon.status === Image.Ready ? searchIcon.right : parent.left
-                anchors.right: parent.right
+                anchors.right: clearButton.visible ? clearButton.left : parent.right
                 anchors.margins: searchBox.thickBorder
                 anchors.verticalCenter: parent.verticalCenter
                 leftPadding: Units.dp(3)

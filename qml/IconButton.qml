@@ -8,6 +8,9 @@ Item {
     property string icon          // theme resource name, e.g. "home"
     property string pressedIcon   // e.g. "home_inv"
     property string fallbackText
+    // Draws the icon this many pixels square instead of at its own size; 0 for its own
+    // size. Give the button a width and height to keep a bigger tap target.
+    property int iconSize: 0
     signal clicked()
 
     implicitWidth: image.status === Image.Ready ? image.implicitWidth : fallback.implicitWidth
@@ -16,12 +19,16 @@ Item {
     Image {
         id: image
         anchors.centerIn: parent
+        sourceSize.width: button.iconSize
+        sourceSize.height: button.iconSize
         source: button.icon ? "image://theme/" + button.icon : ""
     }
     Image {
         id: pressedImage
         anchors.centerIn: parent
         visible: mouse.pressed && status === Image.Ready
+        sourceSize.width: button.iconSize
+        sourceSize.height: button.iconSize
         source: button.pressedIcon ? "image://theme/" + button.pressedIcon : ""
     }
     Text {
