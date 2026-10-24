@@ -201,8 +201,11 @@ Window {
         visible: bookList.visible && bookOrbit.jumpSections.length > 0
         x: parent.width - Units.dp(33)                 // the 71px right of the rows
         width: Units.dp(33) - Units.dp(10)             // clear of the scrollbar
-        y: bookList.y + Units.dp(7)
-        height: bookList.height - 2 * Units.dp(7)
+        // Starts below the sub-toolbar, clear of the sort button, and stays put when the
+        // sub-toolbar scrolls away
+        readonly property real subToolbarHeight: bookList.headerItem ? bookList.headerItem.height : 0
+        y: bookList.y + subToolbarHeight + Units.dp(7)
+        height: bookList.height - subToolbarHeight - 2 * Units.dp(7)
 
         Column {
             id: railLetters
