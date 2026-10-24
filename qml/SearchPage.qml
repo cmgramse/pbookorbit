@@ -3,7 +3,8 @@ import QtQuick.Controls
 import "units.js" as Units
 
 // Full-window search page, after the library app's search on an Era Color: the toolbar
-// becomes a back button and a search box, with recent searches below.
+// becomes a back button and a search box, with recent searches below. From three
+// characters on, the books matching the search replace the recent searches.
 Rectangle {
     id: page
     color: "white"
@@ -15,6 +16,8 @@ Rectangle {
 
     // True while the search box has focus, for the quicker e-ink update mode
     readonly property bool typing: searchField.activeFocus
+    // Enough typed to search (bookOrbit.search() ignores anything shorter)
+    readonly property bool showResults: searchField.text.trim().length >= 3
 
     signal back()
     signal search(string text)
@@ -97,7 +100,32 @@ Rectangle {
                 placeholderText: "Search…"
                 placeholderTextColor: "#949494"
                 background: null
-                onAccepted: if (text.trim() !== "") page.search(text.trim())
+                // Search once typing pauses, rather than for every letter; clearing the
+                // results (under three characters) needn't wait
+                onTextChanged: {
+                    // The text itself: showResults may not have caught up with it yet
+                    if (text.trim().length >= 3)
+                        searchTimer.restart()
+                    else {
+                        searchTimer.stop()
+                        bookOrbit.search("")
+                    }
+                }
+                onAccepted: {
+                    if (text.trim() === "")
+                        return
+                    searchTimer.stop()
+                    bookOrbit.search(text)
+                    page.search(text.trim())
+                    // Done typing: put the keyboard away to show the results
+                    page.forceActiveFocus()
+                    Qt.inputMethod.hide()
+                }
+            }
+            Timer {
+                id: searchTimer
+                interval: 400
+                onTriggered: bookOrbit.search(searchField.text)
             }
         }
 
@@ -113,6 +141,7 @@ Rectangle {
     // "RECENT SEARCH" heading over a full-width line
     Item {
         id: recentHeading
+        visible: !page.showResults
         anchors.top: header.bottom
         width: parent.width
         height: Units.dp(56)   // 122px
@@ -133,6 +162,7 @@ Rectangle {
     }
 
     ListView {
+        visible: !page.showResults
         anchors.top: recentHeading.bottom
         anchors.bottom: parent.bottom
         width: parent.width
@@ -179,5 +209,74 @@ Rectangle {
                 }
             }
         }
+    }
+
+    // Matching books, in the library's rows without its sections. Loads as it scrolls,
+    // like the library list.
+    ListView {
+        id: results
+        visible: page.showResults
+        anchors.top: header.bottom
+        anchors.bottom: parent.bottom
+        width: parent.width
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        model: bookOrbit.searchResults
+
+        function loadVisibleBooks() {
+            if (count === 0)
+                return
+            let first = indexAt(width / 2, contentY)
+            let last = indexAt(width / 2, contentY + height - 1)
+            if (first < 0)
+                first = 0
+            if (last < 0)
+                last = count - 1
+            const screenful = last - first + 1
+            bookOrbit.loadSearchResults(first - screenful, last + screenful)
+        }
+        Timer {
+            id: loadTimer
+            interval: 150
+            onTriggered: results.loadVisibleBooks()
+        }
+        onContentYChanged: loadTimer.restart()
+        onCountChanged: loadTimer.restart()
+
+        // New results start at the top
+        Connections {
+            target: bookOrbit
+            function onSearchChanged() {
+                if (bookOrbit.searchTotal === -1)
+                    results.positionViewAtBeginning()
+            }
+        }
+
+        // Fast black-and-white updates while it scrolls, as in the library list
+        onMovementStarted: {
+            const pos = mapToGlobal(0, 0)
+            eink.enterA2ForFlick(pos.x, pos.y, width, height)
+        }
+        onMovementEnded: eink.leaveA2()
+        onVisibleChanged: if (!visible) eink.leaveA2()
+
+        delegate: BookRow {
+            required book
+        }
+    }
+
+    ListScrollbar {
+        list: results
+    }
+
+    // While the first results load, or when nothing matches
+    Text {
+        visible: page.showResults && results.count === 0
+        anchors.top: header.bottom
+        anchors.topMargin: Units.dp(26)
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: bookOrbit.searchTotal === 0 ? "No books found" : "Searching…"
+        color: "#737373"
+        font.pointSize: 9
     }
 }

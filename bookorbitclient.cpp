@@ -17,6 +17,9 @@ static const char *DEFAULT_SERVER_URL = "https://books.example.com";
 // Books per request for the book list; pages load as the list scrolls to them
 static const int BOOKS_PAGE_SIZE = 40;
 
+// Searches start at this many characters: fewer match too much to be useful
+static const int MIN_SEARCH_LENGTH = 3;
+
 BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     : QObject(parent)
     , m_settings(settingsPath, QSettings::IniFormat)
@@ -82,26 +85,60 @@ void BookOrbitClient::setBookQuery(const QString &sortField, const QStringList &
 
 void BookOrbitClient::refreshBooks()
 {
-    m_queryGeneration++;
-    m_loadedPages.clear();
-    m_loadingPages.clear();
-    const int generation = m_queryGeneration;
+    restartPages(m_list);
+    const int generation = m_list.queryGeneration;
     loadLibrary([this, generation]() {
-        if (generation != m_queryGeneration)
+        if (generation != m_list.queryGeneration)
             return;
+        m_list.query = bookQuery();
         // The A-Z sorts need their sections first: they say which rows start one
         if (letterSections()) {
             loadJumpSections([this, generation]() {
-                if (generation == m_queryGeneration)
-                    loadBooksPage(0);
+                if (generation == m_list.queryGeneration)
+                    loadPage(m_list, 0);
             });
         } else {
             m_sectionStarts.clear();
             m_jumpSections.clear();
             emit jumpSectionsChanged();
-            loadBooksPage(0);
+            loadPage(m_list, 0);
         }
     });
+}
+
+void BookOrbitClient::search(const QString &text)
+{
+    restartPages(m_search);
+    const QString q = text.trimmed();
+    if (q.length() < MIN_SEARCH_LENGTH) {
+        m_search.listGeneration = m_search.queryGeneration;
+        m_search.total = 0;
+        m_search.model.reset(0);
+        emit searchChanged();
+        return;
+    }
+    emit searchChanged();   // searchTotal is -1 until the results arrive
+    const int generation = m_search.queryGeneration;
+    loadLibrary([this, generation, q]() {
+        if (generation != m_search.queryGeneration)
+            return;
+        // As BookOrbit's web client searches: the text as q, the results by title
+        m_search.query = QJsonObject{
+            {"q", q},
+            {"sort", QJsonArray{QJsonObject{{"field", "title"}, {"dir", "asc"}}}},
+        };
+        loadPage(m_search, 0);
+    });
+}
+
+int BookOrbitClient::searchTotal() const
+{
+    return m_search.listGeneration == m_search.queryGeneration ? m_search.total : -1;
+}
+
+void BookOrbitClient::loadSearchResults(int first, int last)
+{
+    loadPages(m_search, first, last);
 }
 
 void BookOrbitClient::loadLibrary(std::function<void()> then)
@@ -174,51 +211,68 @@ void BookOrbitClient::loadJumpSections(std::function<void()> then)
 
 void BookOrbitClient::loadBooks(int first, int last)
 {
+    loadPages(m_list, first, last);
+}
+
+void BookOrbitClient::restartPages(PagedBooks &list)
+{
+    list.queryGeneration++;
+    list.loadedPages.clear();
+    list.loadingPages.clear();
+}
+
+void BookOrbitClient::loadPages(PagedBooks &list, int first, int last)
+{
     // Pages of a new query wait for its first page, which sizes the list
-    if (m_listGeneration != m_queryGeneration)
+    if (list.listGeneration != list.queryGeneration)
         return;
     first = qMax(0, first);
-    last = qMin(last, m_books.count() - 1);
+    last = qMin(last, list.model.count() - 1);
     for (int page = first / BOOKS_PAGE_SIZE; page <= last / BOOKS_PAGE_SIZE && last >= 0; page++) {
-        if (!m_loadedPages.contains(page) && !m_loadingPages.contains(page))
-            loadBooksPage(page);
+        if (!list.loadedPages.contains(page) && !list.loadingPages.contains(page))
+            loadPage(list, page);
     }
 }
 
-void BookOrbitClient::loadBooksPage(int page)
+void BookOrbitClient::loadPage(PagedBooks &list, int page)
 {
     // Same query the web client sends: returns {items: [...], total, page, size}. Pages
     // count from 0, as in the web client: page 1 is the second page.
-    QJsonObject query = bookQuery();
+    QJsonObject query = list.query;
     query.insert("pagination", QJsonObject{{"page", page}, {"size", BOOKS_PAGE_SIZE}});
 
-    m_loadingPages.insert(page);
-    const int generation = m_queryGeneration;
+    list.loadingPages.insert(page);
+    const int generation = list.queryGeneration;
+    PagedBooks *pages = &list;
     callJson("POST", QString("/libraries/%1/books").arg(m_libraryId), QJsonDocument(query),
-        [this, page, generation](const QJsonDocument &doc) {
-            if (generation != m_queryGeneration)
-                return;   // the sort or filter changed since this was asked for
-            m_loadingPages.remove(page);
-            m_loadedPages.insert(page);
+        [this, pages, page, generation](const QJsonDocument &doc) {
+            if (generation != pages->queryGeneration)
+                return;   // the query changed since this was asked for
+            pages->loadingPages.remove(page);
+            pages->loadedPages.insert(page);
             const QJsonObject result = doc.object();
             // The first page of a new query replaces the list with one of the right length
-            if (m_listGeneration != generation) {
-                m_listGeneration = generation;
-                m_totalBooks = result.value("total").toInt();
-                m_books.reset(m_totalBooks);
+            if (pages->listGeneration != generation) {
+                pages->listGeneration = generation;
+                pages->total = result.value("total").toInt();
+                pages->model.reset(pages->total);
             }
             QVariantList books;
             for (const QJsonValue &item : result.value("items").toArray())
                 books.append(decorateBook(item.toObject().toVariantMap()));
             const int first = page * BOOKS_PAGE_SIZE;
-            m_books.setBooks(first, books);
-            // Also the row after the page, whose section start depends on the last one here
-            updateSectionStarts(first, first + int(books.size()));
-            emit booksChanged();
+            pages->model.setBooks(first, books);
+            if (pages == &m_list) {
+                // Also the row after the page, whose section start depends on the last one here
+                updateSectionStarts(first, first + int(books.size()));
+                emit booksChanged();
+            } else {
+                emit searchChanged();
+            }
         },
-        [this, page, generation]() {
-            if (generation == m_queryGeneration)
-                m_loadingPages.remove(page);   // try again when it is next on screen
+        [pages, page, generation]() {
+            if (generation == pages->queryGeneration)
+                pages->loadingPages.remove(page);   // try again when it is next on screen
         });
 }
 
@@ -279,18 +333,19 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
 
 void BookOrbitClient::updateSectionStarts(int first, int last)
 {
-    for (int row = qMax(0, first); row <= last && row < m_books.count(); row++) {
-        if (!m_books.isLoaded(row))
+    BookListModel &books = m_list.model;
+    for (int row = qMax(0, first); row <= last && row < books.count(); row++) {
+        if (!books.isLoaded(row))
             continue;
         if (letterSections()) {
-            m_books.setField(row, "sectionStart", m_sectionStarts.contains(row));
-            m_books.setField(row, "sectionLabel", m_sectionStarts.value(row));
+            books.setField(row, "sectionStart", m_sectionStarts.contains(row));
+            books.setField(row, "sectionLabel", m_sectionStarts.value(row));
         } else {
             // A new day, if the row before is known to be a different one. Until that row
             // loads, no box: its page fills this in.
-            const QString section = m_books.book(row).value("section").toString();
-            m_books.setField(row, "sectionStart", row == 0
-                || (m_books.isLoaded(row - 1) && m_books.book(row - 1).value("section").toString() != section));
+            const QString section = books.book(row).value("section").toString();
+            books.setField(row, "sectionStart", row == 0
+                || (books.isLoaded(row - 1) && books.book(row - 1).value("section").toString() != section));
         }
     }
 }
@@ -469,17 +524,18 @@ void BookOrbitClient::clearSession()
     m_refreshToken.clear();
     m_settings.remove("refreshToken");
     m_settings.sync();
-    m_books.reset(0);
-    m_totalBooks = 0;
     m_libraryId = -1;
-    m_loadedPages.clear();
-    m_loadingPages.clear();
-    m_queryGeneration++;
-    m_listGeneration = -1;
+    for (PagedBooks *list : {&m_list, &m_search}) {
+        restartPages(*list);
+        list->listGeneration = -1;
+        list->total = 0;
+        list->model.reset(0);
+    }
     m_sectionStarts.clear();
     m_jumpSections.clear();
     emit jumpSectionsChanged();
     emit booksChanged();
+    emit searchChanged();
     setSignedIn(false);
 }
 

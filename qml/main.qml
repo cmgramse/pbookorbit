@@ -175,23 +175,10 @@ Window {
         }
     }
 
-    // Scrollbar on the far right, as in the system library. The list has a row for every
-    // book, loaded or not, so it covers the whole library.
     // TODO: floating buttons at the bottom left and right that scroll a whole page, as in
     // the system library (see TODO.md)
-    Rectangle {
-        id: scrollbar
-        readonly property real trackTop: bookList.y + Units.dp(7)
-        readonly property real trackHeight: bookList.height - 2 * Units.dp(7)
-        readonly property real scrolled: Math.max(0, Math.min(1,
-            (bookList.contentY - bookList.originY) / Math.max(1, bookList.contentHeight - bookList.height)))
-
-        visible: bookList.visible && bookList.contentHeight > bookList.height
-        x: parent.width - Units.dp(8)
-        width: Units.dp(4)
-        height: Math.max(Units.dp(10), trackHeight * bookList.height / Math.max(1, bookList.contentHeight))
-        y: trackTop + (trackHeight - height) * scrolled
-        color: "black"
+    ListScrollbar {
+        list: bookList
     }
 
     // Jump rail, for the A-Z sorts: the whole alphabet down the right, between the rows and
@@ -399,7 +386,7 @@ Window {
         // TODO: real recent searches; sample terms until the search logic exists
         recentSearches: ["door", "the faith"]
         onBack: root.searching = false
-        // TODO: run the search
+        // TODO: save searches to the recent searches
         onSearch: (text) => diagnostics.log("search: " + text)
     }
 }

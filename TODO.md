@@ -11,7 +11,9 @@
   Choose one when the server has several.
 - Jump rail: dragging along it, and jumping by date for the date sorts (the jump-buckets
   endpoint returns days or months for those).
-- Search: run searches and keep real recent searches (sample terms for now).
+- Search: keep real recent searches (sample terms for now; `onSearch` in `main.qml` gets
+  each search entered).
+- Tapping a book, in the list or the search results, does nothing yet.
 - Make the server address configurable (`DEFAULT_SERVER_URL` in `bookorbitclient.cpp`).
 - Test data for reading status: the `app` test account has no reading progress or
   statuses, so "Completed" and "N% read" can't be seen in the emulator. Add a mock, e.g. an

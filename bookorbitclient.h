@@ -33,6 +33,10 @@ class BookOrbitClient : public QObject
     // Sections to jump to, for the A-Z sorts: [{label: "A", index: 2}, ...] in list order.
     // Empty for the date sorts.
     Q_PROPERTY(QVariantList jumpSections READ jumpSections NOTIFY jumpSectionsChanged)
+    // Books matching the search text, by title
+    Q_PROPERTY(BookListModel *searchResults READ searchResults CONSTANT)
+    // How many books match the search text, or -1 until the server has said
+    Q_PROPERTY(int searchTotal READ searchTotal NOTIFY searchChanged)
 
 public:
     using DataHandler = std::function<void(const QByteArray &)>;
@@ -45,9 +49,11 @@ public:
     bool signedIn() const { return m_signedIn; }
     bool busy() const { return m_pending > 0; }
     QString error() const { return m_error; }
-    BookListModel *books() { return &m_books; }
-    int totalBooks() const { return m_totalBooks; }
+    BookListModel *books() { return &m_list.model; }
+    int totalBooks() const { return m_list.total; }
     QVariantList jumpSections() const { return m_jumpSections; }
+    BookListModel *searchResults() { return &m_search.model; }
+    int searchTotal() const;
 
     // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
@@ -65,6 +71,12 @@ public:
     // list calls it for the rows on screen and a screenful either side as it scrolls.
     Q_INVOKABLE void loadBooks(int first, int last);
 
+    // Searches the library's titles, authors and series. Shorter than MIN_SEARCH_LENGTH
+    // characters clears the results instead.
+    Q_INVOKABLE void search(const QString &text);
+    // loadBooks() for the search results
+    Q_INVOKABLE void loadSearchResults(int first, int last);
+
     // Authenticated GET for raw data such as cover thumbnails. Doesn't count as busy, so
     // background downloads don't redraw the status line.
     void download(const QString &path, DataHandler onSuccess, ErrorHandler onError);
@@ -76,8 +88,26 @@ signals:
     void errorChanged();
     void booksChanged();
     void jumpSectionsChanged();
+    void searchChanged();
 
 private:
+    // A list of books loaded a page at a time: the library, or search results. The model
+    // has a row for every book from the first page on; other pages load as they are needed.
+    struct PagedBooks {
+        BookListModel model;
+        // Sort, filter and search text, as BookOrbit's book queries take them
+        QJsonObject query;
+        // Pages (counting from 0) loaded, and asked for, for the current query
+        QSet<int> loadedPages;
+        QSet<int> loadingPages;
+        // Bumped by every reload, so replies to an older query are dropped
+        int queryGeneration = 0;
+        // The query the rows were made for: until the first page of a new query arrives,
+        // the list still shows the old one
+        int listGeneration = -1;
+        int total = 0;
+    };
+
     // Sends a request; withToken adds the access token (login, refresh and logout go
     // without); quiet requests don't count as busy
     void send(const QByteArray &method, const QString &path, const QJsonDocument &body,
@@ -97,7 +127,10 @@ private:
     QJsonObject bookQuery() const;
     // Loads the A-Z sections (jump buckets), then calls then
     void loadJumpSections(std::function<void()> then);
-    void loadBooksPage(int page);
+    // Starts a new query for a list: replies to the old one are dropped from now on
+    void restartPages(PagedBooks &list);
+    void loadPages(PagedBooks &list, int first, int last);
+    void loadPage(PagedBooks &list, int page);
     // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText,
     // onDevice
     QVariantMap decorateBook(const QVariantMap &book) const;
@@ -120,22 +153,15 @@ private:
     bool m_signedIn = false;
     int m_pending = 0;
     QString m_error;
-    BookListModel m_books;
-    int m_totalBooks = 0;
+    int m_libraryId = -1;
+    // The library's book list
+    PagedBooks m_list;
     QString m_sortField = "addedAt";
     QStringList m_formats;
-    int m_libraryId = -1;
-    // Pages (counting from 0) loaded, and asked for, for the current query
-    QSet<int> m_loadedPages;
-    QSet<int> m_loadingPages;
-    // Bumped by every reload, so replies to an older query are dropped
-    int m_queryGeneration = 0;
-    // The query the list's rows were made for: until the first page of a new query
-    // arrives, the list still shows the old one
-    int m_listGeneration = -1;
     QVariantList m_jumpSections;
     // For the A-Z sorts: the first row of each section -> its letter
     QHash<int, QString> m_sectionStarts;
+    PagedBooks m_search;
     bool m_refreshing = false;
     QList<std::function<void()>> m_afterRefresh;
 };
