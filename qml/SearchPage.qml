@@ -5,22 +5,25 @@ import "units.js" as Units
 // Full-window search page, after the library app's search on an Era Color: the toolbar
 // becomes a back button and a search box, with recent searches below. From three
 // characters on, the books matching the search replace the recent searches.
+//
+// A search is kept in the recent searches once the keyboard goes away for it: Enter,
+// scrolling the results or tapping a book (or the keyboard's own close key). Going back
+// doesn't keep it.
 Rectangle {
     id: page
     color: "white"
 
     // Same height as the main toolbar, so the page below doesn't jump when switching
     property int headerHeight: Units.dp(56)
-    // Recent search terms, newest first
-    property var recentSearches: []
-
     // True while the search box has focus, for the quicker e-ink update mode
     readonly property bool typing: searchField.activeFocus
     // Enough typed to search (bookOrbit.search() ignores anything shorter)
     readonly property bool showResults: searchField.text.trim().length >= 3
 
     signal back()
-    signal search(string text)
+
+    // Set while going back, so the search box losing focus doesn't keep the search
+    property bool closing: false
 
     // Focus the search box, which brings up the on-screen keyboard
     function open() {
@@ -28,10 +31,17 @@ Rectangle {
     }
 
     function close() {
+        closing = true
+        hideKeyboard()
+        searchField.text = ""
+        closing = false
+        page.back()
+    }
+
+    // Ends the typing: the search box loses focus, which keeps the search
+    function hideKeyboard() {
         page.forceActiveFocus()
         Qt.inputMethod.hide()
-        searchField.text = ""
-        page.back()
     }
 
     // Closing the on-screen keyboard ends the editing: the box loses focus and its thick
@@ -116,10 +126,13 @@ Rectangle {
                         return
                     searchTimer.stop()
                     bookOrbit.search(text)
-                    page.search(text.trim())
                     // Done typing: put the keyboard away to show the results
-                    page.forceActiveFocus()
-                    Qt.inputMethod.hide()
+                    page.hideKeyboard()
+                }
+                // However the typing ends, bar going back, the search is kept
+                onActiveFocusChanged: {
+                    if (!activeFocus && page.visible && !page.closing)
+                        bookOrbit.addRecentSearch(text)
                 }
             }
             Timer {
@@ -168,7 +181,7 @@ Rectangle {
         width: parent.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        model: page.recentSearches
+        model: bookOrbit.recentSearches
 
         delegate: Item {
             width: ListView.view.width
@@ -204,8 +217,11 @@ Rectangle {
                 id: rowMouse
                 anchors.fill: parent
                 onClicked: {
-                    searchField.text = modelData
-                    page.search(modelData)
+                    // Searched again, so it moves to the top. The list changes under the
+                    // tap, so take the text first.
+                    const search = modelData
+                    searchField.text = search
+                    bookOrbit.addRecentSearch(search)
                 }
             }
         }
@@ -252,8 +268,10 @@ Rectangle {
             }
         }
 
-        // Fast black-and-white updates while it scrolls, as in the library list
+        // Fast black-and-white updates while it scrolls, as in the library list. Scrolling
+        // the results ends the typing.
         onMovementStarted: {
+            page.hideKeyboard()
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
         }
@@ -262,6 +280,12 @@ Rectangle {
 
         delegate: BookRow {
             required book
+
+            // TODO: open the book. For now a tap just ends the typing.
+            MouseArea {
+                anchors.fill: parent
+                onClicked: page.hideKeyboard()
+            }
         }
     }
 

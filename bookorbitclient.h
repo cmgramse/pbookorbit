@@ -37,6 +37,8 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *searchResults READ searchResults CONSTANT)
     // How many books match the search text, or -1 until the server has said
     Q_PROPERTY(int searchTotal READ searchTotal NOTIFY searchChanged)
+    // Searches kept for the search page, newest first
+    Q_PROPERTY(QStringList recentSearches READ recentSearches NOTIFY recentSearchesChanged)
 
 public:
     using DataHandler = std::function<void(const QByteArray &)>;
@@ -54,6 +56,7 @@ public:
     QVariantList jumpSections() const { return m_jumpSections; }
     BookListModel *searchResults() { return &m_search.model; }
     int searchTotal() const;
+    QStringList recentSearches() const { return m_recentSearches; }
 
     // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
@@ -76,6 +79,9 @@ public:
     Q_INVOKABLE void search(const QString &text);
     // loadBooks() for the search results
     Q_INVOKABLE void loadSearchResults(int first, int last);
+    // Puts text at the top of the recent searches, or moves it there if it is already in
+    // them (ignoring case), and saves them
+    Q_INVOKABLE void addRecentSearch(const QString &text);
 
     // Authenticated GET for raw data such as cover thumbnails. Doesn't count as busy, so
     // background downloads don't redraw the status line.
@@ -89,6 +95,7 @@ signals:
     void booksChanged();
     void jumpSectionsChanged();
     void searchChanged();
+    void recentSearchesChanged();
 
 private:
     // A list of books loaded a page at a time: the library, or search results. The model
@@ -162,6 +169,7 @@ private:
     // For the A-Z sorts: the first row of each section -> its letter
     QHash<int, QString> m_sectionStarts;
     PagedBooks m_search;
+    QStringList m_recentSearches;
     bool m_refreshing = false;
     QList<std::function<void()>> m_afterRefresh;
 };

@@ -20,6 +20,9 @@ static const int BOOKS_PAGE_SIZE = 40;
 // Searches start at this many characters: fewer match too much to be useful
 static const int MIN_SEARCH_LENGTH = 3;
 
+// Recent searches kept
+static const int MAX_RECENT_SEARCHES = 10;
+
 BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     : QObject(parent)
     , m_settings(settingsPath, QSettings::IniFormat)
@@ -28,6 +31,7 @@ BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     m_nam.setTransferTimeout(30000);
     m_username = m_settings.value("username").toString();
     m_refreshToken = m_settings.value("refreshToken").toString();
+    m_recentSearches = m_settings.value("recentSearches").toStringList();
     // A saved session counts as signed in straight away, so the app opens on the book list.
     // If the server has since rejected it, the first request finds out and signs out.
     m_signedIn = !m_refreshToken.isEmpty();
@@ -74,6 +78,11 @@ void BookOrbitClient::signOut()
     }
     clearSession();
     setError(QString());
+    // They belong to this user
+    m_recentSearches.clear();
+    m_settings.remove("recentSearches");
+    m_settings.sync();
+    emit recentSearchesChanged();
 }
 
 void BookOrbitClient::setBookQuery(const QString &sortField, const QStringList &formats)
@@ -139,6 +148,24 @@ int BookOrbitClient::searchTotal() const
 void BookOrbitClient::loadSearchResults(int first, int last)
 {
     loadPages(m_search, first, last);
+}
+
+void BookOrbitClient::addRecentSearch(const QString &text)
+{
+    const QString search = text.trimmed();
+    if (search.length() < MIN_SEARCH_LENGTH)
+        return;
+    QStringList searches{search};
+    for (const QString &recent : std::as_const(m_recentSearches)) {
+        if (recent.compare(search, Qt::CaseInsensitive) != 0 && searches.size() < MAX_RECENT_SEARCHES)
+            searches.append(recent);
+    }
+    if (searches == m_recentSearches)
+        return;
+    m_recentSearches = searches;
+    m_settings.setValue("recentSearches", m_recentSearches);
+    m_settings.sync();
+    emit recentSearchesChanged();
 }
 
 void BookOrbitClient::loadLibrary(std::function<void()> then)

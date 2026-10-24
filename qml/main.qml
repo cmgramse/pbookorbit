@@ -383,10 +383,6 @@ Window {
         anchors.fill: parent
         visible: root.searching
         headerHeight: header.height
-        // TODO: real recent searches; sample terms until the search logic exists
-        recentSearches: ["door", "the faith"]
         onBack: root.searching = false
-        // TODO: save searches to the recent searches
-        onSearch: (text) => diagnostics.log("search: " + text)
     }
 }
