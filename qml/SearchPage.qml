@@ -168,7 +168,7 @@ Rectangle {
         }
     }
 
-    // "RECENT SEARCH" heading over a full-width line
+    // "RECENT SEARCHES" heading over a full-width line
     Item {
         id: recentHeading
         visible: !page.showResults
@@ -178,7 +178,7 @@ Rectangle {
 
         Text {
             anchors.centerIn: parent
-            text: "Recent search"
+            text: "Recent searches"
             color: "#737373"
             font.pointSize: 9
             font.capitalization: Font.AllUppercase
