@@ -163,7 +163,7 @@ private:
     int m_libraryId = -1;
     // The library's book list
     PagedBooks m_list;
-    QString m_sortField = "addedAt";
+    QString m_sortField = "title";   // matches the sort menu's default, Title
     QStringList m_formats;
     QVariantList m_jumpSections;
     // For the A-Z sorts: the first row of each section -> its letter

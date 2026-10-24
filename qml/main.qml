@@ -75,7 +75,7 @@ Window {
     onFilterIndexChanged: applyBookQuery()
     onSortIndexChanged: applyBookQuery()
     property int filterIndex: 0
-    property int sortIndex: 0
+    property int sortIndex: 1   // Title, as bookOrbit starts out
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
     function closeDropdowns() {
