@@ -68,14 +68,32 @@ Window {
     // BookOrbit sort field for each sort option
     readonly property var sortFields: ["addedAt", "title", "author", "lastReadAt"]
 
+    // Each sort's usual order: newest first for the dates, A to Z otherwise
+    readonly property var sortDescendingByDefault: [true, false, false, true]
+
+    // The direction is worked out here rather than read from sortDescending: when the
+    // sort and sortReversed change together, that binding may not have caught up yet
     function applyBookQuery() {
-        bookOrbit.setBookQuery(sortFields[sortIndex], filterFormats[filterIndex])
+        const descending = sortDescendingByDefault[sortIndex] !== sortReversed
+        bookOrbit.setBookQuery(sortFields[sortIndex], descending, filterFormats[filterIndex])
         bookList.positionViewAtBeginning()
     }
+    // Choosing the current sort again turns it round; choosing another starts it the usual
+    // way. Either way the list reloads once, with both settled.
+    function chooseSort(index) {
+        if (index === sortIndex) {
+            sortReversed = !sortReversed
+        } else {
+            sortReversed = false
+            sortIndex = index
+        }
+        applyBookQuery()
+    }
     onFilterIndexChanged: applyBookQuery()
-    onSortIndexChanged: applyBookQuery()
     property int filterIndex: 0
     property int sortIndex: 1   // Title, as bookOrbit starts out
+    property bool sortReversed: false
+    readonly property bool sortDescending: sortDescendingByDefault[sortIndex] !== sortReversed
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
     function closeDropdowns() {
@@ -141,6 +159,7 @@ Window {
                 width: parent.width
                 filterText: root.filterOptions[root.filterIndex]
                 sortText: "By " + root.sortOptions[root.sortIndex]
+                sortReversed: root.sortReversed
                 filterOpen: filterMenu.visible
                 sortOpen: sortMenu.visible
                 tabOverhang: filterMenu.border.width - 1
@@ -186,8 +205,10 @@ Window {
     // system library has nothing like it.
     Item {
         id: jumpRail
-        readonly property var letters: ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
-                                        "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+        readonly property var alphabet: ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
+                                         "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
+        // In the list's order: Z to A, then #, when the sort is turned round
+        readonly property var letters: root.sortDescending ? alphabet.slice().reverse() : alphabet
         // Letter -> the row its section starts at
         readonly property var starts: {
             const starts = {}
@@ -286,6 +307,7 @@ Window {
         onlyOpenTab: true
         filterText: root.filterOptions[root.filterIndex]
         sortText: "By " + root.sortOptions[root.sortIndex]
+        sortReversed: root.sortReversed
         filterOpen: filterMenu.visible
         sortOpen: sortMenu.visible
         tabOverhang: filterMenu.border.width - 1
@@ -336,7 +358,7 @@ Window {
                 checked: index === root.sortIndex
                 showSeparator: index < root.sortOptions.length - 1
                 onClicked: {
-                    root.sortIndex = index
+                    root.chooseSort(index)
                     root.closeDropdowns()
                 }
             }

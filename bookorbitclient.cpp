@@ -85,9 +85,11 @@ void BookOrbitClient::signOut()
     emit recentSearchesChanged();
 }
 
-void BookOrbitClient::setBookQuery(const QString &sortField, const QStringList &formats)
+void BookOrbitClient::setBookQuery(const QString &sortField, bool descending,
+                                   const QStringList &formats)
 {
     m_sortField = sortField;
+    m_sortDescending = descending;
     m_formats = formats;
     refreshBooks();
 }
@@ -189,10 +191,8 @@ void BookOrbitClient::loadLibrary(std::function<void()> then)
 
 QJsonObject BookOrbitClient::bookQuery() const
 {
-    // Recently read and date added put the newest first; the A-Z sorts go ascending
-    const bool newestFirst = m_sortField == "addedAt" || m_sortField == "lastReadAt";
     QJsonObject query{
-        {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", newestFirst ? "desc" : "asc"}}}},
+        {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", m_sortDescending ? "desc" : "asc"}}}},
     };
     if (!m_formats.isEmpty()) {
         query.insert("filter", QJsonObject{

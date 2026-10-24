@@ -3,13 +3,17 @@ import "units.js" as Units
 
 // Bar under the toolbar with a filter button on the left and a sort button on the right,
 // after the Libby app on an Era Color. A button whose menu is open becomes a black tab
-// that runs down over the menu's top border, so the two read as one shape.
+// that runs down over the menu's top border, so the two read as one shape. The filter
+// button's arrow shows whether its menu is open; the sort button's arrow and icon show
+// the sort order instead: down for the sort's usual order (A to Z, newest first), up when
+// it is turned round.
 Item {
     id: bar
     property string filterText
     property string sortText
     property bool filterOpen: false
     property bool sortOpen: false
+    property bool sortReversed: false
     // How far an open tab reaches below the bar: the menu's border width
     property int tabOverhang: Units.dp(4)
     // For a copy drawn over the faded page while a menu is open: just the open tab
@@ -24,13 +28,14 @@ Item {
 
     height: Units.dp(55)   // 120px
 
-    // One of the two buttons: icon, label and an arrow showing whether its menu is open
+    // One of the two buttons: icon, label and an arrow
     component DropdownButton: Item {
         id: button
         property string icon
         property string text
         property bool capitals: false
         property bool open: false
+        property bool arrowUp: open
         property int spacing: Units.dp(2)
         signal clicked()
 
@@ -53,7 +58,7 @@ Item {
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: button.text + (button.open ? " ↑" : " ↓")
+                text: button.text + (button.arrowUp ? " ↑" : " ↓")
                 color: button.open ? "white" : "black"
                 font.pointSize: 9
                 font.capitalization: button.capitals ? Font.AllUppercase : Font.MixedCase
@@ -90,10 +95,11 @@ Item {
     DropdownButton {
         id: sortButton
         x: bar.width - Units.dp(26) - width
-        icon: "sorting_descending"
+        icon: bar.sortReversed ? "sorting_ascending" : "sorting_descending"
         text: bar.sortText
         spacing: Units.dp(10)
         open: bar.sortOpen
+        arrowUp: bar.sortReversed
         visible: !bar.onlyOpenTab || open
         onClicked: bar.sortClicked()
     }

@@ -64,10 +64,12 @@ public:
     Q_INVOKABLE void signOut();
 
     // How the book list is sorted and filtered, and so how it is split into sections:
-    //   sortField  addedAt, title, author or lastReadAt (BookOrbit sort fields)
-    //   formats    only books with one of these file formats; empty for all books
+    //   sortField   addedAt, title, author or lastReadAt (BookOrbit sort fields)
+    //   descending  Z to A, or newest first
+    //   formats     only books with one of these file formats; empty for all books
     // Reloads the list.
-    Q_INVOKABLE void setBookQuery(const QString &sortField, const QStringList &formats);
+    Q_INVOKABLE void setBookQuery(const QString &sortField, bool descending,
+                                  const QStringList &formats);
     // Reloads the book list from the first page
     Q_INVOKABLE void refreshBooks();
     // Loads the pages holding rows first to last, if they aren't loaded or loading. The
@@ -163,7 +165,8 @@ private:
     int m_libraryId = -1;
     // The library's book list
     PagedBooks m_list;
-    QString m_sortField = "title";   // matches the sort menu's default, Title
+    QString m_sortField = "title";   // matches the sort menu's default, Title A to Z
+    bool m_sortDescending = false;
     QStringList m_formats;
     QVariantList m_jumpSections;
     // For the A-Z sorts: the first row of each section -> its letter
