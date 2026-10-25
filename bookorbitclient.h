@@ -67,9 +67,9 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(bool seriesLoaded READ seriesLoaded NOTIFY seriesListChanged)
     // The library's authors, as loadAuthors() lists them, in rows like the series': {kind:
     // "author", id, name, sortName ("Martin, George R.R."), bookCount, photo (the authors
-    // list's imageUrl, or "" without one), lastAddedAt, formats (of their books, filled in
-    // later)}, bookCount counting an ebook and its audiobook once when their books are in;
-    // under a filter, the count and formats are of just the books it lets through. As for
+    // list's imageUrl, or "" without one), lastAddedAt, formats and seriesCount (of their
+    // books, filled in later; -1 until then)}, bookCount counting an ebook and its audiobook once when their books are in;
+    // under a filter, the counts and formats are of just the books it lets through. As for
     // the series, the letters to jump to when sorted by name or sort
     // name, and whether they have been listed
     Q_PROPERTY(BookListModel *authorsList READ authorsList CONSTANT)

@@ -12,7 +12,8 @@ import "units.js" as Units
 // under each row. Tapping the row sends clicked().
 // An author's row (in the Authors list) has their photo where the cover goes, or the theme's
 // author icon in an outline without one, their name in the title's place, just their books'
-// formats on the line below, and how many books they have.
+// formats on the line below, and how many books they have and how many series those are in,
+// "6 books · 2 series".
 Item {
     id: row
     // A row of bookOrbit.collections, seriesList or authorsList
@@ -212,7 +213,9 @@ Item {
             y: Units.dp(73) - baselineOffset
             width: parent.width
             readonly property int count: row.group.bookCount || 0
-            text: count + (count === 1 ? " book" : " books")
+            // An author's series, once their books are in
+            readonly property int series: row.isAuthor && row.group.seriesCount !== undefined ? row.group.seriesCount : 0
+            text: count + (count === 1 ? " book" : " books") + (series > 0 ? " · " + series + " series" : "")
             font.pointSize: 7.25
             font.italic: true
             elide: Text.ElideRight

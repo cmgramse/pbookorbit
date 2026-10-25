@@ -1088,6 +1088,28 @@ void BookOrbitClient::loadSeriesPage(int page, int generation)
     });
 }
 
+// Every series a book is in
+static QStringList seriesNames(const QVariantMap &book)
+{
+    QStringList names;
+    for (const QVariant &membership : book.value("seriesMemberships").toList())
+        names.append(membership.toMap().value("seriesName").toString());
+    if (names.isEmpty() && !book.value("seriesName").toString().isEmpty())
+        names.append(book.value("seriesName").toString());
+    return names;
+}
+
+// How many series a group's books are in, books being key -> series names
+static int seriesCount(const QHash<QString, QStringList> &bookSeries)
+{
+    QSet<QString> series;
+    for (const QStringList &names : bookSeries) {
+        for (const QString &name : names)
+            series.insert(name);
+    }
+    return int(series.size());
+}
+
 void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int generation)
 {
     if (first >= groups->rows.size()) {
@@ -1122,22 +1144,25 @@ void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int ge
             // Each one's books: an ebook and its audiobook kept as separate records count
             // once, as they make one row in its book list, with the formats of both
             QHash<QString, QHash<QString, QStringList>> booksOf;   // name -> key -> formats
+            // For the authors, the series each of their books is in: name -> key -> series
+            QHash<QString, QHash<QString, QStringList>> seriesOf;
             for (const QJsonValue &item : items) {
                 const QVariantMap book = item.toObject().toVariantMap();
                 // Every series a book is in, or every author it has
-                QStringList bookNames;
-                if (series) {
-                    for (const QVariant &membership : book.value("seriesMemberships").toList())
-                        bookNames.append(membership.toMap().value("seriesName").toString());
-                } else {
-                    bookNames = book.value("authors").toStringList();
-                }
+                const QStringList bookNames = series ? seriesNames(book) : book.value("authors").toStringList();
                 const QString key = companionKey(book);
-                for (const QString &name : std::as_const(bookNames)) {
+                for (const QString &name : bookNames) {
                     QStringList &formats = booksOf[name][key];
                     for (const QString &format : ownFormats(book)) {
                         if (!formats.contains(format))
                             formats.append(format);
+                    }
+                    if (!series) {
+                        QStringList &names = seriesOf[name][key];
+                        for (const QString &seriesName : seriesNames(book)) {
+                            if (!names.contains(seriesName))
+                                names.append(seriesName);
+                        }
                     }
                 }
             }
@@ -1160,9 +1185,30 @@ void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int ge
                 sortFormats(formats);
                 row.insert("formats", formats);
                 row.insert("books", rowBooks);
+                if (!series) {
+                    QVariantMap bookSeries = row.value("bookSeries").toMap();
+                    const QHash<QString, QStringList> foundSeries = seriesOf.value(row.value("name").toString());
+                    for (auto it = foundSeries.constBegin(); it != foundSeries.constEnd(); ++it) {
+                        QStringList names = bookSeries.value(it.key()).toStringList();
+                        for (const QString &name : it.value()) {
+                            if (!names.contains(name))
+                                names.append(name);
+                        }
+                        bookSeries.insert(it.key(), names);
+                    }
+                    row.insert("bookSeries", bookSeries);
+                }
                 // Counted once all its books are in
-                if (!more && !rowBooks.isEmpty())
+                if (!more && !rowBooks.isEmpty()) {
                     row.insert("bookCount", rowBooks.size());
+                    if (!series) {
+                        QHash<QString, QStringList> bookSeries;
+                        const QVariantMap stored = row.value("bookSeries").toMap();
+                        for (auto it = stored.constBegin(); it != stored.constEnd(); ++it)
+                            bookSeries.insert(it.key(), it.value().toStringList());
+                        row.insert("seriesCount", seriesCount(bookSeries));
+                    }
+                }
             }
             showGroups(*groups);
             if (more)
@@ -1223,6 +1269,8 @@ void BookOrbitClient::loadAuthorsPage(int page, int generation)
                 {"lastAddedAt", author.value("lastAddedAt").toString()},
                 {"formats", QStringList()},
                 {"books", QVariantMap()},
+                {"bookSeries", QVariantMap()},
+                {"seriesCount", -1},
             });
         }
         m_authors.loaded = true;
@@ -1253,6 +1301,7 @@ void BookOrbitClient::showGroups(Groups &groups)
         // each counting just those and showing their formats, as the filtered book list
         // shows them. An author whose books haven't been looked up yet waits for them.
         QHash<QString, QHash<QString, QStringList>> downloaded;   // author -> key -> formats
+        QHash<QString, QHash<QString, QStringList>> downloadedSeries;   // author -> key -> series
         for (const QVariant &value : std::as_const(groups.downloadedBooks)) {
             const QVariantMap book = value.toMap();
             bool wanted = groups.formats.isEmpty();
@@ -1266,22 +1315,32 @@ void BookOrbitClient::showGroups(Groups &groups)
                     if (!formats.contains(format))
                         formats.append(format);
                 }
+                QStringList &series = downloadedSeries[author][companionKey(book)];
+                for (const QString &name : seriesNames(book)) {
+                    if (!series.contains(name))
+                        series.append(name);
+                }
             }
         }
         for (QVariantMap row : std::as_const(groups.rows)) {
-            // Its books let through, by key, with their formats
+            // Its books let through, by key, with their formats and series
             QHash<QString, QStringList> wantedBooks;
+            QHash<QString, QStringList> wantedSeries;
             if (groups.downloadedOnly) {
                 wantedBooks = downloaded.value(row.value("name").toString());
+                wantedSeries = downloadedSeries.value(row.value("name").toString());
             } else {
                 const QVariantMap books = row.value("books").toMap();
+                const QVariantMap bookSeries = row.value("bookSeries").toMap();
                 for (auto it = books.constBegin(); it != books.constEnd(); ++it) {
                     const QStringList formats = it.value().toStringList();
                     bool wanted = false;
                     for (const QString &format : formats)
                         wanted = wanted || groups.formats.contains(format);
-                    if (wanted)
+                    if (wanted) {
                         wantedBooks.insert(it.key(), formats);
+                        wantedSeries.insert(it.key(), bookSeries.value(it.key()).toStringList());
+                    }
                 }
             }
             if (wantedBooks.isEmpty())
@@ -1295,6 +1354,7 @@ void BookOrbitClient::showGroups(Groups &groups)
             }
             sortFormats(formats);
             row.insert("bookCount", int(wantedBooks.size()));
+            row.insert("seriesCount", seriesCount(wantedSeries));
             row.insert("formats", formats);
             rows.append(row);
         }
