@@ -42,6 +42,17 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *booksOf READ booksOf CONSTANT)
     // How many there are, or -1 until the server has said
     Q_PROPERTY(int booksOfTotal READ booksOfTotal NOTIFY booksOfChanged)
+    // The user's book collections, as loadCollections() lists them, one row each (role
+    // "book", as in the book lists): {id, name, icon (a Lucide icon name or "custom:<slug>"),
+    // bookCount, covers: [{id, coverVersion}] (the last two books added to it that have
+    // covers), authors (of all its books, each once, by surname), formats (of all its
+    // books), bookIds (latest added first)}. These fill in as its books load.
+    Q_PROPERTY(BookListModel *collections READ collections CONSTANT)
+    // jumpSections for collections: their letters when sorted by name, else empty. Each
+    // row starting one has sectionStart and sectionLabel, as in the book lists.
+    Q_PROPERTY(QVariantList collectionJumpSections READ collectionJumpSections NOTIFY collectionsChanged)
+    // Whether the collections have been listed since signing in
+    Q_PROPERTY(bool collectionsLoaded READ collectionsLoaded NOTIFY collectionsChanged)
     // jumpSections for booksOf: for an author's books (by title) the letters, for a
     // series' the numbers in the series: [{label: "12", index: 11}, ...]
     Q_PROPERTY(QVariantList booksOfJumpSections READ booksOfJumpSections NOTIFY jumpSectionsChanged)
@@ -72,6 +83,9 @@ public:
     BookListModel *booksOf() { return &m_booksOf.model; }
     int booksOfTotal() const;
     QVariantList booksOfJumpSections() const { return m_booksOf.jumpSections; }
+    BookListModel *collections() { return &m_collections; }
+    bool collectionsLoaded() const { return m_collectionsLoaded; }
+    QVariantList collectionJumpSections() const { return m_collectionJumpSections; }
     QStringList recentSearches() const { return m_recentSearches; }
     QColor accentColor() const;
     QColor accentTextColor() const;
@@ -103,12 +117,26 @@ public:
     Q_INVOKABLE void search(const QString &text);
     // loadBooks() for the search results
     Q_INVOKABLE void loadSearchResults(int first, int last);
-    // Lists every book by any of the authors (field "author", values their names), or
-    // in the series (field "series", values its name) in booksOf: by title, or for a series
-    // in its order
+    // Lists every book by any of the authors (field "author", values their names), or in
+    // the series (field "series", values its name) in booksOf: by title, or for a series in
+    // its order
     Q_INVOKABLE void showBooksOf(const QString &field, const QStringList &values);
+    // Lists a collection's books in booksOf, sorted and filtered as setBookQuery() does
+    // the library, except that sortField "collectionOrder" is the order they were added
+    // to the collection (descending: the latest first). Downloaded books are listed if
+    // they are among the collection's books that loadCollections() found. Called again
+    // for the same collection, the old rows stay until the new ones arrive.
+    Q_INVOKABLE void showCollectionBooks(int collectionId, const QString &sortField, bool descending,
+                                         const QStringList &formats, bool onlyListed = false,
+                                         const QVariantList &onlyBooks = {});
     // loadBooks() for booksOf
     Q_INVOKABLE void loadBooksOf(int first, int last);
+    // Lists the user's book collections (GET /collections) in collections, then loads each
+    // one's books for its covers, authors and formats. The old rows stay until the new
+    // ones arrive.
+    Q_INVOKABLE void loadCollections();
+    // How collections is sorted: field "name" or "bookCount"
+    Q_INVOKABLE void setCollectionSort(const QString &field, bool descending);
     // Fetches a book's full details (GET /books/:id: description, publisher, genres...);
     // bookDetails(bookId, details) follows, with empty details if it failed
     Q_INVOKABLE void loadBookDetails(int bookId);
@@ -141,6 +169,7 @@ signals:
     void jumpSectionsChanged();
     void searchChanged();
     void booksOfChanged();
+    void collectionsChanged();
     void bookDetails(int bookId, const QVariantMap &details);
     void recentSearchesChanged();
     void accentChanged();
@@ -160,6 +189,15 @@ private:
         // Pages (counting from 0) loaded, and asked for, for the current query
         QSet<int> loadedPages;
         QSet<int> loadingPages;
+        // Where the query goes: the library's books, or a collection's
+        QString path;
+        QString jumpPath;
+        // For the library and a collection, the sort and filter (see setBookQuery)
+        QString sortField = "title";
+        bool sortDescending = false;
+        QStringList formats;
+        bool onlyListed = false;
+        QVariantList onlyBooks;
         // Bumped by every reload, so replies to an older query are dropped
         int queryGeneration = 0;
         // The query the rows were made for: until the first page of a new query arrives,
@@ -176,6 +214,12 @@ private:
         QHash<int, QString> sectionStarts;
     };
 
+    // Where the library's book queries go
+    QString libraryBooksPath() const { return QString("/libraries/%1/books").arg(m_libraryId); }
+    // Loads a collection's books from page on, adding them to its row
+    void loadCollectionBooks(int collectionId, int page, int generation);
+    // Fills collections from m_collectionRows, sorted
+    void showCollections();
     // On the device, asks the system to bring up Wi-Fi if it isn't connected
     void ensureNetwork();
     // Sends a request; withToken adds the access token (login, refresh and logout go
@@ -195,11 +239,14 @@ private:
     void loadAccent();
     // The library the list shows (GET /libraries), then calls then
     void loadLibrary(std::function<void()> then);
-    // The sort, and the filter if there is one, as BookOrbit's book queries take them
-    QJsonObject bookQuery() const;
-    // Fills the list with onlyBooks: filtered by the downloaded file's format, sorted, and
+    // A list's sort, and its filter if there is one, as BookOrbit's book queries take them
+    static QJsonObject bookQuery(const PagedBooks &list);
+    // Reloads the library or a collection's books (with its path set) from the first page,
+    // or lists its onlyBooks
+    void refreshList(PagedBooks &list);
+    // Fills a list with its onlyBooks: filtered by the downloaded file's format, sorted, and
     // split into sections like the server's lists
-    void showListedBooks();
+    void showListedBooks(PagedBooks &list);
     // Loads the A-Z sections (jump buckets) for a list's query, then calls then
     void loadJumpSections(PagedBooks &list, std::function<void()> then);
     // Loads the series numbers of every book in a list sorted by them, as its jumpSections,
@@ -216,15 +263,17 @@ private:
     // formats to the rows
     void lookUpCompanions(PagedBooks *list, int first, const QVariantList &books, int generation);
     // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText,
-    // and variants, formats and hidden (see addCompanions)
-    QVariantMap decorateBook(const QVariantMap &book) const;
+    // and variants, formats and hidden (see addCompanions), for a row of list
+    QVariantMap decorateBook(const QVariantMap &book, const PagedBooks &list) const;
     // Adds other records of the same book to a row: their versions to its variants and
     // their formats to its formats. Hides the row (an audiobook record whose ebook is
     // listed too) if hideAudio.
     static void addCompanions(QVariantMap &row, const QList<QVariantMap> &companions, bool hideAudio);
     // Works out which of a list's rows first to last start a section, so they show its box
     void updateSectionStarts(PagedBooks &list, int first, int last);
-    bool letterSections() const { return m_sortField == "title" || m_sortField == "author"; }
+    // The sorts split into A-Z sections, and those by day
+    static bool isLetterSort(const QString &field) { return field == "title" || field == "author"; }
+    static bool isDateSort(const QString &field) { return field == "addedAt" || field == "lastReadAt"; }
     // Swaps the refresh token for a new access token, then runs the callbacks queued meanwhile
     void refreshSession(std::function<void()> then);
     void applyCredentials(const QJsonObject &credentials);
@@ -244,13 +293,20 @@ private:
     int m_libraryId = -1;
     // The library's book list
     PagedBooks m_list;
-    QString m_sortField = "title";   // matches the sort menu's default, Title A to Z
-    bool m_sortDescending = false;
-    bool m_onlyListed = false;
-    QVariantList m_onlyBooks;
-    QStringList m_formats;
     PagedBooks m_search;
     PagedBooks m_booksOf;
+    // The collection booksOf lists, or -1 for an author's or series' books, and its books
+    // as far as loadCollections() found them, latest added first
+    int m_booksOfCollection = -1;
+    QVariantList m_booksOfCollectionIds;
+    // The collections in the server's order, and as listed, sorted
+    QList<QVariantMap> m_collectionRows;
+    BookListModel m_collections;
+    QVariantList m_collectionJumpSections;
+    bool m_collectionsLoaded = false;
+    int m_collectionsGeneration = 0;
+    QString m_collectionSort = "name";   // matches the sort menu's default, Name A to Z
+    bool m_collectionSortDescending = false;
     QStringList m_recentSearches;
     QString m_accent;   // a BookOrbit accent name, e.g. "teal"; empty for the default
     bool m_refreshing = false;

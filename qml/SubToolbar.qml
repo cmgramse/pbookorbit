@@ -14,6 +14,8 @@ Item {
     property bool filterOpen: false
     property bool sortOpen: false
     property bool sortReversed: false
+    // Pages that only sort leave the filter button out
+    property bool showFilter: true
     // How far an open tab reaches below the bar: the menu's border width
     property int tabOverhang: Units.dp(4)
     // For a copy drawn over the faded page while a menu is open: just the open tab
@@ -110,7 +112,7 @@ Item {
         text: bar.filterText
         capitals: true
         open: bar.filterOpen
-        visible: !bar.onlyOpenTab || open
+        visible: bar.showFilter && (!bar.onlyOpenTab || open)
         onClicked: bar.filterClicked()
     }
     DropdownButton {

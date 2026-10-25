@@ -17,8 +17,8 @@ Window {
 
     // Search page open over everything else
     property bool searching: false
-    // Pages opened from the book menu, over the search page: the books of an author or
-    // series, and over that a book's info
+    // Pages opened from the book menu or a collection, over the search page: the books of
+    // an author, series or collection, and over that a book's info
     property bool showingBooksOf: false
     property bool showingInfo: false
 
@@ -52,12 +52,19 @@ Window {
             downloadDialog.show(book, variants)
     }
 
-    // The book list is the only page for now, so the title just goes back to its top
+    // The title goes back to the top of the current view's list
     function backToTop() {
         menu.visible = false
         closeDropdowns()
-        bookList.positionViewAtBeginning()
+        activeList.positionViewAtBeginning()
     }
+
+    // The footer's views: Library, or Collections. Series and Authors have no page of
+    // their own yet and show the library.
+    readonly property bool showingCollections: footer.currentIndex === 1
+    // The list under the sub-toolbar whose menus are in use
+    readonly property ListView activeList: showingCollectionBooks ? booksOfPage.list
+                                           : showingCollections ? collectionsPage.list : bookList
 
     AppHeader {
         id: header
@@ -88,7 +95,6 @@ Window {
 
     // Signed in: the home page. Sub-toolbar with filter and sort, the book list, and a
     // footer for BookOrbit's views, after the Libby app.
-    // TODO: give the views other than Library content
     readonly property var filterOptions: ["All titles", "Ebooks", "Audiobooks"]
     // File formats for each filter option (BookOrbit's EBOOK_FORMAT_LIST, AUDIO_FORMAT_LIST)
     readonly property var filterFormats: [
@@ -96,45 +102,65 @@ Window {
         ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"],
         ["m4b", "mp3", "m4a", "opus", "ogg", "flac"]
     ]
-    readonly property var sortOptions: ["Date added", "Title", "Author", "Recently read"]
-    // BookOrbit sort field for each sort option
-    readonly property var sortFields: ["addedAt", "title", "author", "lastReadAt"]
 
-    // Each sort's usual order: newest first for the dates, A to Z otherwise
-    readonly property var sortDescendingByDefault: [true, false, false, true]
-
-    // The direction is worked out here rather than read from sortDescending: when the
-    // sort and sortReversed change together, that binding may not have caught up yet
-    function applyBookQuery() {
-        const descending = sortDescendingByDefault[sortIndex] !== sortReversed
-        bookOrbit.setBookQuery(sortFields[sortIndex], descending, filterFormats[filterIndex],
-                               downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
-        bookList.positionViewAtBeginning()
+    // The library's sort and filter. Each sort's usual order: newest first for the dates,
+    // A to Z otherwise.
+    ListQuery {
+        id: libraryQuery
+        sortOptions: ["Date added", "Title", "Author", "Recently read"]
+        sortFields: ["addedAt", "title", "author", "lastReadAt"]
+        sortDescendingByDefault: [true, false, false, true]
+        sortIndex: 1   // Title, as bookOrbit starts out
+        onApplied: {
+            bookOrbit.setBookQuery(sortFields[sortIndex], descending(), root.filterFormats[filterIndex],
+                                   downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
+            bookList.positionViewAtBeginning()
+        }
     }
-    // Choosing another sort starts it the usual way. The list reloads once, with both
-    // settled.
-    function chooseSort(index) {
-        if (index === sortIndex)
-            return
-        sortReversed = false
-        sortIndex = index
-        applyBookQuery()
+    // The collections' sorts, from BookOrbit's collections page (less its "Custom order",
+    // which isn't clear here): A to Z, and the most books first
+    ListQuery {
+        id: collectionsQuery
+        sortOptions: ["Name", "Book count"]
+        sortFields: ["name", "bookCount"]
+        sortDescendingByDefault: [false, true]
+        hasFilter: false
+        onApplied: {
+            bookOrbit.setCollectionSort(sortFields[sortIndex], descending())
+            collectionsPage.list.positionViewAtBeginning()
+        }
     }
-    function reverseSort() {
-        sortReversed = !sortReversed
-        applyBookQuery()
+    // A collection's books: the library's sorts, but Date added is when each book was added
+    // to the collection. Kept from one collection to the next, as the library's are.
+    ListQuery {
+        id: collectionBooksQuery
+        property int collectionId: -1
+        sortOptions: libraryQuery.sortOptions
+        sortFields: ["collectionOrder", "title", "author", "lastReadAt"]
+        sortDescendingByDefault: libraryQuery.sortDescendingByDefault
+        sortIndex: 1
+        onApplied: {
+            bookOrbit.showCollectionBooks(collectionId, sortFields[sortIndex], descending(),
+                                          root.filterFormats[filterIndex], downloadedOnly,
+                                          downloadedOnly ? downloads.downloadedBooks() : [])
+            booksOfPage.list.positionViewAtBeginning()
+        }
     }
-    onFilterIndexChanged: applyBookQuery()
-    property int filterIndex: 0
-    // Only the books on the device, along with the content type
-    property bool downloadedOnly: false
-    onDownloadedOnlyChanged: applyBookQuery()
-    // Books arriving on the device (or their details being looked up) change that list
+    // Books arriving on the device (or their details being looked up) change the
+    // downloaded books
     readonly property int downloadsRevision: downloads.revision
-    onDownloadsRevisionChanged: if (downloadedOnly) applyBookQuery()
-    property int sortIndex: 1   // Title, as bookOrbit starts out
-    property bool sortReversed: false
-    readonly property bool sortDescending: sortDescendingByDefault[sortIndex] !== sortReversed
+    onDownloadsRevisionChanged: {
+        if (libraryQuery.downloadedOnly)
+            libraryQuery.applied()
+        if (showingCollectionBooks && collectionBooksQuery.downloadedOnly)
+            collectionBooksQuery.applied()
+    }
+
+    // A collection's books open over the views, with a sub-toolbar of their own
+    readonly property bool showingCollectionBooks: showingBooksOf && booksOfPage.kind === "Collection"
+    // The sort and filter that the menus show and change: those of the page in front
+    readonly property ListQuery activeQuery: showingCollectionBooks ? collectionBooksQuery
+                                             : showingCollections ? collectionsQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
     function closeDropdowns() {
@@ -147,18 +173,18 @@ Window {
         closeDropdowns()
         if (open) {
             // If the bar is partly scrolled off, bring it fully into view first
-            if (bookList.headerItem.mapToItem(root.contentItem, 0, 0).y < bookList.y)
-                bookList.positionViewAtBeginning()
+            if (activeList.headerItem.mapToItem(root.contentItem, 0, 0).y < activeList.y)
+                activeList.positionViewAtBeginning()
             // Line the menu and the copy of the tab up with the sub-toolbar where it has
             // scrolled to. The list can't move while a menu is open: the fading takes taps.
-            openTab.y = bookList.headerItem.mapToItem(root.contentItem, 0, 0).y
+            openTab.y = activeList.headerItem.mapToItem(root.contentItem, 0, 0).y
             dropdown.visible = true
         }
     }
 
     ListView {
         id: bookList
-        visible: bookOrbit.signedIn
+        visible: bookOrbit.signedIn && !root.showingCollections
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -198,15 +224,15 @@ Window {
 
             SubToolbar {
                 width: parent.width
-                filterText: root.filterOptions[root.filterIndex]
-                sortText: "By " + root.sortOptions[root.sortIndex]
-                sortReversed: root.sortReversed
+                filterText: root.filterOptions[libraryQuery.filterIndex]
+                sortText: "By " + libraryQuery.sortOptions[libraryQuery.sortIndex]
+                sortReversed: libraryQuery.sortReversed
                 filterOpen: filterMenu.visible
                 sortOpen: sortMenu.visible
                 tabOverhang: filterMenu.border.width - 1
                 onFilterClicked: root.toggleDropdown(filterMenu)
                 onSortClicked: root.toggleDropdown(sortMenu)
-                onSortIconClicked: root.reverseSort()
+                onSortIconClicked: libraryQuery.reverseSort()
             }
             Text {
                 id: status
@@ -214,11 +240,11 @@ Window {
                 width: parent.width - 2 * x
                 // Busy only until the first books arrive: later pages load as the list
                 // scrolls, and a line appearing above the rows would shift them
-                visible: bookOrbit.error !== "" || (bookList.count === 0 && (bookOrbit.busy || root.downloadedOnly))
+                visible: bookOrbit.error !== "" || (bookList.count === 0 && (bookOrbit.busy || libraryQuery.downloadedOnly))
                 topPadding: Units.dp(8)
                 text: bookOrbit.error !== "" ? bookOrbit.error
                       : bookOrbit.busy ? "Working…"
-                      : "No downloaded books" + (root.filterIndex === 0 ? "" : " of this type")
+                      : "No downloaded books" + (libraryQuery.filterIndex === 0 ? "" : " of this type")
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -252,7 +278,7 @@ Window {
         id: libraryRail
         list: bookList
         sections: bookOrbit.jumpSections
-        descending: root.sortDescending
+        descending: libraryQuery.sortDescending
         topInset: bookList.headerItem ? bookList.headerItem.height : 0
         bottomInset: pageButtons.height
     }
@@ -264,13 +290,41 @@ Window {
         anchors.bottom: bookList.bottom
     }
 
+    CollectionsPage {
+        id: collectionsPage
+        visible: bookOrbit.signedIn && root.showingCollections
+        anchors.top: header.bottom
+        anchors.bottom: footer.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        sortText: "By " + collectionsQuery.sortOptions[collectionsQuery.sortIndex]
+        sortReversed: collectionsQuery.sortReversed
+        descending: collectionsQuery.sortDescending
+        // Its jump rail level with the library's, spaced the same
+        jumpRailTop: libraryRail.entriesY - y
+        jumpRailPitch: libraryRail.pitch
+        sortOpen: sortMenu.visible
+        tabOverhang: sortMenu.border.width - 1
+        onSortClicked: root.toggleDropdown(sortMenu)
+        onSortIconClicked: collectionsQuery.reverseSort()
+        // Listed afresh each time the view opens
+        onVisibleChanged: if (visible) bookOrbit.loadCollections()
+        onCollectionClicked: (collection) => {
+            booksOfPage.kind = "Collection"
+            booksOfPage.name = collection.name
+            collectionBooksQuery.collectionId = collection.id
+            collectionBooksQuery.applied()
+            root.showingBooksOf = true
+        }
+    }
+
     TabFooter {
         id: footer
         visible: bookOrbit.signedIn
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        // BookOrbit's views; only Library has content so far
+        // BookOrbit's views; Series and Authors have no content yet
         tabs: [
             { label: "Library", icon: "overdrive_library" },
             { label: "Collections", icon: "e3_filter_bookshelf" },
@@ -279,10 +333,12 @@ Window {
         ]
         onTabClicked: (index) => {
             // Tapping the current view's tab again goes back to the top of its list
-            if (index === currentIndex)
-                bookList.positionViewAtBeginning()
-            else
+            if (index === currentIndex) {
+                root.activeList.positionViewAtBeginning()
+            } else {
+                root.closeDropdowns()
                 currentIndex = index
+            }
         }
     }
 
@@ -305,9 +361,10 @@ Window {
         z: 2
         width: parent.width
         onlyOpenTab: true
-        filterText: root.filterOptions[root.filterIndex]
-        sortText: "By " + root.sortOptions[root.sortIndex]
-        sortReversed: root.sortReversed
+        showFilter: root.activeQuery.hasFilter
+        filterText: root.filterOptions[root.activeQuery.filterIndex]
+        sortText: "By " + root.activeQuery.sortOptions[root.activeQuery.sortIndex]
+        sortReversed: root.activeQuery.sortReversed
         filterOpen: filterMenu.visible
         sortOpen: sortMenu.visible
         tabOverhang: filterMenu.border.width - 1
@@ -330,10 +387,10 @@ Window {
                 required property string modelData
                 required property int index
                 text: modelData
-                checked: index === root.filterIndex
+                checked: index === root.activeQuery.filterIndex
                 showSeparator: index < root.filterOptions.length - 1
                 onClicked: {
-                    root.filterIndex = index
+                    root.activeQuery.chooseFilter(index)
                     root.closeDropdowns()
                 }
             }
@@ -341,8 +398,8 @@ Window {
         // Goes with the content type, so the menu stays open to choose that too
         SwitchMenuItem {
             text: "Downloaded only"
-            checked: root.downloadedOnly
-            onClicked: root.downloadedOnly = !root.downloadedOnly
+            checked: root.activeQuery.downloadedOnly
+            onClicked: root.activeQuery.setDownloadedOnly(!root.activeQuery.downloadedOnly)
         }
     }
     PopupMenu {
@@ -356,15 +413,15 @@ Window {
 
         MenuHeading { text: "Sort by" }
         Repeater {
-            model: root.sortOptions
+            model: root.activeQuery.sortOptions
             RadioMenuItem {
                 required property string modelData
                 required property int index
                 text: modelData
-                checked: index === root.sortIndex
-                showSeparator: index < root.sortOptions.length - 1
+                checked: index === root.activeQuery.sortIndex
+                showSeparator: index < root.activeQuery.sortOptions.length - 1
                 onClicked: {
-                    root.chooseSort(index)
+                    root.activeQuery.chooseSort(index)
                     root.closeDropdowns()
                 }
             }
@@ -428,9 +485,24 @@ Window {
         // Its jump rail starts level with the library's, spaced the same
         jumpRailTop: libraryRail.entriesY
         jumpRailPitch: libraryRail.pitch
+        // A collection's books have the sub-toolbar, with the shared menus
+        filterText: root.filterOptions[collectionBooksQuery.filterIndex]
+        sortText: "By " + collectionBooksQuery.sortOptions[collectionBooksQuery.sortIndex]
+        sortReversed: collectionBooksQuery.sortReversed
+        sortDescending: collectionBooksQuery.sortDescending
+        downloadedOnly: collectionBooksQuery.downloadedOnly
+        filterOpen: filterMenu.visible
+        sortOpen: sortMenu.visible
+        tabOverhang: filterMenu.border.width - 1
+        onFilterClicked: root.toggleDropdown(filterMenu)
+        onSortClicked: root.toggleDropdown(sortMenu)
+        onSortIconClicked: collectionBooksQuery.reverseSort()
         anchors.fill: parent
         visible: root.showingBooksOf
-        onBack: root.showingBooksOf = false
+        onBack: {
+            root.closeDropdowns()
+            root.showingBooksOf = false
+        }
         onBookClicked: (book) => root.openBook(book)
         onBookHeld: (row) => bookMenu.open(row)
     }
