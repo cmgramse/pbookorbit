@@ -22,6 +22,7 @@ Rectangle {
 
     signal back()
     signal bookClicked(var book)
+    signal bookHeld(BookRow row)
 
     // Set while going back, so the search box losing focus doesn't keep the search
     property bool closing: false
@@ -297,11 +298,16 @@ Rectangle {
         onVisibleChanged: if (!visible) eink.leaveA2()
 
         delegate: BookRow {
+            id: bookRow
             required book
             // Ends the typing too, which keeps the search
             onClicked: {
                 page.hideKeyboard()
                 page.bookClicked(book)
+            }
+            onHeld: {
+                page.hideKeyboard()
+                page.bookHeld(bookRow)
             }
         }
     }

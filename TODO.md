@@ -30,3 +30,7 @@
   add a way to get or open the other version.
 - Search results don't merge an ebook and its audiobook kept as separate records (a search
   can match only one of them, e.g. by narrator); both rows show both formats instead.
+- Book menu: the system's menu also has Mark as read, Add to collection, Add to Favorites,
+  Select and Open with; the Book info page has a favourite heart and CHOOSE ACTION.
+- Deleting a book asks the scanner to scan again: check on the device that the book also
+  leaves the system library. KOReader's `.sdr` folder beside the book is left in place.

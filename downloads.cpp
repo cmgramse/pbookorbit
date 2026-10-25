@@ -109,6 +109,43 @@ QStringList Downloads::formatsOnDevice(int bookId) const
     return formats;
 }
 
+QStringList Downloads::pathsOnDevice(int bookId) const
+{
+    QStringList paths;
+    for (const QString &path : pathsFor(bookId)) {
+        if (QFileInfo::exists(path))
+            paths.append(path);
+    }
+    return paths;
+}
+
+bool Downloads::remove(int bookId)
+{
+    // Files already gone count as deleted. Reading positions and notes kept beside a book
+    // (KOReader's .sdr folder) stay.
+    QStringList kept;
+    for (const QString &path : pathsFor(bookId)) {
+        if (QFileInfo::exists(path) && !QFile::remove(path)) {
+            diagnostics::log(QString("book %1: can't delete %2").arg(bookId).arg(path));
+            kept.append(path);
+        } else {
+            diagnostics::log(QString("book %1 deleted from %2").arg(bookId).arg(path));
+        }
+    }
+    if (kept.isEmpty()) {
+        m_settings.remove(QString("downloads/%1").arg(bookId));
+        m_settings.remove(QString("downloadEntries/%1").arg(bookId));
+    } else {
+        m_settings.setValue(QString("downloads/%1").arg(bookId), kept);
+    }
+    m_settings.sync();
+    // So the system library drops it too
+    requestLibraryScan();
+    m_revision++;
+    emit changed();
+    return kept.isEmpty();
+}
+
 bool Downloads::isOnDevice(int bookId) const
 {
     for (const QString &path : pathsFor(bookId)) {

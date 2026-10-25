@@ -10,7 +10,9 @@ import "units.js" as Units
 // with a small e-reader mark for a format on the device (where the system shows its cloud icon). A row standing in for
 // another (the audiobook record of a book whose ebook row shows both) is hidden: no
 // height at all.
-// Tapping the row sends clicked().
+// Tapping the row sends clicked(); holding it for two seconds sends held(), for the book
+// menu, which sets focused to frame it in a thick black border first, as the search box
+// is while it has focus.
 Item {
     id: row
     property var book
@@ -26,7 +28,10 @@ Item {
         }
         return formats
     }
+    // Framed while it is about to open the book menu
+    property bool focused: false
     signal clicked()
+    signal held()
     readonly property bool sectionStart: book.sectionStart
     readonly property bool letterSection: book.sectionLabel.length === 1
 
@@ -45,7 +50,10 @@ Item {
     MouseArea {
         anchors.fill: parent
         enabled: row.book.loaded === true
+        pressAndHoldInterval: 1500
         onClicked: row.clicked()
+        // A row held this long doesn't send clicked() when it is let go
+        onPressAndHold: row.held()
     }
 
     // Cover, shrunk to fit; an outline while it downloads or if there isn't one
@@ -214,6 +222,7 @@ Item {
 
     // Section letter: a floating square at the top left, over the cover's corner
     Rectangle {
+        z: 1    // over the focus frame too
         visible: row.sectionStart && row.letterSection
         x: 0
         y: 0
@@ -232,6 +241,7 @@ Item {
 
     // Section date: a narrow box down the left edge, the date written upwards
     Rectangle {
+        z: 1
         visible: row.sectionStart && !row.letterSection && row.book.sectionLabel !== ""
         x: 0
         y: 1
@@ -246,5 +256,17 @@ Item {
             text: row.book.sectionLabel
             font.pointSize: 6
         }
+    }
+
+    // Focus frame round the row, 5px like the search box's: its sides about halfway
+    // between the ends of the line under the row and the screen's edges
+    Rectangle {
+        x: Math.round(row.lineLeft / 2)
+        width: Math.round((row.contentRight + row.width) / 2) - x
+        height: parent.height
+        visible: row.focused
+        color: "transparent"
+        border.width: Units.dp(2)
+        border.color: "black"
     }
 }

@@ -38,6 +38,10 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *searchResults READ searchResults CONSTANT)
     // How many books match the search text, or -1 until the server has said
     Q_PROPERTY(int searchTotal READ searchTotal NOTIFY searchChanged)
+    // The books showBooksOf() asked for: all of an author's, or a series'
+    Q_PROPERTY(BookListModel *booksOf READ booksOf CONSTANT)
+    // How many there are, or -1 until the server has said
+    Q_PROPERTY(int booksOfTotal READ booksOfTotal NOTIFY booksOfChanged)
     // The user's BookOrbit accent colour (its "Accent color" appearance setting), and the
     // colour for text and icons on it. Only known if they sync (or once synced) their theme
     // preferences to the server; otherwise BookOrbit's default, teal. Kept for offline use.
@@ -62,6 +66,8 @@ public:
     QVariantList jumpSections() const { return m_jumpSections; }
     BookListModel *searchResults() { return &m_search.model; }
     int searchTotal() const;
+    BookListModel *booksOf() { return &m_booksOf.model; }
+    int booksOfTotal() const;
     QStringList recentSearches() const { return m_recentSearches; }
     QColor accentColor() const;
     QColor accentTextColor() const;
@@ -93,6 +99,16 @@ public:
     Q_INVOKABLE void search(const QString &text);
     // loadBooks() for the search results
     Q_INVOKABLE void loadSearchResults(int first, int last);
+    // Lists every book by any of the authors (field "author", values their names), or
+    // in the series (field "series", values its name) in booksOf: by title, or for a series
+    // in its order
+    Q_INVOKABLE void showBooksOf(const QString &field, const QStringList &values);
+    // loadBooks() for booksOf
+    Q_INVOKABLE void loadBooksOf(int first, int last);
+    // Fetches a book's full details (GET /books/:id: description, publisher, genres...);
+    // bookDetails(bookId, details) follows, with empty details if it failed
+    Q_INVOKABLE void loadBookDetails(int bookId);
+
     // Puts text at the top of the recent searches, or moves it there if it is already in
     // them (ignoring case), and saves them
     Q_INVOKABLE void addRecentSearch(const QString &text);
@@ -120,6 +136,8 @@ signals:
     void booksChanged();
     void jumpSectionsChanged();
     void searchChanged();
+    void booksOfChanged();
+    void bookDetails(int bookId, const QVariantMap &details);
     void recentSearchesChanged();
     void accentChanged();
 
@@ -216,6 +234,7 @@ private:
     // For the A-Z sorts: the first row of each section -> its letter
     QHash<int, QString> m_sectionStarts;
     PagedBooks m_search;
+    PagedBooks m_booksOf;
     QStringList m_recentSearches;
     QString m_accent;   // a BookOrbit accent name, e.g. "teal"; empty for the default
     bool m_refreshing = false;

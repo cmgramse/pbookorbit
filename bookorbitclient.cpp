@@ -25,6 +25,17 @@ static const int MIN_SEARCH_LENGTH = 3;
 // Recent searches kept
 static const int MAX_RECENT_SEARCHES = 10;
 
+// Filter parts for BookOrbit's book queries
+static QJsonObject rule(const QString &field, const QString &op, const QJsonValue &value)
+{
+    return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
+}
+
+static QJsonObject group(const QString &join, const QJsonArray &rules)
+{
+    return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
+}
+
 BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     : QObject(parent)
     , m_settings(settingsPath, QSettings::IniFormat)
@@ -200,6 +211,53 @@ void BookOrbitClient::loadSearchResults(int first, int last)
     loadPages(m_search, first, last);
 }
 
+void BookOrbitClient::showBooksOf(const QString &field, const QStringList &values)
+{
+    restartPages(m_booksOf);
+    // Not the last author's or series' books while the first page loads
+    m_booksOf.listGeneration = -1;
+    m_booksOf.total = 0;
+    m_booksOf.model.reset(0);
+    emit booksOfChanged();
+    const int generation = m_booksOf.queryGeneration;
+    loadLibrary([this, generation, field, values]() {
+        if (generation != m_booksOf.queryGeneration)
+            return;
+        // Matches the names exactly
+        m_booksOf.query = QJsonObject{
+            {"filter", group("AND", {rule(field, "includesAny", QJsonArray::fromStringList(values))})},
+            {"sort", QJsonArray{QJsonObject{{"field", field == "series" ? "seriesIndex" : "title"}, {"dir", "asc"}}}},
+        };
+        // Every type is listed, so an audiobook's ebook record is too
+        m_booksOf.mergePairs = true;
+        loadPage(m_booksOf, 0);
+    });
+}
+
+int BookOrbitClient::booksOfTotal() const
+{
+    return m_booksOf.listGeneration == m_booksOf.queryGeneration ? m_booksOf.total : -1;
+}
+
+void BookOrbitClient::loadBooksOf(int first, int last)
+{
+    loadPages(m_booksOf, first, last);
+}
+
+void BookOrbitClient::loadBookDetails(int bookId)
+{
+    // BookDetail (packages/types/src/book.ts). Quiet: the page shows the list's details
+    // meanwhile, and the rest just doesn't appear offline.
+    download(QString("/books/%1").arg(bookId),
+        [this, bookId](const QByteArray &data) {
+            emit bookDetails(bookId, QJsonDocument::fromJson(data).object().toVariantMap());
+        },
+        [this, bookId](int, const QString &message) {
+            diagnostics::log(QString("book %1 details: %2").arg(bookId).arg(message));
+            emit bookDetails(bookId, QVariantMap());
+        });
+}
+
 void BookOrbitClient::addRecentSearch(const QString &text)
 {
     const QString search = text.trimmed();
@@ -235,17 +293,6 @@ void BookOrbitClient::loadLibrary(std::function<void()> then)
         m_libraryId = libraries.first().toObject().value("id").toInt();
         then();
     });
-}
-
-// Filter parts for BookOrbit's book queries
-static QJsonObject rule(const QString &field, const QString &op, const QJsonValue &value)
-{
-    return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
-}
-
-static QJsonObject group(const QString &join, const QJsonArray &rules)
-{
-    return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
 }
 
 // What makes two records the same book: title and first author
@@ -533,6 +580,8 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
                 // Also the row after the page, whose section start depends on the last one here
                 updateSectionStarts(first, first + int(books.size()));
                 emit booksChanged();
+            } else if (pages == &m_booksOf) {
+                emit booksOfChanged();
             } else {
                 emit searchChanged();
             }
@@ -909,7 +958,7 @@ void BookOrbitClient::clearSession()
     m_settings.remove("refreshToken");
     m_settings.sync();
     m_libraryId = -1;
-    for (PagedBooks *list : {&m_list, &m_search}) {
+    for (PagedBooks *list : {&m_list, &m_search, &m_booksOf}) {
         restartPages(*list);
         list->listGeneration = -1;
         list->total = 0;
@@ -920,6 +969,7 @@ void BookOrbitClient::clearSession()
     emit jumpSectionsChanged();
     emit booksChanged();
     emit searchChanged();
+    emit booksOfChanged();
     setSignedIn(false);
 }
 

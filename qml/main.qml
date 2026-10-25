@@ -17,6 +17,17 @@ Window {
 
     // Search page open over everything else
     property bool searching: false
+    // Pages opened from the book menu, over the search page: the books of an author or
+    // series, and over that a book's info
+    property bool showingBooksOf: false
+    property bool showingInfo: false
+
+    function closePages() {
+        bookMenu.close()
+        showingInfo = false
+        showingBooksOf = false
+        searching = false
+    }
 
     function openSearch() {
         menu.visible = false
@@ -223,8 +234,10 @@ Window {
         onMovementEnded: eink.leaveA2Soon()
         onVisibleChanged: if (!visible) eink.leaveA2()
         delegate: BookRow {
+            id: bookRow
             required book
             onClicked: root.openBook(book)
+            onHeld: bookMenu.open(bookRow)
         }
     }
 
@@ -441,7 +454,7 @@ Window {
             showSeparator: false
             onClicked: {
                 menu.visible = false
-                root.searching = false
+                root.closePages()
                 bookOrbit.signOut()
             }
         }
@@ -454,6 +467,85 @@ Window {
         headerHeight: header.height
         onBack: root.searching = false
         onBookClicked: (book) => root.openBook(book)
+        onBookHeld: (row) => bookMenu.open(row)
+    }
+
+    BooksOfPage {
+        id: booksOfPage
+        anchors.fill: parent
+        visible: root.showingBooksOf
+        onBack: root.showingBooksOf = false
+        onBookClicked: (book) => root.openBook(book)
+        onBookHeld: (row) => bookMenu.open(row)
+    }
+
+    BookInfoPage {
+        id: bookInfoPage
+        anchors.fill: parent
+        visible: root.showingInfo
+        onBack: root.showingInfo = false
+    }
+
+    // Over the pages, from any of their book lists
+    BookMenu {
+        id: bookMenu
+        anchors.fill: parent
+        onInfoChosen: (book) => {
+            bookInfoPage.show(book)
+            root.showingInfo = true
+        }
+        onBooksOfChosen: (field, values, title) => {
+            booksOfPage.kind = field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author"
+            booksOfPage.name = title
+            bookOrbit.showBooksOf(field, values)
+            root.showingBooksOf = true
+        }
+        onDeleteChosen: (book) => deleteDialog.ask(book)
+    }
+
+    // Asks before deleting a book from the device, as the system library does (screenshot
+    // 13). Deletes every version of it there, ebook and audiobook.
+    SystemDialog {
+        id: deleteDialog
+        anchors.fill: parent
+        property var book: ({})
+        // Set if a file couldn't be deleted
+        property bool failed: false
+
+        function ask(newBook) {
+            book = newBook
+            failed = false
+            visible = true
+        }
+
+        icon: failed ? "icon_error" : "icon_question"
+        buttons: failed ? [["Close", "no"]] : [["No", "no"], ["Yes", "yes"]]
+        onPressed: (action) => {
+            if (action === "yes") {
+                const ids = [book.id]
+                for (const variant of book.variants || []) {
+                    if (ids.indexOf(variant.bookId) < 0)
+                        ids.push(variant.bookId)
+                }
+                let deleted = true
+                for (const id of ids)
+                    deleted = downloads.remove(id) && deleted
+                if (!deleted) {
+                    failed = true
+                    return
+                }
+            }
+            visible = false
+        }
+
+        Text {
+            width: parent.width
+            text: deleteDialog.failed
+                  ? "Couldn't delete " + (deleteDialog.book.title || "") + " from your device."
+                  : "Are you sure you want to delete " + (deleteDialog.book.title || "") + " from your device?"
+            font.pointSize: 8
+            wrapMode: Text.Wrap
+        }
     }
 
     // Over everything, the search page too

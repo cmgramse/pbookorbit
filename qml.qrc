@@ -20,6 +20,10 @@
         <file>qml/DownloadDialog.qml</file>
         <file>qml/SystemDialog.qml</file>
         <file>qml/FindBooksDialog.qml</file>
+        <file>qml/BookMenu.qml</file>
+        <file>qml/PageHeader.qml</file>
+        <file>qml/BookInfoPage.qml</file>
+        <file>qml/BooksOfPage.qml</file>
         <file>images/bookorbit-icon.png</file>
     </qresource>
 </RCC>

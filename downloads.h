@@ -57,6 +57,11 @@ public:
     Q_INVOKABLE void cancel();
     // Opens a downloaded book: an ebook in the reader, an audiobook in the audiobook app
     Q_INVOKABLE bool open(int bookId);
+    // The book's files on the device
+    Q_INVOKABLE QStringList pathsOnDevice(int bookId) const;
+    // Deletes the book's files from the device and forgets them; false if one couldn't be
+    // deleted (it stays recorded)
+    Q_INVOKABLE bool remove(int bookId);
 
     // Every book file the app has recorded, whether or not it is still there
     QSet<QString> recordedPaths() const;
