@@ -196,19 +196,16 @@ Rectangle {
             InfoField {
                 width: parent.width
                 label: "Publisher"
-                valueSize: 8
                 value: page.details.publisher || ""
             }
             InfoField {
                 width: parent.width
                 label: "Genres"
-                valueSize: 8
                 value: (page.details.genres || []).join(", ")
             }
             InfoField {
                 width: parent.width
                 label: "Description"
-                valueSize: 8
                 value: page.details.description || ""
                 richText: true
                 showLine: false
@@ -227,7 +224,6 @@ Rectangle {
         property string label
         property string value
         property bool richText: false
-        property real valueSize: 8
         property bool showLine: true
         visible: value !== ""
         spacing: Units.dp(6)
@@ -244,7 +240,7 @@ Rectangle {
             text: field.value
             // Descriptions come as HTML
             textFormat: field.richText ? Text.RichText : Text.PlainText
-            font.pointSize: field.valueSize
+            font.pointSize: 8
             wrapMode: Text.Wrap
         }
         // 21px under the value, then 61px to the next label's baseline
