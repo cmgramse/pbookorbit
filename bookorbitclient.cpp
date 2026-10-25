@@ -20,6 +20,8 @@ static const char *DEFAULT_SERVER_URL = "https://books.example.com";
 
 // Books per request for the book list; pages load as the list scrolls to them
 static const int BOOKS_PAGE_SIZE = 40;
+// Books asked for at a time just to read their series numbers: the most the server sends
+static const int SERIES_NUMBERS_PAGE_SIZE = 200;
 
 // Searches start at this many characters: fewer match too much to be useful
 static const int MIN_SEARCH_LENGTH = 3;
@@ -166,14 +168,11 @@ void BookOrbitClient::refreshBooks()
         m_list.mergePairs = m_formats.isEmpty();
         // The A-Z sorts need their sections first: they say which rows start one
         if (letterSections()) {
-            loadJumpSections([this, generation]() {
-                if (generation == m_list.queryGeneration)
-                    loadPage(m_list, 0);
-            });
+            m_list.sections = Sections::Letters;
+            loadJumpSections(m_list, [this]() { loadPage(m_list, 0); });
         } else {
-            m_sectionStarts.clear();
-            m_jumpSections.clear();
-            emit jumpSectionsChanged();
+            m_list.sections = Sections::Days;
+            clearJumpSections(m_list);
             loadPage(m_list, 0);
         }
     });
@@ -221,6 +220,7 @@ void BookOrbitClient::showBooksOf(const QString &field, const QStringList &value
     m_booksOf.listGeneration = -1;
     m_booksOf.total = 0;
     m_booksOf.model.reset(0);
+    clearJumpSections(m_booksOf);
     emit booksOfChanged();
     const int generation = m_booksOf.queryGeneration;
     loadLibrary([this, generation, field, values]() {
@@ -233,7 +233,16 @@ void BookOrbitClient::showBooksOf(const QString &field, const QStringList &value
         };
         // Every type is listed, so an audiobook's ebook record is too
         m_booksOf.mergePairs = true;
-        loadPage(m_booksOf, 0);
+        // An author's books, by title, go in A-Z sections like the library's. A series'
+        // go in its order, each under its number.
+        if (field == "series") {
+            m_booksOf.sections = Sections::SeriesNumbers;
+            loadPage(m_booksOf, 0);
+            loadSeriesSections(m_booksOf);
+        } else {
+            m_booksOf.sections = Sections::Letters;
+            loadJumpSections(m_booksOf, [this]() { loadPage(m_booksOf, 0); });
+        }
     });
 }
 
@@ -489,14 +498,15 @@ void BookOrbitClient::showListedBooks()
     });
 
     QVariantList rows;
-    m_sectionStarts.clear();
-    m_jumpSections.clear();
+    m_list.sections = letterSections() ? Sections::Letters : Sections::Days;
+    m_list.sectionStarts.clear();
+    m_list.jumpSections.clear();
     for (const auto &[key, row] : std::as_const(books)) {
         if (letterSections()) {
             const QString letter = letterSection(key);
-            if (m_jumpSections.isEmpty() || m_jumpSections.last().toMap().value("label") != letter) {
-                m_sectionStarts.insert(rows.size(), letter);
-                m_jumpSections.append(QVariantMap{{"label", letter}, {"index", rows.size()}});
+            if (m_list.jumpSections.isEmpty() || m_list.jumpSections.last().toMap().value("label") != letter) {
+                m_list.sectionStarts.insert(rows.size(), letter);
+                m_list.jumpSections.append(QVariantMap{{"label", letter}, {"index", rows.size()}});
             }
         }
         rows.append(row);
@@ -509,36 +519,78 @@ void BookOrbitClient::showListedBooks()
         m_list.loadedPages.insert(page);
     m_list.model.reset(rows.size());
     m_list.model.setBooks(0, rows);
-    updateSectionStarts(0, rows.size() - 1);
+    updateSectionStarts(m_list, 0, rows.size() - 1);
     emit jumpSectionsChanged();
     emit booksChanged();
 }
 
-void BookOrbitClient::loadJumpSections(std::function<void()> then)
+void BookOrbitClient::loadJumpSections(PagedBooks &list, std::function<void()> then)
 {
     // As BookOrbit's web client asks for its jump rail: the list query plus maxBuckets.
     // Returns {buckets: [{key, label, index}], total, kind: "letter"}, index being the
     // section's first row. Sections follow the server's own sort keys (an author's sort
     // name, say), so they always match the list.
-    QJsonObject query = bookQuery();
+    QJsonObject query = list.query;
     query.insert("pagination", QJsonObject{{"page", 0}, {"size", BOOKS_PAGE_SIZE}});
     query.insert("maxBuckets", 64);
+    PagedBooks *sectioned = &list;
+    const int generation = list.queryGeneration;
     callJson("POST", QString("/libraries/%1/books/jump-buckets").arg(m_libraryId), QJsonDocument(query),
-        [this, then](const QJsonDocument &doc) {
+        [this, sectioned, generation, then](const QJsonDocument &doc) {
+            if (generation != sectioned->queryGeneration)
+                return;   // the query changed since this was asked for
             const QJsonObject result = doc.object();
-            m_sectionStarts.clear();
-            m_jumpSections.clear();
+            sectioned->sectionStarts.clear();
+            sectioned->jumpSections.clear();
             if (result.value("kind").toString() == "letter") {
                 for (const QJsonValue &bucket : result.value("buckets").toArray()) {
                     const QString label = bucket["label"].toString();
                     const int index = bucket["index"].toInt();
-                    m_sectionStarts.insert(index, label);
-                    m_jumpSections.append(QVariantMap{{"label", label}, {"index", index}});
+                    sectioned->sectionStarts.insert(index, label);
+                    sectioned->jumpSections.append(QVariantMap{{"label", label}, {"index", index}});
                 }
             }
             emit jumpSectionsChanged();
             then();
         });
+}
+
+void BookOrbitClient::loadSeriesSections(PagedBooks &list, int page)
+{
+    // The server has no jump buckets for the series order, so this reads every book's
+    // number from the list itself, a large page at a time, while the rows load as usual
+    QJsonObject query = list.query;
+    query.insert("pagination", QJsonObject{{"page", page}, {"size", SERIES_NUMBERS_PAGE_SIZE}});
+    PagedBooks *sectioned = &list;
+    const int generation = list.queryGeneration;
+    callJson("POST", QString("/libraries/%1/books").arg(m_libraryId), QJsonDocument(query),
+        [this, sectioned, page, generation](const QJsonDocument &doc) {
+            if (generation != sectioned->queryGeneration)
+                return;
+            const QJsonObject result = doc.object();
+            const QJsonArray items = result.value("items").toArray();
+            for (int i = 0; i < items.size(); i++) {
+                // Books with no number have no section. Records of the same book (an
+                // ebook and its audiobook) share one.
+                const QVariant index = items.at(i)["seriesIndex"].toVariant();
+                if (index.isNull())
+                    continue;
+                const QString label = index.toString();
+                if (sectioned->jumpSections.isEmpty() || sectioned->jumpSections.last().toMap().value("label") != label)
+                    sectioned->jumpSections.append(QVariantMap{{"label", label}, {"index", page * SERIES_NUMBERS_PAGE_SIZE + i}});
+            }
+            if ((page + 1) * SERIES_NUMBERS_PAGE_SIZE < result.value("total").toInt() && !items.isEmpty())
+                loadSeriesSections(*sectioned, page + 1);
+            else
+                emit jumpSectionsChanged();
+        });
+}
+
+void BookOrbitClient::clearJumpSections(PagedBooks &list)
+{
+    list.sectionStarts.clear();
+    list.jumpSections.clear();
+    emit jumpSectionsChanged();
 }
 
 void BookOrbitClient::loadBooks(int first, int last)
@@ -598,9 +650,9 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
             const int first = page * BOOKS_PAGE_SIZE;
             pages->model.setBooks(first, books);
             lookUpCompanions(pages, first, records, generation);
+            // Also the row after the page, whose section start depends on the last one here
+            updateSectionStarts(*pages, first, first + int(books.size()));
             if (pages == &m_list) {
-                // Also the row after the page, whose section start depends on the last one here
-                updateSectionStarts(first, first + int(books.size()));
                 emit booksChanged();
             } else if (pages == &m_booksOf) {
                 emit booksOfChanged();
@@ -669,8 +721,7 @@ void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVaria
                     list->model.setField(first + i, field, row.value(field));
             }
             // Hidden rows pass their section boxes on to the next row
-            if (list == &m_list)
-                updateSectionStarts(first, first + int(books.size()));
+            updateSectionStarts(*list, first, first + int(books.size()));
         });
 }
 
@@ -730,9 +781,11 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
     return row;
 }
 
-void BookOrbitClient::updateSectionStarts(int first, int last)
+void BookOrbitClient::updateSectionStarts(PagedBooks &list, int first, int last)
 {
-    BookListModel &books = m_list.model;
+    if (list.sections == Sections::None)
+        return;
+    BookListModel &books = list.model;
     const auto hidden = [&books](int row) { return books.book(row).value("hidden").toBool(); };
     for (int row = qMax(0, first); row <= last && row < books.count(); row++) {
         if (!books.isLoaded(row))
@@ -745,11 +798,17 @@ void BookOrbitClient::updateSectionStarts(int first, int last)
         int previous = row - 1;
         while (previous >= 0 && books.isLoaded(previous) && hidden(previous))
             previous--;
-        if (letterSections()) {
+        if (list.sections == Sections::SeriesNumbers) {
+            // Its number in the series, as in seriesText, which the box stands in for
+            const QVariant index = books.book(row).value("seriesIndex");
+            books.setField(row, "sectionStart", !index.isNull());
+            books.setField(row, "sectionLabel", index.isNull() ? QString() : index.toString());
+            books.setField(row, "seriesText", QString());
+        } else if (list.sections == Sections::Letters) {
             // A section starting here, or on the hidden rows just before
             QString label;
             for (int r = row; r > previous && label.isEmpty(); r--)
-                label = m_sectionStarts.value(r);
+                label = list.sectionStarts.value(r);
             books.setField(row, "sectionStart", !label.isEmpty());
             books.setField(row, "sectionLabel", label);
         } else {
@@ -997,9 +1056,9 @@ void BookOrbitClient::clearSession()
         list->listGeneration = -1;
         list->total = 0;
         list->model.reset(0);
+        list->sectionStarts.clear();
+        list->jumpSections.clear();
     }
-    m_sectionStarts.clear();
-    m_jumpSections.clear();
     emit jumpSectionsChanged();
     emit booksChanged();
     emit searchChanged();

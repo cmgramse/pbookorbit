@@ -3,8 +3,8 @@ import "units.js" as Units
 
 // One book in the list, after the system library on an Era Color (screenshots 9 and 10):
 // cover, then title, author, and a line with the reading status and series. A section's
-// first row carries a floating box at its left edge: the letter in a square, or the date
-// written upwards in a narrow box. A black line runs under each row. The book's formats
+// first row carries a floating box at its left edge: a short label (a letter, a number in
+// a series) in a square, or the date written upwards in a narrow box. A black line runs under each row. The book's formats
 // show in small capitals at the right of the author line, all of them where its ebook and
 // audiobook share the row: grey, or in a solid pill of the user's BookOrbit accent colour
 // with a small e-reader mark for a format on the device (where the system shows its cloud icon). A row standing in for
@@ -33,7 +33,7 @@ Item {
     signal clicked()
     signal held()
     readonly property bool sectionStart: book.sectionStart
-    readonly property bool letterSection: book.sectionLabel.length === 1
+    readonly property bool squareSection: book.sectionLabel.length <= 4
 
     // Measured in device pixels on the Era Color (2.175px per dp)
     readonly property int rowHeight: Units.dp(83)              // 180px
@@ -220,10 +220,10 @@ Item {
         color: "black"
     }
 
-    // Section letter: a floating square at the top left, over the cover's corner
+    // Section letter or number: a floating square at the top left, over the cover's corner
     Rectangle {
         z: 1    // over the focus frame too
-        visible: row.sectionStart && row.letterSection
+        visible: row.sectionStart && row.squareSection && row.book.sectionLabel !== ""
         x: 0
         y: 0
         width: Units.dp(35)                                     // 76px
@@ -233,16 +233,21 @@ Item {
 
         Text {
             anchors.centerIn: parent
+            width: parent.width - Units.dp(4)
+            horizontalAlignment: Text.AlignHCenter
             text: row.book.sectionLabel
             font.pointSize: 9
             font.bold: true
+            // Smaller for a longer number, such as 10.5
+            fontSizeMode: Text.HorizontalFit
+            minimumPointSize: 6
         }
     }
 
     // Section date: a narrow box down the left edge, the date written upwards
     Rectangle {
         z: 1
-        visible: row.sectionStart && !row.letterSection && row.book.sectionLabel !== ""
+        visible: row.sectionStart && !row.squareSection
         x: 0
         y: 1
         width: row.lineLeft                                     // 57px

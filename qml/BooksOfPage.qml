@@ -1,8 +1,11 @@
 import QtQuick
 import "units.js" as Units
 
-// All the books of an author or series, from the book menu: the library's rows without
-// sections, under a toolbar with a back button, e.g. "SERIES / A SONG OF ICE AND FIRE".
+// All the books of an author or series, from the book menu: the library's rows under a
+// toolbar with a back button, e.g. "SERIES / A SONG OF ICE AND FIRE". An author's books
+// go in A-Z sections, as in the library; a series' in its order, each under its number in
+// the series. Either has a jump rail when there are more than fit on the screen, and for a
+// series at least 10 books.
 // Loads as it scrolls, like the library list. bookOrbit.showBooksOf() fills it.
 Rectangle {
     id: page
@@ -11,6 +14,10 @@ Rectangle {
     // "Author" or "Series", and the name
     property string kind
     property string name
+    // Where the jump rail's first entry goes, in the page's coordinates
+    property real jumpRailTop: NaN
+    // And the spacing of its entries
+    property real jumpRailPitch: NaN
 
     signal back()
     signal bookClicked(var book)
@@ -79,6 +86,16 @@ Rectangle {
 
     ListScrollbar {
         list: books
+        bottomInset: booksPages.height
+    }
+    JumpRail {
+        list: books
+        sections: bookOrbit.booksOfJumpSections
+        alignTop: page.jumpRailTop
+        alignPitch: page.jumpRailPitch
+        alphabetical: page.kind !== "Series"
+        // A series of fewer books is quick enough to scroll
+        minSections: page.kind === "Series" ? 16 : 1
         bottomInset: booksPages.height
     }
     PageButtons {

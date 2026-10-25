@@ -246,75 +246,15 @@ Window {
         bottomInset: pageButtons.height
     }
 
-    // Jump rail, for the A-Z sorts: the whole alphabet down the right, between the rows and
-    // the scrollbar. Letters with books are bold; tapping one goes to its section. The
-    // system library has nothing like it.
-    Item {
-        id: jumpRail
-        readonly property var alphabet: ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L",
-                                         "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"]
-        // In the list's order: Z to A, then #, when the sort is turned round
-        readonly property var letters: root.sortDescending ? alphabet.slice().reverse() : alphabet
-        // Letter -> the row its section starts at
-        readonly property var starts: {
-            const starts = {}
-            for (const section of bookOrbit.jumpSections)
-                starts[section.label] = section.index
-            return starts
-        }
-        // 44px a letter, closer if the list is too short for that
-        readonly property int pitch: Math.min(Units.dp(20), Math.floor(height / letters.length))
-
-        visible: bookList.visible && bookOrbit.jumpSections.length > 0
-        // The whole gap between the ends of the rows (71px from the edge) and the scrollbar
-        // (dp(8) from it), so the centred letters sit as far from one as the other
-        x: parent.width - Units.dp(33)
-        width: Units.dp(33) - Units.dp(8)
-        // Starts below the sub-toolbar, clear of the sort button, and stays put when the
-        // sub-toolbar scrolls away
-        readonly property real subToolbarHeight: bookList.headerItem ? bookList.headerItem.height : 0
-        y: bookList.y + subToolbarHeight + Units.dp(7)
-        // Ends above the page buttons
-        height: bookList.height - subToolbarHeight - pageButtons.height - 2 * Units.dp(7)
-
-        Column {
-            id: railLetters
-            anchors.verticalCenter: parent.verticalCenter
-            Repeater {
-                model: jumpRail.letters
-                Text {
-                    required property string modelData
-                    readonly property bool hasBooks: jumpRail.starts[modelData] !== undefined
-                    width: jumpRail.width
-                    height: jumpRail.pitch
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: modelData
-                    font.pointSize: 7
-                    font.bold: hasBooks
-                    color: hasBooks ? "black" : "#b4b4b4"
-                }
-            }
-        }
-        // Wider than the letters, reaching a little over the ends of the rows, so the
-        // rail is easier to hit
-        MouseArea {
-            x: -Units.dp(16)                           // 35px
-            width: parent.width - x
-            height: parent.height
-            onClicked: (mouse) => {
-                const letter = jumpRail.letters[Math.floor((mouse.y - railLetters.y) / jumpRail.pitch)]
-                const index = jumpRail.starts[letter]
-                if (index === undefined)
-                    return
-                // The first section shows the sub-toolbar too
-                if (index === 0)
-                    bookList.positionViewAtBeginning()
-                else
-                    bookList.positionViewAtIndex(index, ListView.Beginning)
-                bookList.loadVisibleBooks()
-            }
-        }
+    // For the A-Z sorts. Starts below the sub-toolbar, clear of the sort button, and stays
+    // put when the sub-toolbar scrolls away.
+    JumpRail {
+        id: libraryRail
+        list: bookList
+        sections: bookOrbit.jumpSections
+        descending: root.sortDescending
+        topInset: bookList.headerItem ? bookList.headerItem.height : 0
+        bottomInset: pageButtons.height
     }
 
     // Over the bottom of the list, above the footer
@@ -485,6 +425,9 @@ Window {
 
     BooksOfPage {
         id: booksOfPage
+        // Its jump rail starts level with the library's, spaced the same
+        jumpRailTop: libraryRail.entriesY
+        jumpRailPitch: libraryRail.pitch
         anchors.fill: parent
         visible: root.showingBooksOf
         onBack: root.showingBooksOf = false

@@ -42,6 +42,9 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *booksOf READ booksOf CONSTANT)
     // How many there are, or -1 until the server has said
     Q_PROPERTY(int booksOfTotal READ booksOfTotal NOTIFY booksOfChanged)
+    // jumpSections for booksOf: for an author's books (by title) the letters, for a
+    // series' the numbers in the series: [{label: "12", index: 11}, ...]
+    Q_PROPERTY(QVariantList booksOfJumpSections READ booksOfJumpSections NOTIFY jumpSectionsChanged)
     // The user's BookOrbit accent colour (its "Accent color" appearance setting), and the
     // colour for text and icons on it. Only known if they sync (or once synced) their theme
     // preferences to the server; otherwise BookOrbit's default, teal. Kept for offline use.
@@ -63,11 +66,12 @@ public:
     QString error() const { return m_error; }
     BookListModel *books() { return &m_list.model; }
     int totalBooks() const { return m_list.total; }
-    QVariantList jumpSections() const { return m_jumpSections; }
+    QVariantList jumpSections() const { return m_list.jumpSections; }
     BookListModel *searchResults() { return &m_search.model; }
     int searchTotal() const;
     BookListModel *booksOf() { return &m_booksOf.model; }
     int booksOfTotal() const;
+    QVariantList booksOfJumpSections() const { return m_booksOf.jumpSections; }
     QStringList recentSearches() const { return m_recentSearches; }
     QColor accentColor() const;
     QColor accentTextColor() const;
@@ -142,6 +146,11 @@ signals:
     void accentChanged();
 
 private:
+    // How a list is split into sections: not at all, A-Z (from the server's jump buckets),
+    // by day (for the date sorts), or a section for each book of a series headed by its
+    // number in the series (whose rows then leave the series out)
+    enum class Sections { None, Letters, Days, SeriesNumbers };
+
     // A list of books loaded a page at a time: the library, or search results. The model
     // has a row for every book from the first page on; other pages load as they are needed.
     struct PagedBooks {
@@ -160,6 +169,11 @@ private:
         // Hide the audiobook record of a book whose ebook is a separate record, so the
         // ebook's row stands for both. Only where the ebook is sure to be in the list too.
         bool mergePairs = false;
+        Sections sections = Sections::None;
+        // The sections to jump to (see jumpSections), and for Letters the first row of
+        // each -> its letter
+        QVariantList jumpSections;
+        QHash<int, QString> sectionStarts;
     };
 
     // On the device, asks the system to bring up Wi-Fi if it isn't connected
@@ -186,8 +200,13 @@ private:
     // Fills the list with onlyBooks: filtered by the downloaded file's format, sorted, and
     // split into sections like the server's lists
     void showListedBooks();
-    // Loads the A-Z sections (jump buckets), then calls then
-    void loadJumpSections(std::function<void()> then);
+    // Loads the A-Z sections (jump buckets) for a list's query, then calls then
+    void loadJumpSections(PagedBooks &list, std::function<void()> then);
+    // Loads the series numbers of every book in a list sorted by them, as its jumpSections,
+    // from page (of SERIES_NUMBERS_PAGE_SIZE) on
+    void loadSeriesSections(PagedBooks &list, int page = 0);
+    // Drops a list's sections to jump to
+    void clearJumpSections(PagedBooks &list);
     // Starts a new query for a list: replies to the old one are dropped from now on
     void restartPages(PagedBooks &list);
     void loadPages(PagedBooks &list, int first, int last);
@@ -203,8 +222,8 @@ private:
     // their formats to its formats. Hides the row (an audiobook record whose ebook is
     // listed too) if hideAudio.
     static void addCompanions(QVariantMap &row, const QList<QVariantMap> &companions, bool hideAudio);
-    // Works out which of rows first to last start a section, so they show its box
-    void updateSectionStarts(int first, int last);
+    // Works out which of a list's rows first to last start a section, so they show its box
+    void updateSectionStarts(PagedBooks &list, int first, int last);
     bool letterSections() const { return m_sortField == "title" || m_sortField == "author"; }
     // Swaps the refresh token for a new access token, then runs the callbacks queued meanwhile
     void refreshSession(std::function<void()> then);
@@ -230,9 +249,6 @@ private:
     bool m_onlyListed = false;
     QVariantList m_onlyBooks;
     QStringList m_formats;
-    QVariantList m_jumpSections;
-    // For the A-Z sorts: the first row of each section -> its letter
-    QHash<int, QString> m_sectionStarts;
     PagedBooks m_search;
     PagedBooks m_booksOf;
     QStringList m_recentSearches;
