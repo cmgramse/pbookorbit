@@ -118,7 +118,11 @@ Item {
 
     Rectangle {
         id: panel
-        anchors.centerIn: parent
+        // Near the bottom of the screen, as the system's dialogs are (screenshot 13): its
+        // bottom edge 131px up
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Units.dp(60)
         width: parent.width - 2 * Units.dp(42)                 // 92px from each side
         height: body.height + buttonRow.height + 2 * border.width
         radius: Units.dp(9)
