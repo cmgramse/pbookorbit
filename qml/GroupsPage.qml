@@ -10,6 +10,10 @@ Item {
     property string sortText
     property bool sortReversed: false
     property bool sortOpen: false
+    // The authors also have the library's filter
+    property bool hasFilter: false
+    property string filterText
+    property bool filterOpen: false
     property int tabOverhang: Units.dp(4)
     // Z to A when the sort is turned round
     property bool descending: false
@@ -24,6 +28,7 @@ Item {
     property string emptyText
     readonly property alias list: groupList
 
+    signal filterClicked()
     signal sortClicked()
     signal sortIconClicked()
     signal groupClicked(var group)
@@ -45,7 +50,10 @@ Item {
 
             SubToolbar {
                 width: parent.width
-                showFilter: false
+                showFilter: page.hasFilter
+                filterText: page.filterText
+                filterOpen: page.filterOpen
+                onFilterClicked: page.filterClicked()
                 sortText: page.sortText
                 sortReversed: page.sortReversed
                 sortOpen: page.sortOpen

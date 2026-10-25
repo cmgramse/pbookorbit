@@ -8,13 +8,15 @@
 
 class BookOrbitClient;
 
-// Cover thumbnails for the book list. Downloads each book's thumbnail from BookOrbit
-// (GET /books/:id/thumbnail, about 100 KB), shrinks it to the size it is shown at and
+// Cover thumbnails for the book list, and authors' photos for the authors list. Downloads
+// each book's thumbnail from BookOrbit (GET /books/:id/thumbnail, about 100 KB), or an
+// author's (GET /authors/:id/thumbnail), shrinks it to the size it is shown at and
 // adjusts its colours for the screen (einkcolors.h) and keeps it as a PNG on the device,
 // so it loads straight from storage next time.
 //
 // QML asks for a cover with source(); if it isn't cached yet the result is empty, a
-// download starts, and ready(bookId) follows once source() has it.
+// download starts, and ready(bookId) follows once source() has it. authorPhoto() and
+// photoReady(authorId) do the same for a photo.
 class Covers : public QObject
 {
     Q_OBJECT
@@ -25,19 +27,28 @@ public:
     // File URL of the cached cover, or "" while it downloads. version is the book's
     // coverVersion, so a changed cover is fetched again.
     Q_INVOKABLE QString source(int bookId, const QString &version, int width, int height);
+    // The same for an author's photo; imageUrl is the authors list's, which says where it
+    // is and which version: "/api/v1/authors/7/thumbnail?t=1788298235776"
+    Q_INVOKABLE QString authorPhoto(int authorId, const QString &imageUrl, int width, int height);
 
 signals:
     void ready(int bookId);
+    void photoReady(int authorId);
 
 private:
     struct Request {
+        // A book's cover, or an author's photo
         int bookId;
-        QString version;
+        int authorId;
+        QString path;
         QSize size;
         QString file;
     };
 
-    QString cacheFile(int bookId, const QString &version, const QSize &size) const;
+    // name: "<bookId>" for a cover, "author-<authorId>" for a photo
+    QString cacheFile(const QString &name, const QString &version, const QSize &size) const;
+    // The cached file's URL, or "" while it downloads
+    QString fetch(const Request &request);
     void startDownloads();
 
     BookOrbitClient *m_client;

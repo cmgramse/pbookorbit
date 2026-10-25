@@ -21,25 +21,42 @@ Covers::Covers(BookOrbitClient *client, const QString &cacheDir, QObject *parent
     QDir().mkpath(m_cacheDir);
 }
 
-QString Covers::cacheFile(int bookId, const QString &version, const QSize &size) const
+QString Covers::cacheFile(const QString &name, const QString &version, const QSize &size) const
 {
     const QString versionHash = QString::fromLatin1(
         QCryptographicHash::hash(version.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
     // Adjusted for the screen and dithered, so PNG: JPEG would smear the dither
-    return QString("%1/%2-%3-%4x%5.png").arg(m_cacheDir).arg(bookId).arg(versionHash)
+    return QString("%1/%2-%3-%4x%5.png").arg(m_cacheDir, name, versionHash)
         .arg(size.width()).arg(size.height());
 }
 
 QString Covers::source(int bookId, const QString &version, int width, int height)
 {
     const QSize size(width, height);
-    const QString file = cacheFile(bookId, version, size);
-    if (QFileInfo::exists(file))
-        return QUrl::fromLocalFile(file).toString();
+    return fetch({bookId, -1, QString("/books/%1/thumbnail").arg(bookId), size,
+                  cacheFile(QString::number(bookId), version, size)});
+}
 
-    if (!m_wanted.contains(file)) {
-        m_wanted.insert(file);
-        m_queue.prepend({bookId, version, size, file});
+QString Covers::authorPhoto(int authorId, const QString &imageUrl, int width, int height)
+{
+    // The URL's path under the API, which download() adds; its query is the version
+    static const QString apiPrefix = "/api/v1";
+    if (!imageUrl.startsWith(apiPrefix))
+        return QString();
+    const QString path = imageUrl.mid(apiPrefix.size());
+    const QString version = QUrl(imageUrl).query();
+    const QSize size(width, height);
+    return fetch({-1, authorId, path, size, cacheFile(QString("author-%1").arg(authorId), version, size)});
+}
+
+QString Covers::fetch(const Request &request)
+{
+    if (QFileInfo::exists(request.file))
+        return QUrl::fromLocalFile(request.file).toString();
+
+    if (!m_wanted.contains(request.file)) {
+        m_wanted.insert(request.file);
+        m_queue.prepend(request);
         startDownloads();
     }
     return QString();
@@ -50,7 +67,7 @@ void Covers::startDownloads()
     while (m_running < MAX_DOWNLOADS && !m_queue.isEmpty()) {
         const Request request = m_queue.takeFirst();
         m_running++;
-        m_client->download(QString("/books/%1/thumbnail").arg(request.bookId),
+        m_client->download(request.path,
             [this, request](const QByteArray &data) {
                 m_running--;
                 m_wanted.remove(request.file);
@@ -60,17 +77,21 @@ void Covers::startDownloads()
                     image = image.scaled(request.size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
                     // Adjusted for the colour screen, as the system library shows covers
                     adjustForEink(image);
-                    if (image.save(request.file, "PNG"))
-                        emit ready(request.bookId);
+                    if (image.save(request.file, "PNG")) {
+                        if (request.authorId >= 0)
+                            emit photoReady(request.authorId);
+                        else
+                            emit ready(request.bookId);
+                    }
                 } else {
-                    diagnostics::log(QString("cover %1: not an image").arg(request.bookId));
+                    diagnostics::log(request.path + ": not an image");
                 }
                 startDownloads();
             },
             [this, request](int status, const QString &message) {
                 m_running--;
                 m_wanted.remove(request.file);
-                diagnostics::log(QString("cover %1: %2 (%3)").arg(request.bookId).arg(message).arg(status));
+                diagnostics::log(QString("%1: %2 (%3)").arg(request.path, message).arg(status));
                 startDownloads();
             });
     }

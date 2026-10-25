@@ -10,9 +10,12 @@ import "units.js" as Units
 // book's status goes. The first row of a section (a letter, when sorted by name) carries
 // the letter in a floating square at its left edge, as a book row does. A black line runs
 // under each row. Tapping the row sends clicked().
+// An author's row (in the Authors list) has their photo where the cover goes, or the theme's
+// author icon in an outline without one, their name in the title's place, just their books'
+// formats on the line below, and how many books they have.
 Item {
     id: row
-    // A row of bookOrbit.collections or bookOrbit.seriesList
+    // A row of bookOrbit.collections, seriesList or authorsList
     property var group
     signal clicked()
 
@@ -28,6 +31,7 @@ Item {
     readonly property int frontHeight: Math.round(coverHeight * 0.86)
     readonly property int backWidth: Math.round(coverWidth * 0.74)
     readonly property int backHeight: Math.round(coverHeight * 0.74)
+    readonly property bool isAuthor: group.kind === "author"
     readonly property var stackBooks: group.covers || []
 
     width: ListView.view ? ListView.view.width : 0
@@ -56,13 +60,16 @@ Item {
         width: coverWidth
         height: coverHeight
 
-        property string url: book.id !== undefined ? covers.source(book.id, book.coverVersion, boxWidth, boxHeight) : ""
+        // Bumped when a download arrives, to ask again; a binding rather than setting url,
+        // so a row that changes to another group (when the list is sorted) follows it
+        property int revision: 0
+        property string url: revision >= 0 && book.id !== undefined
+                             ? covers.source(book.id, book.coverVersion, boxWidth, boxHeight) : ""
         Connections {
             target: covers
             function onReady(bookId) {
                 if (bookId === stackCover.book.id)
-                    stackCover.url = covers.source(stackCover.book.id, stackCover.book.coverVersion,
-                                                   stackCover.boxWidth, stackCover.boxHeight)
+                    stackCover.revision++
             }
         }
         // A white edge round the front cover parts it from the one behind
@@ -109,9 +116,40 @@ Item {
         // No covers (yet): an outline where they go
         Rectangle {
             anchors.fill: parent
-            visible: row.stackBooks.length === 0
+            visible: row.stackBooks.length === 0 && !row.isAuthor
             border.width: 1
             border.color: "#cccccc"
+        }
+
+        // An author's photo, shrunk to fit and centred; without one (or while it downloads),
+        // the theme's author icon in an outline
+        Rectangle {
+            anchors.fill: parent
+            visible: row.isAuthor && photo.status !== Image.Ready
+            border.width: 1
+            border.color: "#cccccc"
+            Image {
+                anchors.centerIn: parent
+                source: "image://theme/e3_filter_author"
+            }
+        }
+        Image {
+            id: photo
+            anchors.centerIn: parent
+            visible: row.isAuthor
+            // As for the covers: bumped to ask again when the download arrives
+            property int revision: 0
+            property string url: revision >= 0 && row.isAuthor && (row.group.photo || "") !== ""
+                                 ? covers.authorPhoto(row.group.id, row.group.photo, row.coverWidth, row.coverHeight) : ""
+            Connections {
+                target: covers
+                function onPhotoReady(authorId) {
+                    if (row.isAuthor && authorId === row.group.id)
+                        photo.revision++
+                }
+            }
+            source: url
+            asynchronous: true
         }
 
         // A collection's icon, in a white disc with a black edge
@@ -128,12 +166,14 @@ Item {
             Image {
                 id: icon
                 anchors.centerIn: parent
-                property string url: collectionIcons.source(row.group.icon || "")
+                // As for the covers: bumped to ask again when the download arrives
+                property int revision: 0
+                property string url: revision >= 0 ? collectionIcons.source(row.group.icon || "") : ""
                 Connections {
                     target: collectionIcons
                     function onReady(name) {
                         if (name === row.group.icon)
-                            icon.url = collectionIcons.source(name)
+                            icon.revision++
                     }
                 }
                 source: url
