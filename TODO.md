@@ -31,3 +31,6 @@
   Select and Open with; the Book info page has a favourite heart and CHOOSE ACTION.
 - Deleting a book asks the scanner to scan again: check on the device that the book also
   leaves the system library. KOReader's `.sdr` folder beside the book is left in place.
+- Once the app's UI is settled, delete the device screenshots in the repo root
+  (`scr0001.bmp`...) and their entry in `.gitignore`. Code comments refer to them by number,
+  e.g. "screenshot 9".
