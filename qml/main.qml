@@ -41,8 +41,8 @@ Window {
             downloadDialog.show(book, variants)
     }
 
-    // The book list is the only page for now, so home just goes back to its top
-    function goHome() {
+    // The book list is the only page for now, so the title just goes back to its top
+    function backToTop() {
         menu.visible = false
         closeDropdowns()
         bookList.positionViewAtBeginning()
@@ -57,7 +57,10 @@ Window {
         title: "PocketBook × Book<font color=\"" + bookOrbit.accentColor + "\">Orbit</font>"
         menuOpen: menu.visible
         showSearch: bookOrbit.signedIn
-        onHomeClicked: root.goHome()
+        // Its only item is signing out
+        showMenu: bookOrbit.signedIn
+        onHomeClicked: Qt.quit()
+        onTitleClicked: root.backToTop()
         onSearchClicked: root.openSearch()
         onMenuClicked: menu.visible = !menu.visible
     }
@@ -427,16 +430,12 @@ Window {
         PopupMenuItem {
             visible: bookOrbit.signedIn
             text: "Sign out"
+            showSeparator: false
             onClicked: {
                 menu.visible = false
                 root.searching = false
                 bookOrbit.signOut()
             }
-        }
-        PopupMenuItem {
-            text: "Exit"
-            showSeparator: false
-            onClicked: Qt.quit()
         }
     }
 

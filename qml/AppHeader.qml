@@ -1,8 +1,9 @@
 import QtQuick
 import "units.js" as Units
 
-// Top toolbar: home button, title, optional search button, menu button, and a 1px line
-// underneath.
+// Top toolbar: home button, title, optional search and menu buttons, and a 1px line
+// underneath. As in the system apps, home leaves the app for the dashboard; the title
+// can be tapped too.
 // Follows AppHeader.qml in the SDK's qml_test example: theme icons at their own size,
 // dp(15) from the edges. Taller than dp(56) if the theme's icons are.
 Rectangle {
@@ -10,12 +11,14 @@ Rectangle {
     property alias title: titleText.text
     property bool menuOpen: false
     property bool showSearch: false
+    property bool showMenu: true
     signal homeClicked()
+    signal titleClicked()
     signal searchClicked()
     signal menuClicked()
 
     readonly property int margin: Units.dp(15)
-    height: Math.max(Units.dp(56), homeButton.height, menuButton.height) + separator.height
+    height: Math.max(Units.dp(56), homeButton.height, rightButtons.height) + separator.height
     color: "white"
 
     IconButton {
@@ -42,6 +45,14 @@ Rectangle {
         textFormat: Text.StyledText
         font.pointSize: 8
         font.capitalization: Font.AllUppercase
+
+        // The toolbar's full height, across the title's width
+        MouseArea {
+            width: parent.width
+            height: header.height - separator.height
+            anchors.centerIn: parent
+            onClicked: header.titleClicked()
+        }
     }
 
     Row {
@@ -60,6 +71,7 @@ Rectangle {
         }
         IconButton {
             id: menuButton
+            visible: header.showMenu
             // bw_menu_close_b is the inverted look: shown while pressed and while the menu is open
             icon: header.menuOpen ? "bw_menu_close_b" : "bw_menu_open_b"
             pressedIcon: "bw_menu_close_b"
