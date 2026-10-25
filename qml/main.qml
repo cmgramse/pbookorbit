@@ -59,12 +59,14 @@ Window {
         activeList.positionViewAtBeginning()
     }
 
-    // The footer's views: Library, or Collections. Series and Authors have no page of
-    // their own yet and show the library.
+    // The footer's views: Library, Collections or Series. Authors has no page of its own
+    // yet and shows the library.
     readonly property bool showingCollections: footer.currentIndex === 1
+    readonly property bool showingSeries: footer.currentIndex === 2
     // The list under the sub-toolbar whose menus are in use
     readonly property ListView activeList: showingBooksOf ? booksOfPage.list
-                                           : showingCollections ? collectionsPage.list : bookList
+                                           : showingCollections ? collectionsPage.list
+                                           : showingSeries ? seriesPage.list : bookList
 
     AppHeader {
         id: header
@@ -130,6 +132,19 @@ Window {
             collectionsPage.list.positionViewAtBeginning()
         }
     }
+    // The series' sorts, from BookOrbit's series page: A to Z, and the most books, the
+    // latest added and the most read first
+    ListQuery {
+        id: seriesQuery
+        sortOptions: ["Name", "Book count", "Recently added", "Read progress"]
+        sortFields: ["name", "bookCount", "lastAddedAt", "readProgress"]
+        sortDescendingByDefault: [false, true, true, true]
+        hasFilter: false
+        onApplied: {
+            bookOrbit.setSeriesSort(sortFields[sortIndex], descending())
+            seriesPage.list.positionViewAtBeginning()
+        }
+    }
     // The books of an author, series or collection, as bookOrbit.showBooksOf() takes them,
     // each kind with its own sort and filter, kept from one to the next as the library's are
     property string booksOfField
@@ -190,7 +205,8 @@ Window {
 
     // The sort and filter that the menus show and change: those of the page in front
     readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
-                                             : showingCollections ? collectionsQuery : libraryQuery
+                                             : showingCollections ? collectionsQuery
+                                             : showingSeries ? seriesQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
     function closeDropdowns() {
@@ -214,7 +230,7 @@ Window {
 
     ListView {
         id: bookList
-        visible: bookOrbit.signedIn && !root.showingCollections
+        visible: bookOrbit.signedIn && !root.showingCollections && !root.showingSeries
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -320,9 +336,13 @@ Window {
         anchors.bottom: bookList.bottom
     }
 
-    CollectionsPage {
+    GroupsPage {
         id: collectionsPage
         visible: bookOrbit.signedIn && root.showingCollections
+        model: bookOrbit.collections
+        jumpSections: bookOrbit.collectionJumpSections
+        loaded: bookOrbit.collectionsLoaded
+        emptyText: "No collections"
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -339,8 +359,35 @@ Window {
         onSortIconClicked: collectionsQuery.reverseSort()
         // Listed afresh each time the view opens
         onVisibleChanged: if (visible) bookOrbit.loadCollections()
-        onCollectionClicked: (collection) => root.openBooksOf("Collection", collection.name, "collection",
-                                                             [String(collection.id)])
+        onGroupClicked: (collection) => root.openBooksOf("Collection", collection.name, "collection",
+                                                        [String(collection.id)])
+    }
+
+    GroupsPage {
+        id: seriesPage
+        visible: bookOrbit.signedIn && root.showingSeries
+        model: bookOrbit.seriesList
+        jumpSections: bookOrbit.seriesJumpSections
+        loaded: bookOrbit.seriesLoaded
+        emptyText: "No series"
+        anchors.top: header.bottom
+        anchors.bottom: footer.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        sortText: "By " + seriesQuery.sortOptions[seriesQuery.sortIndex]
+        sortReversed: seriesQuery.sortReversed
+        descending: seriesQuery.sortDescending
+        // Its jump rail level with the library's, spaced the same
+        jumpRailTop: libraryRail.entriesY - y
+        jumpRailPitch: libraryRail.pitch
+        sortOpen: sortMenu.visible
+        tabOverhang: sortMenu.border.width - 1
+        onSortClicked: root.toggleDropdown(sortMenu)
+        onSortIconClicked: seriesQuery.reverseSort()
+        // Listed the first time the view opens: a large library has many series, and
+        // their formats take a request for every few
+        onVisibleChanged: if (visible && !bookOrbit.seriesLoaded) bookOrbit.loadSeries()
+        onGroupClicked: (series) => root.openBooksOf("Series", series.name, "series", [series.name])
     }
 
     TabFooter {
@@ -349,7 +396,7 @@ Window {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        // BookOrbit's views; Series and Authors have no content yet
+        // BookOrbit's views; Authors has no content yet
         tabs: [
             { label: "Library", icon: "overdrive_library" },
             { label: "Collections", icon: "e3_filter_bookshelf" },

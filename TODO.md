@@ -5,7 +5,15 @@
   own library.
 - Big audiobooks (1 GB+) might want a warning, or a check for free space, before they
   download. Check on the device that the audiobook player finds them in Audio Books.
-- Views: Collections, Series and Authors in the footer still show the book list.
+- Views: Authors in the footer still shows the book list.
+- Cache what the views fetch, so they open at once and work offline: the collections and
+  series lists, the covers, authors, formats and book ids gathered for each (a request per
+  collection, and one per 20 series, on every load), and perhaps book list pages. Keep it
+  on the device beside the covers, show it straight away, and refresh it in the background
+  when online. The series list is only fetched once a session for now, so changes on the
+  server don't show until the app restarts; the collections list is fetched every time its
+  tab opens. Series covers have no version in the list, so a changed one isn't fetched
+  again.
 - Libraries: the list shows the first library (`loadLibrary()` in `bookorbitclient.cpp`).
   Choose one when the server has several.
 - Jump rail: dragging along it, and jumping by date for the date sorts (the jump-buckets

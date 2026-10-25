@@ -26,8 +26,8 @@
         <file>qml/BooksOfPage.qml</file>
         <file>qml/PageButtons.qml</file>
         <file>qml/JumpRail.qml</file>
-        <file>qml/CollectionRow.qml</file>
-        <file>qml/CollectionsPage.qml</file>
+        <file>qml/GroupRow.qml</file>
+        <file>qml/GroupsPage.qml</file>
         <file>qml/ListQuery.qml</file>
         <file>lucide/lucide-icons.json</file>
         <file>images/bookorbit-icon.png</file>

@@ -1,10 +1,10 @@
 import QtQuick
 import "units.js" as Units
 
-// The Collections view: the user's book collections (bookOrbit.collections), one
-// CollectionRow each, under a sub-toolbar with just the sort button, with a jump rail
-// when sorted by name. Goes between the header and the footer; main.qml owns the sort
-// menu, as it does the library's.
+// The Collections or Series view: groups of books (bookOrbit.collections or seriesList),
+// one GroupRow each, under a sub-toolbar with just the sort button, with a jump rail when
+// sorted by name. Goes between the header and the footer; main.qml owns the sort menu, as
+// it does the library's.
 Item {
     id: page
     property string sortText
@@ -16,18 +16,24 @@ Item {
     // Where the jump rail's first entry goes, in the page's coordinates, and its spacing
     property real jumpRailTop: NaN
     property real jumpRailPitch: NaN
-    readonly property alias list: collectionList
+    // The groups' model and letters to jump to, whether they have been listed, and what to
+    // say when there are none
+    property var model
+    property var jumpSections: []
+    property bool loaded: false
+    property string emptyText
+    readonly property alias list: groupList
 
     signal sortClicked()
     signal sortIconClicked()
-    signal collectionClicked(var collection)
+    signal groupClicked(var group)
 
     ListView {
-        id: collectionList
+        id: groupList
         anchors.fill: parent
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        model: bookOrbit.collections
+        model: page.model
 
         // The rows are all there at once: nothing to load. The jump rail calls this.
         function loadVisibleBooks() {}
@@ -51,11 +57,11 @@ Item {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                visible: bookOrbit.error !== "" || collectionList.count === 0
+                visible: bookOrbit.error !== "" || groupList.count === 0
                 topPadding: Units.dp(8)
                 text: bookOrbit.error !== "" ? bookOrbit.error
-                      : !bookOrbit.collectionsLoaded ? "Working…"
-                      : "No collections"
+                      : !page.loaded ? "Working…"
+                      : page.emptyText
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -69,29 +75,29 @@ Item {
         onMovementEnded: eink.leaveA2Soon()
         onVisibleChanged: if (!visible) eink.leaveA2()
 
-        delegate: CollectionRow {
+        delegate: GroupRow {
             required property var book
-            collection: book
-            onClicked: page.collectionClicked(book)
+            group: book
+            onClicked: page.groupClicked(book)
         }
     }
 
     ListScrollbar {
-        list: collectionList
+        list: groupList
         bottomInset: pageButtons.height
     }
     JumpRail {
-        list: collectionList
-        sections: bookOrbit.collectionJumpSections
+        list: groupList
+        sections: page.jumpSections
         descending: page.descending
-        topInset: collectionList.headerItem ? collectionList.headerItem.height : 0
+        topInset: groupList.headerItem ? groupList.headerItem.height : 0
         bottomInset: pageButtons.height
         alignTop: page.jumpRailTop
         alignPitch: page.jumpRailPitch
     }
     PageButtons {
         id: pageButtons
-        list: collectionList
-        anchors.bottom: collectionList.bottom
+        list: groupList
+        anchors.bottom: groupList.bottom
     }
 }

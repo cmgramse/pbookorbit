@@ -1,18 +1,19 @@
 import QtQuick
 import "units.js" as Units
 
-// One collection in the collections list, laid out like a book row (BookRow): where the
-// cover goes, a stack of two of its books' covers, the second smaller and behind, with the
-// collection's icon in a white disc over the middle; then its name in the title's place,
+// One group of books, a collection or a series, in the Collections or Series list, laid
+// out like a book row (BookRow): where the cover goes, a stack of two of its books' covers,
+// the second smaller and behind, with a collection's icon in a white disc over the middle;
+// then its name in the title's place,
 // and its books' authors, in order of surname and cut short with an ellipsis, with their
 // formats in small capitals at the right; then how many books it has, in italics where a
 // book's status goes. The first row of a section (a letter, when sorted by name) carries
-// the letter in a floating square at its left edge, as a book row does. A black line runs under each row. Tapping the
-// row sends clicked().
+// the letter in a floating square at its left edge, as a book row does. A black line runs
+// under each row. Tapping the row sends clicked().
 Item {
     id: row
-    // A row of bookOrbit.collections
-    property var collection
+    // A row of bookOrbit.collections or bookOrbit.seriesList
+    property var group
     signal clicked()
 
     // As in BookRow, measured in device pixels on the Era Color (2.175px per dp)
@@ -27,7 +28,7 @@ Item {
     readonly property int frontHeight: Math.round(coverHeight * 0.86)
     readonly property int backWidth: Math.round(coverWidth * 0.74)
     readonly property int backHeight: Math.round(coverHeight * 0.74)
-    readonly property var stackBooks: collection.covers || []
+    readonly property var stackBooks: group.covers || []
 
     width: ListView.view ? ListView.view.width : 0
     height: rowHeight
@@ -113,8 +114,9 @@ Item {
             border.color: "#cccccc"
         }
 
-        // The collection's icon, in a white disc with a black edge
+        // A collection's icon, in a white disc with a black edge
         Rectangle {
+            visible: (row.group.icon || "") !== ""
             anchors.centerIn: parent
             width: Units.dp(26)                                 // 57px
             height: width
@@ -126,11 +128,11 @@ Item {
             Image {
                 id: icon
                 anchors.centerIn: parent
-                property string url: collectionIcons.source(row.collection.icon || "")
+                property string url: collectionIcons.source(row.group.icon || "")
                 Connections {
                     target: collectionIcons
                     function onReady(name) {
-                        if (name === row.collection.icon)
+                        if (name === row.group.icon)
                             icon.url = collectionIcons.source(name)
                     }
                 }
@@ -152,7 +154,7 @@ Item {
         Text {
             y: Units.dp(24) - baselineOffset
             width: parent.width
-            text: row.collection.name || ""
+            text: row.group.name || ""
             font.pointSize: 10
             font.bold: true
             elide: Text.ElideRight
@@ -162,14 +164,14 @@ Item {
             y: Units.dp(49) - baselineOffset
             // Leave room for the formats at the right
             width: parent.width - (formats.width > 0 ? formats.width + Units.dp(12) : 0)
-            text: (row.collection.authors || []).join(", ")
+            text: (row.group.authors || []).join(", ")
             font.pointSize: 7.25
             elide: Text.ElideRight
         }
         Text {
             y: Units.dp(73) - baselineOffset
             width: parent.width
-            readonly property int count: row.collection.bookCount || 0
+            readonly property int count: row.group.bookCount || 0
             text: count + (count === 1 ? " book" : " books")
             font.pointSize: 7.25
             font.italic: true
@@ -184,7 +186,7 @@ Item {
             spacing: Units.dp(8)
 
             Repeater {
-                model: row.collection.formats || []
+                model: row.group.formats || []
                 Text {
                     required property string modelData
                     text: modelData.toUpperCase()
@@ -198,7 +200,7 @@ Item {
     // Section letter: a floating square at the top left, over the stack's corner
     Rectangle {
         z: 1
-        visible: row.collection.sectionStart === true
+        visible: row.group.sectionStart === true
         x: 0
         y: 0
         width: Units.dp(35)                                     // 76px
@@ -208,7 +210,7 @@ Item {
 
         Text {
             anchors.centerIn: parent
-            text: row.collection.sectionLabel || ""
+            text: row.group.sectionLabel || ""
             font.pointSize: 9
             font.bold: true
         }
