@@ -68,10 +68,6 @@ Downloads::Downloads(BookOrbitClient *client, const QString &settingsPath, QObje
                 diagnostics::log("library scan finished");
         });
     }
-
-    // Earlier versions kept only each book's title and authors; its entry replaces them
-    m_settings.remove("downloadTitles");
-    m_settings.remove("downloadAuthors");
 }
 
 QVariantList Downloads::downloadedBooks() const
@@ -94,8 +90,7 @@ QVariantList Downloads::downloadedBooks() const
 
 QStringList Downloads::pathsFor(int bookId) const
 {
-    // A list since a record can hold an ebook and an audiobook; earlier versions kept a
-    // single path, which reads back as a list of one
+    // A list since a record can hold an ebook and an audiobook
     return m_settings.value(QString("downloads/%1").arg(bookId)).toStringList();
 }
 

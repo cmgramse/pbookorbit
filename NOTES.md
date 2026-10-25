@@ -104,3 +104,38 @@ The app uses the accent for the on-device format pills, falling back to teal. It
 accent; that's fine for a highlight colour. The test
 account's synced theme was set to wisteria to try this, then back to the defaults
 (system, teal) with syncing off.
+
+## Colours on the colour e-ink screen
+
+The Era Color's screen (Kaleido-style colour e-ink) shows colours much paler than an LCD,
+and the system library compensates: its covers are far more saturated and brighter than
+the same images drawn plainly, and dithered (a visible fine pattern).
+
+**It is InkView's `adjustAreaDefault()`** (or `adjustBitmapDefault()`, the same thing on
+an ibitmap). Tested on the device (October 2026) with a throwaway probe app that ran
+InkView's adjustments on the original pixels of covers and saved the results, compared
+with the system library's screenshots of the same covers (blurred and lined up, RMS of
+255):
+
+| | Martin covers, list | Doors of Eden, list | Doors of Eden, Book info |
+|---|---|---|---|
+| unchanged | 19.1 | 45.2 | 49.0 |
+| `adjustAreaDefault`, 24-bit RGB | **5.1** | **7.9** | **19.0** |
+| `adjustAreaDefault`, BGR | 9.5 | 14.1 | 25.8 |
+| `adjustAreaWithLabColorsSaturation`, 3.0 | 9.7 | 12.9 | 22.6 |
+| fitted formula, c' = Y + 3 (c - Y) | 6.8 | 18.0 | 25.2 |
+
+(The rest of the difference is mostly the source: the library draws the EPUB's own cover,
+the app BookOrbit's thumbnail.) Details:
+
+- The data is 24-bit RGB rows, with any scanline. The output is dithered and reduced to a
+  limited palette, so the app caches adjusted covers as PNG at the size they are drawn.
+- `getBrightnessContrastGammaAdjustParams()` reports brightness 100, contrast 100, gamma
+  120 on the device and in the emulator alike.
+- **In the emulator `adjustAreaDefault()` hardly changes anything**, so colours there
+  look like the plain image; judge them on the device.
+- `einkcolors.cpp` uses it for covers and, averaged over a patch, for the accent colour.
+
+Before the probe, the transform was fitted from screenshots alone: HSV saturation
+S' = 1 - (1 - S)^5 matched the dark covers but not the bright one; saturating around
+Rec. 709 luma by 3 matched both better, but not as well as the real function.

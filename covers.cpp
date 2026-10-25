@@ -2,6 +2,7 @@
 
 #include "bookorbitclient.h"
 #include "diagnostics.h"
+#include "einkcolors.h"
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -24,7 +25,8 @@ QString Covers::cacheFile(int bookId, const QString &version, const QSize &size)
 {
     const QString versionHash = QString::fromLatin1(
         QCryptographicHash::hash(version.toUtf8(), QCryptographicHash::Sha1).toHex().left(12));
-    return QString("%1/%2-%3-%4x%5.jpg").arg(m_cacheDir).arg(bookId).arg(versionHash)
+    // Adjusted for the screen and dithered, so PNG: JPEG would smear the dither
+    return QString("%1/%2-%3-%4x%5.png").arg(m_cacheDir).arg(bookId).arg(versionHash)
         .arg(size.width()).arg(size.height());
 }
 
@@ -56,7 +58,9 @@ void Covers::startDownloads()
                 if (image.loadFromData(data)) {
                     // Shrink to fit the space it is shown in, keeping its shape
                     image = image.scaled(request.size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-                    if (image.save(request.file, "JPG", 85))
+                    // Adjusted for the colour screen, as the system library shows covers
+                    adjustForEink(image);
+                    if (image.save(request.file, "PNG"))
                         emit ready(request.bookId);
                 } else {
                     diagnostics::log(QString("cover %1: not an image").arg(request.bookId));

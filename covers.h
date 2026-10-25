@@ -10,7 +10,8 @@ class BookOrbitClient;
 
 // Cover thumbnails for the book list. Downloads each book's thumbnail from BookOrbit
 // (GET /books/:id/thumbnail, about 100 KB), shrinks it to the size it is shown at and
-// keeps it as a small JPEG on the device, so it loads straight from storage next time.
+// adjusts its colours for the screen (einkcolors.h) and keeps it as a PNG on the device,
+// so it loads straight from storage next time.
 //
 // QML asks for a cover with source(); if it isn't cached yet the result is empty, a
 // download starts, and ready(bookId) follows once source() has it.

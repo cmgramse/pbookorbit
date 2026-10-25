@@ -1,6 +1,7 @@
 #include "bookorbitclient.h"
 #include "accents.h"
 #include "diagnostics.h"
+#include "einkcolors.h"
 #include "formats.h"
 
 #include <inkview.h>
@@ -62,7 +63,8 @@ void BookOrbitClient::start()
 
 QColor BookOrbitClient::accentColor() const
 {
-    return accentColors(m_accent).color;
+    // Made more vivid for the screen, like the covers
+    return einkColor(accentColors(m_accent).color);
 }
 
 QColor BookOrbitClient::accentTextColor() const
