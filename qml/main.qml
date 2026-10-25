@@ -267,8 +267,10 @@ Window {
         readonly property int pitch: Math.min(Units.dp(20), Math.floor(height / letters.length))
 
         visible: bookList.visible && bookOrbit.jumpSections.length > 0
-        x: parent.width - Units.dp(33)                 // the 71px right of the rows
-        width: Units.dp(33) - Units.dp(10)             // clear of the scrollbar
+        // The whole gap between the ends of the rows (71px from the edge) and the scrollbar
+        // (dp(8) from it), so the centred letters sit as far from one as the other
+        x: parent.width - Units.dp(33)
+        width: Units.dp(33) - Units.dp(8)
         // Starts below the sub-toolbar, clear of the sort button, and stays put when the
         // sub-toolbar scrolls away
         readonly property real subToolbarHeight: bookList.headerItem ? bookList.headerItem.height : 0
@@ -543,7 +545,7 @@ Window {
             text: deleteDialog.failed
                   ? "Couldn't delete " + (deleteDialog.book.title || "") + " from your device."
                   : "Are you sure you want to delete " + (deleteDialog.book.title || "") + " from your device?"
-            font.pointSize: 8
+            font.pointSize: 7.25
             wrapMode: Text.Wrap
         }
     }

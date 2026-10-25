@@ -93,14 +93,14 @@ SystemDialog {
     Text {
         width: parent.width
         text: dialog.heading
-        font.pointSize: 8
+        font.pointSize: 7.25
         font.bold: true
         wrapMode: Text.Wrap
     }
     Text {
         width: parent.width
         text: dialog.message
-        font.pointSize: 8
+        font.pointSize: 7.25
         wrapMode: Text.Wrap
     }
 }

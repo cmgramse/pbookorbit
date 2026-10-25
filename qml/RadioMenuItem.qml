@@ -31,7 +31,7 @@ Item {
         x: Units.dp(66)
         anchors.verticalCenter: parent.verticalCenter
         color: mouse.pressed ? "white" : "black"
-        font.pointSize: 9
+        font.pointSize: 8
     }
     Rectangle {
         anchors.bottom: parent.bottom

@@ -49,7 +49,7 @@ Rectangle {
                     // 143x47px pill for "Library"
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: label.implicitWidth + 2 * Units.dp(9)
+                        width: label.implicitWidth + 2 * Units.dp(12)
                         height: Units.dp(22)
                         radius: height / 2
                         color: tab.current ? "black" : "white"
@@ -59,7 +59,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: tab.modelData.label
                             color: tab.current ? "white" : "black"
-                            font.pointSize: 7.5
+                            font.pointSize: 6
                             font.bold: true
                         }
                     }

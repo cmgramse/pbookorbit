@@ -36,7 +36,7 @@ Item {
         anchors.centerIn: parent
         visible: image.status !== Image.Ready
         text: button.fallbackText
-        font.pointSize: 9
+        font.pointSize: 8
         font.bold: true
     }
     MouseArea {

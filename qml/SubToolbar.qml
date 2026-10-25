@@ -72,7 +72,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: button.text + " ↓"
                 color: button.open ? "white" : "black"
-                font.pointSize: 9
+                font.pointSize: 8
                 font.capitalization: button.capitals ? Font.AllUppercase : Font.MixedCase
             }
         }

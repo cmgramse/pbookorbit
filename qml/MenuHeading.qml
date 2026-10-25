@@ -14,7 +14,7 @@ Item {
         id: label
         anchors.centerIn: parent
         color: "#606060"
-        font.pointSize: 9
+        font.pointSize: 8
         font.capitalization: Font.AllUppercase
     }
     Rectangle {

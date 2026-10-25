@@ -125,7 +125,7 @@ Rectangle {
                 anchors.margins: searchBox.thickBorder
                 anchors.verticalCenter: parent.verticalCenter
                 leftPadding: Units.dp(3)
-                font.pointSize: 9
+                font.pointSize: 8
                 placeholderText: "Search…"
                 placeholderTextColor: "#949494"
                 background: null
@@ -182,7 +182,7 @@ Rectangle {
             anchors.centerIn: parent
             text: "Recent searches"
             color: "#737373"
-            font.pointSize: 9
+            font.pointSize: 8
             font.capitalization: Font.AllUppercase
         }
         Rectangle {
@@ -219,7 +219,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 text: modelData
                 color: rowMouse.pressed ? "white" : "black"
-                font.pointSize: 9
+                font.pointSize: 8
                 elide: Text.ElideRight
             }
             // 1px grey line, inset from both sides
@@ -324,6 +324,6 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         text: bookOrbit.searchTotal === 0 ? "No books found" : "Searching…"
         color: "#737373"
-        font.pointSize: 9
+        font.pointSize: 8
     }
 }

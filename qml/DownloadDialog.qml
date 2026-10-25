@@ -107,7 +107,7 @@ SystemDialog {
     Text {
         width: parent.width
         text: dialog.book.title || ""
-        font.pointSize: 8
+        font.pointSize: 7.25
         font.bold: true
         wrapMode: Text.Wrap
     }
@@ -115,14 +115,14 @@ SystemDialog {
         width: parent.width
         visible: text !== ""
         text: (dialog.book.authors || []).join(", ")
-        font.pointSize: 8
+        font.pointSize: 7.25
         wrapMode: Text.Wrap
     }
     Text {
         width: parent.width
         topPadding: Units.dp(6)
         text: dialog.message
-        font.pointSize: 8
+        font.pointSize: 7.25
         wrapMode: Text.Wrap
     }
 }

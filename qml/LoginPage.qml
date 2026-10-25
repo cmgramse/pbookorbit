@@ -58,7 +58,7 @@ Item {
 
     component FormField: TextField {
         width: parent.width
-        font.pointSize: 9
+        font.pointSize: 8
         leftPadding: Units.dp(10)
         rightPadding: Units.dp(10)
         topPadding: Units.dp(8)

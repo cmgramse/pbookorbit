@@ -38,7 +38,7 @@ Rectangle {
             id: label
             anchors.verticalCenter: parent.verticalCenter
             color: mouse.pressed ? "white" : "black"
-            font.pointSize: 9
+            font.pointSize: 8
             font.capitalization: Font.AllUppercase
         }
     }

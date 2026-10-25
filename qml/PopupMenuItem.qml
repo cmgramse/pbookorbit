@@ -38,7 +38,7 @@ Item {
         anchors.rightMargin: Units.dp(10)   // 21px
         anchors.verticalCenter: parent.verticalCenter
         color: mouse.pressed ? "white" : "black"
-        font.pointSize: 9
+        font.pointSize: 8
         elide: Text.ElideRight
     }
     // 1px mid-grey line, inset a little from both sides (the library app dithers the same
