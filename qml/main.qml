@@ -63,7 +63,7 @@ Window {
     // their own yet and show the library.
     readonly property bool showingCollections: footer.currentIndex === 1
     // The list under the sub-toolbar whose menus are in use
-    readonly property ListView activeList: showingCollectionBooks ? booksOfPage.list
+    readonly property ListView activeList: showingBooksOf ? booksOfPage.list
                                            : showingCollections ? collectionsPage.list : bookList
 
     AppHeader {
@@ -130,21 +130,53 @@ Window {
             collectionsPage.list.positionViewAtBeginning()
         }
     }
+    // The books of an author, series or collection, as bookOrbit.showBooksOf() takes them,
+    // each kind with its own sort and filter, kept from one to the next as the library's are
+    property string booksOfField
+    property var booksOfValues: []
+    readonly property ListQuery booksOfQuery: booksOfField === "series" ? seriesBooksQuery
+                                              : booksOfField === "collection" ? collectionBooksQuery
+                                              : authorBooksQuery
+    function openBooksOf(kind, name, field, values) {
+        booksOfPage.kind = kind
+        booksOfPage.name = name
+        booksOfField = field
+        booksOfValues = values
+        applyBooksOf(booksOfQuery)
+        showingBooksOf = true
+    }
+    function applyBooksOf(query) {
+        bookOrbit.showBooksOf(booksOfField, booksOfValues, query.sortFields[query.sortIndex], query.descending(),
+                              filterFormats[query.filterIndex], query.downloadedOnly,
+                              query.downloadedOnly ? downloads.downloadedBooks() : [])
+        booksOfPage.list.positionViewAtBeginning()
+    }
+    // An author's books: the library's sorts
+    ListQuery {
+        id: authorBooksQuery
+        sortOptions: libraryQuery.sortOptions
+        sortFields: libraryQuery.sortFields
+        sortDescendingByDefault: libraryQuery.sortDescendingByDefault
+        sortIndex: 1
+        onApplied: root.applyBooksOf(authorBooksQuery)
+    }
+    // A series' books: in its order first, then the library's sorts
+    ListQuery {
+        id: seriesBooksQuery
+        sortOptions: ["Series order"].concat(libraryQuery.sortOptions)
+        sortFields: ["seriesIndex"].concat(libraryQuery.sortFields)
+        sortDescendingByDefault: [false].concat(libraryQuery.sortDescendingByDefault)
+        onApplied: root.applyBooksOf(seriesBooksQuery)
+    }
     // A collection's books: the library's sorts, but Date added is when each book was added
-    // to the collection. Kept from one collection to the next, as the library's are.
+    // to the collection
     ListQuery {
         id: collectionBooksQuery
-        property int collectionId: -1
         sortOptions: libraryQuery.sortOptions
         sortFields: ["collectionOrder", "title", "author", "lastReadAt"]
         sortDescendingByDefault: libraryQuery.sortDescendingByDefault
         sortIndex: 1
-        onApplied: {
-            bookOrbit.showCollectionBooks(collectionId, sortFields[sortIndex], descending(),
-                                          root.filterFormats[filterIndex], downloadedOnly,
-                                          downloadedOnly ? downloads.downloadedBooks() : [])
-            booksOfPage.list.positionViewAtBeginning()
-        }
+        onApplied: root.applyBooksOf(collectionBooksQuery)
     }
     // Books arriving on the device (or their details being looked up) change the
     // downloaded books
@@ -152,14 +184,12 @@ Window {
     onDownloadsRevisionChanged: {
         if (libraryQuery.downloadedOnly)
             libraryQuery.applied()
-        if (showingCollectionBooks && collectionBooksQuery.downloadedOnly)
-            collectionBooksQuery.applied()
+        if (showingBooksOf && booksOfQuery.downloadedOnly)
+            booksOfQuery.applied()
     }
 
-    // A collection's books open over the views, with a sub-toolbar of their own
-    readonly property bool showingCollectionBooks: showingBooksOf && booksOfPage.kind === "Collection"
     // The sort and filter that the menus show and change: those of the page in front
-    readonly property ListQuery activeQuery: showingCollectionBooks ? collectionBooksQuery
+    readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
                                              : showingCollections ? collectionsQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
@@ -309,13 +339,8 @@ Window {
         onSortIconClicked: collectionsQuery.reverseSort()
         // Listed afresh each time the view opens
         onVisibleChanged: if (visible) bookOrbit.loadCollections()
-        onCollectionClicked: (collection) => {
-            booksOfPage.kind = "Collection"
-            booksOfPage.name = collection.name
-            collectionBooksQuery.collectionId = collection.id
-            collectionBooksQuery.applied()
-            root.showingBooksOf = true
-        }
+        onCollectionClicked: (collection) => root.openBooksOf("Collection", collection.name, "collection",
+                                                             [String(collection.id)])
     }
 
     TabFooter {
@@ -485,18 +510,19 @@ Window {
         // Its jump rail starts level with the library's, spaced the same
         jumpRailTop: libraryRail.entriesY
         jumpRailPitch: libraryRail.pitch
-        // A collection's books have the sub-toolbar, with the shared menus
-        filterText: root.filterOptions[collectionBooksQuery.filterIndex]
-        sortText: "By " + collectionBooksQuery.sortOptions[collectionBooksQuery.sortIndex]
-        sortReversed: collectionBooksQuery.sortReversed
-        sortDescending: collectionBooksQuery.sortDescending
-        downloadedOnly: collectionBooksQuery.downloadedOnly
+        // Its sub-toolbar, with the shared menus
+        filterText: root.filterOptions[root.booksOfQuery.filterIndex]
+        sortText: "By " + root.booksOfQuery.sortOptions[root.booksOfQuery.sortIndex]
+        sortReversed: root.booksOfQuery.sortReversed
+        sortDescending: root.booksOfQuery.sortDescending
+        seriesOrder: root.booksOfQuery.sortFields[root.booksOfQuery.sortIndex] === "seriesIndex"
+        downloadedOnly: root.booksOfQuery.downloadedOnly
         filterOpen: filterMenu.visible
         sortOpen: sortMenu.visible
         tabOverhang: filterMenu.border.width - 1
         onFilterClicked: root.toggleDropdown(filterMenu)
         onSortClicked: root.toggleDropdown(sortMenu)
-        onSortIconClicked: collectionBooksQuery.reverseSort()
+        onSortIconClicked: root.booksOfQuery.reverseSort()
         anchors.fill: parent
         visible: root.showingBooksOf
         onBack: {
@@ -523,10 +549,8 @@ Window {
             root.showingInfo = true
         }
         onBooksOfChosen: (field, values, title) => {
-            booksOfPage.kind = field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author"
-            booksOfPage.name = title
-            bookOrbit.showBooksOf(field, values)
-            root.showingBooksOf = true
+            root.openBooksOf(field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author",
+                             title, field, values)
         }
         onDeleteChosen: (book) => deleteDialog.ask(book)
     }

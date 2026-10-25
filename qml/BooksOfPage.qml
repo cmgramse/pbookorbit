@@ -5,10 +5,10 @@ import "units.js" as Units
 // library's rows under a toolbar with a back button, e.g. "SERIES / A SONG OF ICE AND
 // FIRE". An author's or collection's books go in A-Z sections, as in the library; a series' in its order, each under its number in
 // the series. Either has a jump rail when there are more than fit on the screen, and for a
-// series at least 10 books. A collection's books have the library's sub-toolbar too, to
-// filter and sort them, whose menus main.qml shows.
-// Loads as it scrolls, like the library list. bookOrbit.showBooksOf() or
-// showCollectionBooks() fills it.
+// series at least 16 books. Above them, the library's sub-toolbar, to filter and sort them
+// (a series also in its own order, the one these sections and the number rail go with),
+// whose menus main.qml shows.
+// Loads as it scrolls, like the library list. bookOrbit.showBooksOf() fills it.
 Rectangle {
     id: page
     color: "white"
@@ -20,12 +20,13 @@ Rectangle {
     property real jumpRailTop: NaN
     // And the spacing of its entries
     property real jumpRailPitch: NaN
-    // For a collection's sub-toolbar, as SubToolbar takes them
-    readonly property bool showToolbar: kind === "Collection"
+    // For the sub-toolbar, as SubToolbar takes them
     property string filterText
     property string sortText
     property bool sortReversed: false
     property bool sortDescending: false
+    // Sorted in the series' order: each book under its number, with a number rail
+    property bool seriesOrder: false
     property bool downloadedOnly: false
     property bool filterOpen: false
     property bool sortOpen: false
@@ -55,22 +56,18 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         model: bookOrbit.booksOf
 
-        // A collection's sub-toolbar scrolls away with the books, as the library's does
-        header: page.showToolbar ? toolbarHeader : null
-        Component {
-            id: toolbarHeader
-            SubToolbar {
-                width: ListView.view ? ListView.view.width : 0
-                filterText: page.filterText
-                sortText: page.sortText
-                sortReversed: page.sortReversed
-                filterOpen: page.filterOpen
-                sortOpen: page.sortOpen
-                tabOverhang: page.tabOverhang
-                onFilterClicked: page.filterClicked()
-                onSortClicked: page.sortClicked()
-                onSortIconClicked: page.sortIconClicked()
-            }
+        // The sub-toolbar scrolls away with the books, as the library's does
+        header: SubToolbar {
+            width: ListView.view ? ListView.view.width : 0
+            filterText: page.filterText
+            sortText: page.sortText
+            sortReversed: page.sortReversed
+            filterOpen: page.filterOpen
+            sortOpen: page.sortOpen
+            tabOverhang: page.tabOverhang
+            onFilterClicked: page.filterClicked()
+            onSortClicked: page.sortClicked()
+            onSortIconClicked: page.sortIconClicked()
         }
 
         function loadVisibleBooks() {
@@ -127,10 +124,10 @@ Rectangle {
         sections: bookOrbit.booksOfJumpSections
         alignTop: page.jumpRailTop
         alignPitch: page.jumpRailPitch
-        alphabetical: page.kind !== "Series"
-        descending: page.showToolbar && page.sortDescending
+        alphabetical: !page.seriesOrder
+        descending: page.sortDescending
         // A series of fewer books is quick enough to scroll
-        minSections: page.kind === "Series" ? 16 : 1
+        minSections: page.seriesOrder ? 16 : 1
         bottomInset: booksPages.height
     }
     PageButtons {
@@ -147,7 +144,7 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width - 2 * Units.dp(26)
         horizontalAlignment: Text.AlignHCenter
-        text: bookOrbit.booksOfTotal === 0 ? (page.showToolbar && page.downloadedOnly ? "No downloaded books" : "No books found")
+        text: bookOrbit.booksOfTotal === 0 ? (page.downloadedOnly ? "No downloaded books" : "No books found")
               : bookOrbit.error !== "" ? bookOrbit.error
               : "Loading…"
         color: "#737373"

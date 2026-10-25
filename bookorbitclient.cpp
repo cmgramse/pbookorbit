@@ -170,9 +170,11 @@ void BookOrbitClient::refreshList(PagedBooks &list)
         if (generation != refreshed->queryGeneration)
             return;
         refreshed->query = bookQuery(*refreshed);
-        if (refreshed == &m_list) {
+        if (refreshed == &m_list || m_booksOfField != "collection") {
             refreshed->path = libraryBooksPath();
             refreshed->jumpPath = refreshed->path + "/jump-buckets";
+        }
+        if (refreshed == &m_list) {
             // With every type listed, an audiobook's ebook record is in the list too
             refreshed->mergePairs = refreshed->formats.isEmpty();
         }
@@ -180,6 +182,12 @@ void BookOrbitClient::refreshList(PagedBooks &list)
         if (isLetterSort(refreshed->sortField)) {
             refreshed->sections = Sections::Letters;
             loadJumpSections(*refreshed, [this, refreshed]() { loadPage(*refreshed, 0); });
+        } else if (refreshed->sortField == "seriesIndex") {
+            // Each book under its number in the series
+            refreshed->sections = Sections::SeriesNumbers;
+            clearJumpSections(*refreshed);
+            loadPage(*refreshed, 0);
+            loadSeriesSections(*refreshed);
         } else {
             // A collection's order has no sections: it doesn't say when each was added
             refreshed->sections = isDateSort(refreshed->sortField) ? Sections::Days : Sections::None;
@@ -225,49 +233,14 @@ void BookOrbitClient::loadSearchResults(int first, int last)
     loadPages(m_search, first, last);
 }
 
-void BookOrbitClient::showBooksOf(const QString &field, const QStringList &values)
+void BookOrbitClient::showBooksOf(const QString &field, const QStringList &values,
+                                  const QString &sortField, bool descending,
+                                  const QStringList &formats, bool onlyListed,
+                                  const QVariantList &onlyBooks)
 {
-    restartPages(m_booksOf);
-    m_booksOfCollection = -1;
-    m_booksOf.onlyListed = false;
-    // Not the last author's or series' books while the first page loads
-    m_booksOf.listGeneration = -1;
-    m_booksOf.total = 0;
-    m_booksOf.model.reset(0);
-    clearJumpSections(m_booksOf);
-    emit booksOfChanged();
-    const int generation = m_booksOf.queryGeneration;
-    loadLibrary([this, generation, field, values]() {
-        if (generation != m_booksOf.queryGeneration)
-            return;
-        // Matches the names exactly
-        m_booksOf.path = libraryBooksPath();
-        m_booksOf.jumpPath = m_booksOf.path + "/jump-buckets";
-        m_booksOf.query = QJsonObject{
-            {"filter", group("AND", {rule(field, "includesAny", QJsonArray::fromStringList(values))})},
-            {"sort", QJsonArray{QJsonObject{{"field", field == "series" ? "seriesIndex" : "title"}, {"dir", "asc"}}}},
-        };
-        // Every type is listed, so an audiobook's ebook record is too
-        m_booksOf.mergePairs = true;
-        // An author's books, by title, go in A-Z sections like the library's. A series'
-        // go in its order, each under its number.
-        if (field == "series") {
-            m_booksOf.sections = Sections::SeriesNumbers;
-            loadPage(m_booksOf, 0);
-            loadSeriesSections(m_booksOf);
-        } else {
-            m_booksOf.sections = Sections::Letters;
-            loadJumpSections(m_booksOf, [this]() { loadPage(m_booksOf, 0); });
-        }
-    });
-}
-
-void BookOrbitClient::showCollectionBooks(int collectionId, const QString &sortField, bool descending,
-                                          const QStringList &formats, bool onlyListed,
-                                          const QVariantList &onlyBooks)
-{
-    // Another collection (or after an author's books): not the old rows meanwhile
-    if (collectionId != m_booksOfCollection) {
+    // Other books: not the old rows meanwhile. The same ones sorted or filtered anew keep
+    // them until the new rows arrive, as the library does.
+    if (field != m_booksOfField || values != m_booksOfValues) {
         restartPages(m_booksOf);
         m_booksOf.listGeneration = -1;
         m_booksOf.total = 0;
@@ -275,25 +248,45 @@ void BookOrbitClient::showCollectionBooks(int collectionId, const QString &sortF
         clearJumpSections(m_booksOf);
         emit booksOfChanged();
     }
-    m_booksOfCollection = collectionId;
+    m_booksOfField = field;
+    m_booksOfValues = values;
     m_booksOfCollectionIds.clear();
-    for (const QVariantMap &row : std::as_const(m_collectionRows)) {
-        if (row.value("id").toInt() == collectionId)
-            m_booksOfCollectionIds = row.value("bookIds").toList();
+    if (field == "collection") {
+        const int collectionId = values.value(0).toInt();
+        for (const QVariantMap &row : std::as_const(m_collectionRows)) {
+            if (row.value("id").toInt() == collectionId)
+                m_booksOfCollectionIds = row.value("bookIds").toList();
+        }
+        const QString path = QString("/collections/%1/books").arg(collectionId);
+        m_booksOf.path = path + "/query";
+        m_booksOf.jumpPath = path + "/jump-buckets";
+        m_booksOf.rules = QJsonArray();
+        // An audiobook's ebook record may not be in the collection
+        m_booksOf.mergePairs = false;
+    } else {
+        // The library's books, matching the names exactly. refreshList() sets the path.
+        m_booksOf.rules = QJsonArray{rule(field, "includesAny", QJsonArray::fromStringList(values))};
+        // With every type listed, an audiobook's ebook record is too
+        m_booksOf.mergePairs = formats.isEmpty();
     }
-    const QString path = QString("/collections/%1/books").arg(collectionId);
-    m_booksOf.path = path + "/query";
-    m_booksOf.jumpPath = path + "/jump-buckets";
-    // An audiobook's ebook record may not be in the collection
-    m_booksOf.mergePairs = false;
     m_booksOf.sortField = sortField;
     m_booksOf.sortDescending = descending;
     m_booksOf.formats = formats;
     m_booksOf.onlyListed = onlyListed;
-    // Just the downloaded books in the collection
+    // Just the downloaded books among these
     m_booksOf.onlyBooks.clear();
-    for (const QVariant &book : onlyBooks) {
-        if (m_booksOfCollectionIds.contains(book.toMap().value("id")))
+    for (const QVariant &value : onlyBooks) {
+        const QVariantMap book = value.toMap();
+        bool wanted = false;
+        if (field == "collection") {
+            wanted = m_booksOfCollectionIds.contains(book.value("id"));
+        } else if (field == "series") {
+            wanted = values.contains(book.value("seriesName").toString());
+        } else {
+            for (const QString &author : book.value("authors").toStringList())
+                wanted = wanted || values.contains(author);
+        }
+        if (wanted)
             m_booksOf.onlyBooks.append(book);
     }
     refreshList(m_booksOf);
@@ -479,8 +472,11 @@ QJsonObject BookOrbitClient::bookQuery(const PagedBooks &list)
         {"sort", QJsonArray{QJsonObject{{"field", list.sortField}, {"dir", list.sortDescending ? "desc" : "asc"}}}},
     };
 
+    QJsonArray rules = list.rules;
     if (!list.formats.isEmpty())
-        query.insert("filter", group("AND", {rule("format", "includesAny", QJsonArray::fromStringList(list.formats))}));
+        rules.append(rule("format", "includesAny", QJsonArray::fromStringList(list.formats)));
+    if (!rules.isEmpty())
+        query.insert("filter", group("AND", rules));
     return query;
 }
 
@@ -502,7 +498,10 @@ static QString letterSection(const QString &key)
 void BookOrbitClient::showListedBooks(PagedBooks &list)
 {
     const bool letters = isLetterSort(list.sortField);
-    list.sections = letters ? Sections::Letters : isDateSort(list.sortField) ? Sections::Days : Sections::None;
+    const bool seriesNumbers = list.sortField == "seriesIndex";
+    list.sections = letters ? Sections::Letters
+                  : seriesNumbers ? Sections::SeriesNumbers
+                  : isDateSort(list.sortField) ? Sections::Days : Sections::None;
     // The key each book sorts by, as the server would sort it
     const QString field = list.sortField;
     const QVariantList collectionIds = &list == &m_booksOf ? m_booksOfCollectionIds : QVariantList();
@@ -510,6 +509,11 @@ void BookOrbitClient::showListedBooks(PagedBooks &list)
         if (field == "author") {
             const QStringList authors = book.value("authors").toStringList();
             return authors.isEmpty() ? QString() : authorSortKey(authors.first());
+        }
+        if (field == "seriesIndex") {
+            // Numbers in order, and books without one last
+            const QVariant index = book.value("seriesIndex");
+            return index.isNull() ? QString("~") : QString("%1").arg(index.toDouble(), 12, 'f', 3, QChar('0'));
         }
         if (field == "collectionOrder") {
             // Its place in the collection, counting from the first added
@@ -570,6 +574,11 @@ void BookOrbitClient::showListedBooks(PagedBooks &list)
                 list.sectionStarts.insert(rows.size(), letter);
                 list.jumpSections.append(QVariantMap{{"label", letter}, {"index", rows.size()}});
             }
+        } else if (seriesNumbers && !row.value("seriesIndex").isNull()) {
+            // As loadSeriesSections() lists them for the server's rows
+            const QString label = row.value("seriesIndex").toString();
+            if (list.jumpSections.isEmpty() || list.jumpSections.last().toMap().value("label") != label)
+                list.jumpSections.append(QVariantMap{{"label", label}, {"index", rows.size()}});
         }
         rows.append(row);
     }

@@ -18,7 +18,7 @@ Item {
     property bool alphabetical: true
     // Fewer sections than this and the rail isn't worth showing
     property int minSections: 1
-    // Z to A, then #, when the list is turned round
+    // Z to A, then #, or the numbers from the last, when the list is turned round
     property bool descending: false
     // Space kept clear at the top (e.g. a header that scrolls away) and at the bottom
     // (e.g. page buttons)
@@ -47,8 +47,8 @@ Item {
                                                     : alignPitch
     // The entries, in the list's order: [{label, index}], index being the row to go to, or
     // undefined if there are no books there
-    readonly property var entries: alphabetical ? letterEntries()
-                                                : numberEntries(Math.max(2, Math.floor(room / pitch)))
+    readonly property var entries: alphabetical ? letterEntries() : descending ? numbers.slice().reverse() : numbers
+    readonly property var numbers: alphabetical ? [] : numberEntries(Math.max(2, Math.floor(room / pitch)))
 
     function letterEntries() {
         const starts = {}
