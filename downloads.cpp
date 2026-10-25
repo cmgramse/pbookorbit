@@ -178,7 +178,7 @@ void Downloads::download(const QVariantMap &book, int fileId)
         finish(QString("Can't create the %1 folder").arg(folderName));
         return;
     }
-    m_part.setFileName(QString("%1/.bookorbit-%2.part").arg(folder).arg(file.value("id").toInt()));
+    m_part.setFileName(QString("%1/.pbookorbit-%2.part").arg(folder).arg(file.value("id").toInt()));
     if (!m_part.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         finish(QString("Can't write to the %1 folder: %2").arg(folderName, m_part.errorString()));
         return;

@@ -30,14 +30,14 @@ int main(int argc, char *argv[])
     app.styleHints()->setCursorFlashTime(0);
 
     // /mnt/ext1/system/config on the device, ./system/config in the emulator.
-    // BOOKORBIT_SETTINGS points automated tests at their own file, so they don't touch the
+    // PBOOKORBIT_SETTINGS points automated tests at their own file, so they don't touch the
     // saved login.
-    const QString settingsPath = qEnvironmentVariable("BOOKORBIT_SETTINGS",
-                                                      QString::fromUtf8(CONFIGPATH "/bookorbit.ini"));
+    const QString settingsPath = qEnvironmentVariable("PBOOKORBIT_SETTINGS",
+                                                      QString::fromUtf8(CONFIGPATH "/pbookorbit.ini"));
     BookOrbitClient client(settingsPath);
 
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
-    Covers covers(&client, QString::fromUtf8(USERDATA "/cache/bookorbit-covers"));
+    Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
     Downloads downloads(&client, settingsPath);
     Eink eink;
     diagnostics::Log diagnosticsLog;

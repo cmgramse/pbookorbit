@@ -1,4 +1,4 @@
-TARGET = bookorbit.app
+TARGET = pbookorbit.app
 QT += quick network
 CONFIG += c++17 qtquickcompiler
 

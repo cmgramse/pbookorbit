@@ -14,9 +14,9 @@ namespace diagnostics {
 static QFile *logFile()
 {
     static QFile *file = [] {
-        auto *f = new QFile(QString::fromUtf8(FLASHDIR "/bookorbit.log"));
+        auto *f = new QFile(QString::fromUtf8(FLASHDIR "/pbookorbit.log"));
         if (!f->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
-            fprintf(stderr, "bookorbit: can't write %s\n", qPrintable(f->fileName()));
+            fprintf(stderr, "pbookorbit: can't write %s\n", qPrintable(f->fileName()));
         return f;
     }();
     return file;
