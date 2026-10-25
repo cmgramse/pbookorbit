@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QRegularExpression>
 #include <QElapsedTimer>
 #include <QScopeGuard>
 #include <QUrl>
@@ -297,12 +298,31 @@ void BookOrbitClient::loadLibrary(std::function<void()> then)
     });
 }
 
-// What makes two records the same book: title and first author
+// Just the letters and digits, in lower case: "Carl’s Doomsday Scenario" and "Carl's
+// Doomsday Scenario" are the same, as are "James S.A. Corey" and "James S. A. Corey"
+static QString looseText(const QString &text)
+{
+    QString loose;
+    for (const QChar c : text) {
+        if (c.isLetterOrNumber())
+            loose.append(c.toLower());
+    }
+    return loose;
+}
+
+// The words of some text, without the punctuation around and inside them
+static QStringList words(const QString &text)
+{
+    static const QRegularExpression notWord(R"([^\p{L}\p{N}]+)");
+    return text.split(notWord, Qt::SkipEmptyParts);
+}
+
+// What makes two records the same book: title and first author, in loose text
 static QString companionKey(const QVariantMap &book)
 {
     const QStringList authors = book.value("authors").toStringList();
-    return book.value("title").toString().trimmed().toLower() + '\n'
-           + (authors.isEmpty() ? QString() : authors.first().trimmed().toLower());
+    return looseText(book.value("title").toString()) + '\n'
+           + (authors.isEmpty() ? QString() : looseText(authors.first()));
 }
 
 // A record's versions of the book, at most one ebook and one audiobook:
@@ -598,15 +618,27 @@ void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVaria
 {
     if (books.isEmpty())
         return;
-    // Every record with the same title and first author as a book on the page, whatever
-    // the list's filter: any of (title is ... and an author is ...)
+    // Every record that may have the same title and first author as a book on the page,
+    // whatever the list's filter: any of (title has each of its words and an author has
+    // the longest word of the first's). Punctuation is left out, as records can spell it
+    // differently ("Carl’s" and "Carl's"); companionKey() then picks the matches.
     QJsonArray matches;
     for (const QVariant &value : books) {
         const QVariantMap book = value.toMap();
-        QJsonArray match{rule("title", "eq", book.value("title").toString())};
+        const QString title = book.value("title").toString();
+        QJsonArray match;
+        for (const QString &word : words(title))
+            match.append(rule("title", "contains", word));
+        if (match.isEmpty())
+            match.append(rule("title", "eq", title));
         const QStringList authors = book.value("authors").toStringList();
-        if (!authors.isEmpty())
-            match.append(rule("author", "includesAny", QJsonArray{authors.first()}));
+        QString authorWord;
+        for (const QString &word : words(authors.value(0))) {
+            if (word.length() > authorWord.length())
+                authorWord = word;
+        }
+        if (!authorWord.isEmpty())
+            match.append(rule("author", "includesAny", QJsonArray{authorWord}));
         matches.append(group("AND", match));
     }
     const QJsonObject query{
