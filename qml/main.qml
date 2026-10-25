@@ -429,6 +429,14 @@ Window {
 
         PopupMenuItem {
             visible: bookOrbit.signedIn
+            text: "Find books on this device"
+            onClicked: {
+                menu.visible = false
+                findBooksDialog.search()
+            }
+        }
+        PopupMenuItem {
+            visible: bookOrbit.signedIn
             text: "Sign out"
             showSeparator: false
             onClicked: {
@@ -453,5 +461,20 @@ Window {
         id: downloadDialog
         anchors.fill: parent
         onOpened: (bookId) => downloads.open(bookId)
+    }
+    FindBooksDialog {
+        id: findBooksDialog
+        anchors.fill: parent
+    }
+    // Signing in for the first time offers to find the books already on the device, if
+    // there are any. Only the once: after that it's in the menu.
+    Connections {
+        target: bookOrbit
+        function onSignedInChanged() {
+            if (bookOrbit.signedIn && bookFinder.shouldOffer()) {
+                bookFinder.markOffered()
+                findBooksDialog.offer()
+            }
+        }
     }
 }

@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QSettings>
 #include <QStringList>
 #include <QVariantMap>
@@ -56,6 +57,17 @@ public:
     Q_INVOKABLE void cancel();
     // Opens a downloaded book in the system reader
     Q_INVOKABLE bool open(int bookId);
+
+    // Every book file the app has recorded, whether or not it is still there
+    QSet<QString> recordedPaths() const;
+    // A book file that was on the device already, and the book it is
+    struct Existing {
+        int bookId;
+        QString path;
+        QVariantMap entry;   // the book's list entry
+    };
+    // Records them as if the app had downloaded them
+    void addExisting(const QList<Existing> &books);
 
 signals:
     void changed();

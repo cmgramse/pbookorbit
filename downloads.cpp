@@ -308,6 +308,37 @@ void Downloads::setPercent(int percent)
     emit changed();
 }
 
+QSet<QString> Downloads::recordedPaths() const
+{
+    QSet<QString> paths;
+    m_settings.beginGroup("downloads");
+    const QStringList ids = m_settings.childKeys();
+    m_settings.endGroup();
+    for (const QString &id : ids) {
+        for (const QString &path : pathsFor(id.toInt()))
+            paths.insert(path);
+    }
+    return paths;
+}
+
+void Downloads::addExisting(const QList<Existing> &books)
+{
+    if (books.isEmpty())
+        return;
+    for (const Existing &book : books) {
+        QStringList paths = pathsFor(book.bookId);
+        if (!paths.contains(book.path))
+            paths.append(book.path);
+        m_settings.setValue(QString("downloads/%1").arg(book.bookId), paths);
+        m_settings.setValue(QString("downloadEntries/%1").arg(book.bookId),
+                            QJsonDocument(QJsonObject::fromVariantMap(book.entry)).toJson(QJsonDocument::Compact));
+        diagnostics::log(QString("book %1 found at %2").arg(book.bookId).arg(book.path));
+    }
+    m_settings.sync();
+    m_revision++;
+    emit changed();
+}
+
 bool Downloads::open(int bookId)
 {
     // The ebook if both are here

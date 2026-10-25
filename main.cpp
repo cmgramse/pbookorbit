@@ -7,6 +7,7 @@
 #include <QQuickWindow>
 #include <QStyleHints>
 
+#include "bookfinder.h"
 #include "bookorbitclient.h"
 #include "diagnostics.h"
 #include "covers.h"
@@ -39,6 +40,7 @@ int main(int argc, char *argv[])
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
     Downloads downloads(&client, settingsPath);
+    BookFinder bookFinder(&client, &downloads, settingsPath);
     Eink eink;
     diagnostics::Log diagnosticsLog;
 
@@ -51,6 +53,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("bookOrbit", &client);
     engine.rootContext()->setContextProperty("covers", &covers);
     engine.rootContext()->setContextProperty("downloads", &downloads);
+    engine.rootContext()->setContextProperty("bookFinder", &bookFinder);
     engine.rootContext()->setContextProperty("eink", &eink);
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>

@@ -11,6 +11,13 @@ inline bool isAudioFormat(const QString &format)
     return audio.contains(format.toLower());
 }
 
+// Formats of book files, ebooks or audiobooks, as BookOrbit takes them
+inline bool isBookFormat(const QString &format)
+{
+    static const QStringList ebook{"epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu", "cbz", "cbr"};
+    return ebook.contains(format.toLower()) || isAudioFormat(format);
+}
+
 // "ebook" or "audiobook"
 inline QString mediaKind(const QString &format)
 {

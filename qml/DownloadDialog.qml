@@ -2,12 +2,8 @@ import QtQuick
 import "units.js" as Units
 
 // Offers to download a book that isn't on the device, shows the download, then opens the
-// book. A book with an ebook and an audiobook asks which to download. Laid out like the
-// system's own dialogs (InkView's Dialog(), which can't be used from Qt), measured on an
-// Era Color: thick black rounded border, a round theme icon on the left with the message
-// beside it, and the buttons side by side along the bottom, split by thin grey lines. The
-// window fades behind it.
-Item {
+// book. A book with an ebook and an audiobook asks which to download.
+SystemDialog {
     id: dialog
     // The book being offered, as in the book list
     property var book: ({})
@@ -22,7 +18,9 @@ Item {
 
     signal opened(int bookId)
 
-    visible: false
+    icon: error !== "" || !hasFile ? "icon_error" : "icon_question"
+    percent: downloading ? downloads.percent : -1
+    onPressed: (action) => press(action)
 
     // variants as the book list gives them; without any, the book's primary file
     function show(newBook, variants) {
@@ -75,11 +73,11 @@ Item {
     }
 
     // The buttons, left to right: [label, action]; an option's index downloads it
-    readonly property var buttons: downloading ? [["Cancel", "close"]]
-                                   : !hasFile ? [["Close", "close"]]
-                                   : error !== "" ? [["Try again", options.indexOf(chosen)], ["Cancel", "close"]]
-                                   : chosen === null ? options.map((o, i) => [o.kind, i]).concat([["Cancel", "close"]])
-                                   : [["Download", 0], ["Cancel", "close"]]
+    buttons: downloading ? [["Cancel", "close"]]
+             : !hasFile ? [["Close", "close"]]
+             : error !== "" ? [["Try again", options.indexOf(chosen)], ["Cancel", "close"]]
+             : chosen === null ? options.map((o, i) => [o.kind, i]).concat([["Cancel", "close"]])
+             : [["Download", 0], ["Cancel", "close"]]
 
     function press(action) {
         if (action === "close") {
@@ -106,144 +104,25 @@ Item {
         }
     }
 
-    // The faded window; a tap outside the panel does nothing, so a download isn't
-    // cancelled by accident
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(1, 1, 1, 0.6)
-        MouseArea {
-            anchors.fill: parent
-        }
+    Text {
+        width: parent.width
+        text: dialog.book.title || ""
+        font.pointSize: 8
+        font.bold: true
+        wrapMode: Text.Wrap
     }
-
-    Rectangle {
-        id: panel
-        // Near the bottom of the screen, as the system's dialogs are (screenshot 13): its
-        // bottom edge 131px up
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: Units.dp(60)
-        width: parent.width - 2 * Units.dp(42)                 // 92px from each side
-        height: body.height + buttonRow.height + 2 * border.width
-        radius: Units.dp(9)
-        border.width: Units.dp(4)                               // 9px
-        border.color: "black"
-        color: "white"
-
-        // Icon and message
-        Item {
-            id: body
-            x: panel.border.width
-            y: panel.border.width
-            width: panel.width - 2 * x
-            height: Math.max(Units.dp(175), message.height + 2 * Units.dp(25))   // 380px or more
-
-            Image {
-                id: icon
-                x: Units.dp(25)                                 // 54px
-                anchors.verticalCenter: parent.verticalCenter
-                source: "image://theme/" + (dialog.error !== "" || !dialog.hasFile ? "icon_error" : "icon_question")
-            }
-
-            Column {
-                id: message
-                x: icon.x + icon.width + Units.dp(52)           // 113px after the icon
-                width: parent.width - x - Units.dp(25)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Units.dp(6)
-
-                Text {
-                    width: parent.width
-                    text: dialog.book.title || ""
-                    font.pointSize: 8
-                    font.bold: true
-                    wrapMode: Text.Wrap
-                }
-                Text {
-                    width: parent.width
-                    visible: text !== ""
-                    text: (dialog.book.authors || []).join(", ")
-                    font.pointSize: 8
-                    wrapMode: Text.Wrap
-                }
-                Text {
-                    width: parent.width
-                    topPadding: Units.dp(6)
-                    text: dialog.message
-                    font.pointSize: 8
-                    wrapMode: Text.Wrap
-                }
-                // Progress: a black bar filling a 1px outline
-                Rectangle {
-                    width: parent.width
-                    height: Units.dp(8)
-                    visible: dialog.downloading
-                    border.width: 1
-                    border.color: "black"
-                    Rectangle {
-                        width: parent.width * downloads.percent / 100
-                        height: parent.height
-                        color: "black"
-                    }
-                }
-            }
-        }
-
-        // Buttons along the bottom: a grey line above them and between them, each
-        // inverted while pressed
-        Row {
-            id: buttonRow
-            x: panel.border.width
-            y: body.y + body.height
-            width: panel.width - 2 * x
-            height: Units.dp(54)                                // 118px
-
-            Repeater {
-                model: dialog.buttons
-                Item {
-                    required property var modelData
-                    required property int index
-                    width: buttonRow.width / dialog.buttons.length
-                    height: buttonRow.height
-
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.topMargin: 1
-                        color: "black"
-                        visible: press.pressed
-                        // Square on top, rounded into the panel's corners below
-                        bottomLeftRadius: index === 0 ? panel.radius - panel.border.width : 0
-                        bottomRightRadius: index === dialog.buttons.length - 1 ? panel.radius - panel.border.width : 0
-                    }
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData[0]
-                        color: press.pressed ? "white" : "black"
-                        font.pointSize: 8
-                        font.capitalization: Font.AllUppercase
-                    }
-                    // Line between this button and the one before
-                    Rectangle {
-                        visible: index > 0
-                        width: 1
-                        height: parent.height
-                        color: "#7f7f7f"
-                    }
-                    MouseArea {
-                        id: press
-                        anchors.fill: parent
-                        onClicked: dialog.press(modelData[1])
-                    }
-                }
-            }
-        }
-        // Line above the buttons
-        Rectangle {
-            x: buttonRow.x
-            y: buttonRow.y
-            width: buttonRow.width
-            height: 1
-            color: "#7f7f7f"
-        }
+    Text {
+        width: parent.width
+        visible: text !== ""
+        text: (dialog.book.authors || []).join(", ")
+        font.pointSize: 8
+        wrapMode: Text.Wrap
+    }
+    Text {
+        width: parent.width
+        topPadding: Units.dp(6)
+        text: dialog.message
+        font.pointSize: 8
+        wrapMode: Text.Wrap
     }
 }

@@ -684,6 +684,32 @@ void BookOrbitClient::download(const QString &path, DataHandler onSuccess, Error
     call("GET", path, QJsonDocument(), onSuccess, onError, true);
 }
 
+void BookOrbitClient::request(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                              DataHandler onSuccess, ErrorHandler onError)
+{
+    call(method, path, body, onSuccess, onError, true);
+}
+
+void BookOrbitClient::withLibrary(std::function<void(int libraryId)> then, ErrorHandler onError)
+{
+    if (m_libraryId >= 0) {
+        then(m_libraryId);
+        return;
+    }
+    // As loadLibrary(), without touching the error property
+    request("GET", "/libraries", QJsonDocument(),
+        [this, then, onError](const QByteArray &data) {
+            const QJsonArray libraries = QJsonDocument::fromJson(data).array();
+            if (libraries.isEmpty()) {
+                onError(0, "No libraries on this server");
+                return;
+            }
+            m_libraryId = libraries.first().toObject().value("id").toInt();
+            then(m_libraryId);
+        },
+        onError);
+}
+
 void BookOrbitClient::callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
                                std::function<void(const QJsonDocument &)> onSuccess,
                                std::function<void()> onFailed)

@@ -105,6 +105,12 @@ public:
     // the request and hands over the reply, which the caller then owns
     void startStream(const QString &path, std::function<void(QNetworkReply *)> onStarted,
                      ErrorHandler onError);
+    // Authenticated request for background work: failures go to onError rather than the
+    // error property, and it doesn't count as busy
+    void request(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                 DataHandler onSuccess, ErrorHandler onError);
+    // The library the book list shows, looked up first if it isn't known yet
+    void withLibrary(std::function<void(int libraryId)> then, ErrorHandler onError);
 
 signals:
     void usernameChanged();
