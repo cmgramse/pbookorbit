@@ -296,8 +296,12 @@ Window {
                 }
             }
         }
+        // Wider than the letters, reaching a little over the ends of the rows, so the
+        // rail is easier to hit
         MouseArea {
-            anchors.fill: parent
+            x: -Units.dp(16)                           // 35px
+            width: parent.width - x
+            height: parent.height
             onClicked: (mouse) => {
                 const letter = jumpRail.letters[Math.floor((mouse.y - railLetters.y) / jumpRail.pitch)]
                 const index = jumpRail.starts[letter]
