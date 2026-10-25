@@ -2,6 +2,7 @@
 
 #include "booklistmodel.h"
 
+#include <QColor>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QHash>
@@ -37,6 +38,11 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *searchResults READ searchResults CONSTANT)
     // How many books match the search text, or -1 until the server has said
     Q_PROPERTY(int searchTotal READ searchTotal NOTIFY searchChanged)
+    // The user's BookOrbit accent colour (its "Accent color" appearance setting), and the
+    // colour for text and icons on it. Only known if they sync (or once synced) their theme
+    // preferences to the server; otherwise BookOrbit's default, teal. Kept for offline use.
+    Q_PROPERTY(QColor accentColor READ accentColor NOTIFY accentChanged)
+    Q_PROPERTY(QColor accentTextColor READ accentTextColor NOTIFY accentChanged)
     // Searches kept for the search page, newest first
     Q_PROPERTY(QStringList recentSearches READ recentSearches NOTIFY recentSearchesChanged)
 
@@ -57,6 +63,8 @@ public:
     BookListModel *searchResults() { return &m_search.model; }
     int searchTotal() const;
     QStringList recentSearches() const { return m_recentSearches; }
+    QColor accentColor() const;
+    QColor accentTextColor() const;
 
     // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
@@ -107,6 +115,7 @@ signals:
     void jumpSectionsChanged();
     void searchChanged();
     void recentSearchesChanged();
+    void accentChanged();
 
 private:
     // A list of books loaded a page at a time: the library, or search results. The model
@@ -144,6 +153,8 @@ private:
     void callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
                   std::function<void(const QJsonDocument &)> onSuccess,
                   std::function<void()> onFailed = nullptr);
+    // Reads the user's accent from their synced theme preferences, if any
+    void loadAccent();
     // The library the list shows (GET /libraries), then calls then
     void loadLibrary(std::function<void()> then);
     // The sort, and the filter if there is one, as BookOrbit's book queries take them
@@ -200,6 +211,7 @@ private:
     QHash<int, QString> m_sectionStarts;
     PagedBooks m_search;
     QStringList m_recentSearches;
+    QString m_accent;   // a BookOrbit accent name, e.g. "teal"; empty for the default
     bool m_refreshing = false;
     QList<std::function<void()>> m_afterRefresh;
 };

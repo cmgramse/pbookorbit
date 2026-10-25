@@ -38,6 +38,8 @@ Rectangle {
         width: parent.width - 2 * (header.margin + Math.max(homeButton.width, rightButtons.width))
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
+        // So part of the title can be coloured: <font color="...">
+        textFormat: Text.StyledText
         font.pointSize: 8
         font.capitalization: Font.AllUppercase
     }

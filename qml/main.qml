@@ -53,7 +53,8 @@ Window {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        title: "PocketBook × BookOrbit"
+        // "Orbit" in the user's BookOrbit accent colour
+        title: "PocketBook × Book<font color=\"" + bookOrbit.accentColor + "\">Orbit</font>"
         menuOpen: menu.visible
         showSearch: bookOrbit.signedIn
         onHomeClicked: root.goHome()

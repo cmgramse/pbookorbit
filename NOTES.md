@@ -64,3 +64,24 @@ tested in the emulator: `DialogSynchro` froze the app and drew nothing; `Dialog`
 a stale screen buffer, without its title, and its buttons didn't respond. They belong to
 InkView's own event loop and canvas, which Qt replaces. Dialogs are drawn in QML instead,
 after the native look (`DownloadDialog.qml`).
+
+## The user's accent colour
+
+BookOrbit's appearance settings (theme, accent, corner radius, background) live in the
+browser unless the user turns on syncing them to their account:
+
+- `GET /auth/me` → `settings.syncThemePreferences`: true while they sync.
+- `GET /user-preferences/theme` → `{settings: {theme, accent, radius, background,
+  brightness}}`, or `{settings: null}` if they never synced. **After syncing is turned
+  off the server still returns the last synced theme**, so check `syncThemePreferences`
+  first. The settings can't be cleared (`PUT` rejects null, no `DELETE`).
+- `accent` is a palette name ("teal" by default, "wisteria", ...). The web client defines
+  each as OKLCH lightness/chroma for its light and dark themes plus a hue, and a tone
+  ("vivid" or "pastel"); `accents.cpp` has the light-theme values, converted to sRGB.
+  Pastel accents take dark text.
+
+The app uses the accent for the on-device format pills, falling back to teal. It reads
+`/user-preferences/theme` only, so a user who stopped syncing gets their last synced
+accent; that's fine for a highlight colour. The test
+account's synced theme was set to wisteria to try this, then back to the defaults
+(system, teal) with syncing off.

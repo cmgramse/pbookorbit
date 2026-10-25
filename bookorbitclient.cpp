@@ -1,4 +1,5 @@
 #include "bookorbitclient.h"
+#include "accents.h"
 #include "diagnostics.h"
 #include "formats.h"
 
@@ -33,6 +34,7 @@ BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
     m_username = m_settings.value("username").toString();
     m_refreshToken = m_settings.value("refreshToken").toString();
     m_recentSearches = m_settings.value("recentSearches").toStringList();
+    m_accent = m_settings.value("accent").toString();
     // A saved session counts as signed in straight away, so the app opens on the book list.
     // If the server has since rejected it, the first request finds out and signs out.
     m_signedIn = !m_refreshToken.isEmpty();
@@ -41,8 +43,40 @@ BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
 void BookOrbitClient::start()
 {
     // The first request gets an access token from the saved session
-    if (m_signedIn)
+    if (m_signedIn) {
         refreshBooks();
+        loadAccent();
+    }
+}
+
+QColor BookOrbitClient::accentColor() const
+{
+    return accentColors(m_accent).color;
+}
+
+QColor BookOrbitClient::accentTextColor() const
+{
+    return accentColors(m_accent).text;
+}
+
+void BookOrbitClient::loadAccent()
+{
+    // {settings: {theme, accent, radius, background, brightness}}, or {settings: null} for
+    // a user who has never synced their theme to the server. After they stop syncing, the
+    // server keeps their last theme; that's good enough here. Quiet: the colour can wait.
+    download("/user-preferences/theme",
+        [this](const QByteArray &data) {
+            const QString accent = QJsonDocument::fromJson(data).object().value("settings")
+                                       .toObject().value("accent").toString();
+            diagnostics::log("accent: " + (accent.isEmpty() ? QString("default") : accent));
+            if (accent == m_accent)
+                return;
+            m_accent = accent;
+            m_settings.setValue("accent", m_accent);
+            m_settings.sync();
+            emit accentChanged();
+        },
+        [](int, const QString &message) { diagnostics::log("accent: " + message); });
 }
 
 void BookOrbitClient::signIn(const QString &username, const QString &password)
@@ -66,6 +100,7 @@ void BookOrbitClient::signIn(const QString &username, const QString &password)
             m_settings.setValue("username", m_username);
             m_settings.sync();
             refreshBooks();
+            loadAccent();
         },
         [this](int, const QString &message) { setError(message); });
 }
@@ -82,8 +117,11 @@ void BookOrbitClient::signOut()
     // They belong to this user
     m_recentSearches.clear();
     m_settings.remove("recentSearches");
+    m_accent.clear();
+    m_settings.remove("accent");
     m_settings.sync();
     emit recentSearchesChanged();
+    emit accentChanged();
 }
 
 void BookOrbitClient::setBookQuery(const QString &sortField, bool descending,

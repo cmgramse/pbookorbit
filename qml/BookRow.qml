@@ -6,8 +6,8 @@ import "units.js" as Units
 // first row carries a floating box at its left edge: the letter in a square, or the date
 // written upwards in a narrow box. A black line runs under each row. The book's formats
 // show in small capitals at the right of the author line, all of them where its ebook and
-// audiobook share the row: grey, or white in a solid black pill with a small e-reader
-// mark for a format on the device (where the system shows its cloud icon). A row standing in for
+// audiobook share the row: grey, or in a solid pill of the user's BookOrbit accent colour
+// with a small e-reader mark for a format on the device (where the system shows its cloud icon). A row standing in for
 // another (the audiobook record of a book whose ebook row shows both) is hidden: no
 // height at all.
 // Tapping the row sends clicked().
@@ -129,7 +129,7 @@ Item {
                         width: pillContent.width + 2 * Units.dp(7)
                         height: Units.dp(16)                    // 35px
                         radius: height / 2
-                        color: "black"
+                        color: bookOrbit.accentColor
                     }
                     Row {
                         id: pillContent
@@ -144,23 +144,23 @@ Item {
                             width: Units.dp(5)                  // 11x17px
                             height: Units.dp(8)
                             radius: 2
-                            color: "black"
+                            color: "transparent"
                             border.width: 2
-                            border.color: "white"
+                            border.color: bookOrbit.accentTextColor
                             Rectangle {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 anchors.bottom: parent.bottom
                                 anchors.bottomMargin: 3
                                 width: 3
                                 height: 1
-                                color: "white"
+                                color: bookOrbit.accentTextColor
                             }
                         }
                         Text {
                             id: label
                             anchors.verticalCenter: parent.verticalCenter
                             text: format.modelData.toUpperCase()
-                            color: format.onDevice ? "white" : "#606060"
+                            color: format.onDevice ? bookOrbit.accentTextColor : "#606060"
                             font.pointSize: 6
                         }
                     }
