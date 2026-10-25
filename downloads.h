@@ -55,7 +55,7 @@ public:
     // error is set
     Q_INVOKABLE void download(const QVariantMap &book, int fileId = -1);
     Q_INVOKABLE void cancel();
-    // Opens a downloaded book in the system reader
+    // Opens a downloaded book: an ebook in the reader, an audiobook in the audiobook app
     Q_INVOKABLE bool open(int bookId);
 
     // Every book file the app has recorded, whether or not it is still there

@@ -57,6 +57,25 @@ to KOReader (its `.sdr` folder appeared next to the book). The associations are 
 `/mnt/ext1/system/config/handlers.cfg` (per file, `path:app`). The app stayed running in
 the background while the reader was open.
 
+`OpenBook` picks the app by extension from `extensions.cfg` (the firmware's
+`/ebrmain/config/extensions.cfg`, with additions in `/mnt/ext1/system/config/`, where
+KOReader adds its `epub` line). On 6.10 it lists `mp3` and `m3u` for `music_player.app`
+and no audiobook formats, so an `.m4b` gets "Unknown book type", while `OpenBook` still
+returns 0.
+
+Audiobooks play in the system's Audiobooks app, `/ebrmain/bin/audio_books.app`. Its
+command line (`DataManager::parseArguments`, a `QCommandLineParser`) takes:
+
+- `--bookPlay <path>`: plays that book. The app uses this.
+- `--bookPath <path>` with `--bookTitle` and `--bookAuthor` (base64): seems to be for
+  books from the PocketBook cloud.
+- plain paths: added to its library.
+
+`OpenTask(path, argc, argv, TASK_MAKEACTIVE)` starts it with `path` put in front of
+`argv`, or, if it is already running, sends the arguments to it and brings it to the
+front. Both work on the Era Color (25 October 2026): `OpenTask` returns 0 when it started
+the app, 1 when the app was already running and switched to the new book.
+
 ## InkView dialogs from Qt
 
 InkView's `Dialog`, `DialogSynchro`, `Message` and progress bar don't work in a Qt app,

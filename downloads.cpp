@@ -19,6 +19,8 @@
 // ./system/mnt/ext1/... in the emulator)
 static const char *BOOKS_DIR = FLASHDIR "/Books";
 static const char *AUDIOBOOKS_DIR = AUDIOBOOKS_DEFAULT_PATH;
+// The system's audiobook player (Audiobooks on the home screen)
+static const char *AUDIOBOOKS_APP = "/ebrmain/bin/audio_books.app";
 
 // Audiobook formats, as BookOrbit lists them (AUDIO_FORMAT_LIST)
 
@@ -349,6 +351,17 @@ bool Downloads::open(int bookId)
     }
     if (path.isEmpty())
         return false;
+    if (isAudioFormat(QFileInfo(path).suffix())) {
+        // OpenBook() goes by extensions.cfg, which has no audiobook formats (only mp3, for
+        // the music player), so it says "Unknown book type". The system's audiobook app
+        // plays a book given --bookPlay <path>, read from its parseArguments(); OpenTask
+        // starts it, or hands a running one the arguments and brings it to the front.
+        const QByteArray file = path.toUtf8();
+        const char *args[] = {"--bookPlay", file.constData()};
+        const int rc = OpenTask(AUDIOBOOKS_APP, 2, args, TASK_MAKEACTIVE);
+        diagnostics::log(QString("OpenTask %1 --bookPlay %2 -> %3").arg(AUDIOBOOKS_APP, path).arg(rc));
+        return rc >= 0;
+    }
     // Adds it to the system's recent books, and comes back here when the reader closes
     const int rc = OpenBook(path.toUtf8().constData(), "", OB_ADDTOLAST | OB_WITHRETURN);
     diagnostics::log(QString("OpenBook %1 -> %2").arg(path).arg(rc));
