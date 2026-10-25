@@ -4,15 +4,28 @@ import "units.js" as Units
 // One book in the list, after the system library on an Era Color (screenshots 9 and 10):
 // cover, then title, author, and a line with the reading status and series. A section's
 // first row carries a floating box at its left edge: the letter in a square, or the date
-// written upwards in a narrow box. A black line runs under each row. Books on the device
-// get a small e-reader mark at the bottom right (where the system shows its cloud icon).
+// written upwards in a narrow box. A black line runs under each row. The book's formats
+// show in small capitals at the right of the author line, all of them where its ebook and
+// audiobook share the row: grey, or white in a solid black pill with a small e-reader
+// mark for a format on the device (where the system shows its cloud icon). A row standing in for
+// another (the audiobook record of a book whose ebook row shows both) is hidden: no
+// height at all.
 // Tapping the row sends clicked().
 Item {
     id: row
     property var book
-    // Downloaded by this app and still there; revision re-checks when a download arrives
-    readonly property bool onDevice: book.loaded === true && downloads.revision >= 0
-                                     && downloads.isOnDevice(book.id)
+    // Formats of its versions downloaded by this app and still there, e.g. ["epub"];
+    // revision re-checks when a download arrives
+    readonly property var formatsOnDevice: {
+        if (book.loaded !== true || downloads.revision < 0)
+            return []
+        let formats = downloads.formatsOnDevice(book.id)
+        for (const variant of book.variants || []) {
+            if (variant.bookId !== book.id)
+                formats = formats.concat(downloads.formatsOnDevice(variant.bookId))
+        }
+        return formats
+    }
     signal clicked()
     readonly property bool sectionStart: book.sectionStart
     readonly property bool letterSection: book.sectionLabel.length === 1
@@ -26,7 +39,8 @@ Item {
     readonly property int coverHeight: Units.dp(65)
 
     width: ListView.view ? ListView.view.width : 0
-    height: rowHeight
+    height: book.hidden === true ? 0 : rowHeight
+    visible: book.hidden !== true
 
     MouseArea {
         anchors.fill: parent
@@ -82,17 +96,81 @@ Item {
             elide: Text.ElideRight
         }
         Text {
+            id: author
             y: Units.dp(49) - baselineOffset
-            width: parent.width
+            // Leave room for the formats at the right
+            width: parent.width - (formats.width > 0 ? formats.width + Units.dp(12) : 0)
             text: row.book.authors.join(", ")
             font.pointSize: 7.25
             elide: Text.ElideRight
         }
+        // The formats, centred on the author line: "EPUB  AZW3  M4B", those on the device
+        // in pills
+        Row {
+            id: formats
+            anchors.right: parent.right
+            anchors.rightMargin: Units.dp(2)
+            anchors.verticalCenter: author.verticalCenter
+            spacing: Units.dp(8)
+
+            Repeater {
+                model: row.book.formats || []
+                Item {
+                    id: format
+                    required property string modelData
+                    readonly property bool onDevice: row.formatsOnDevice.indexOf(modelData) >= 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: onDevice ? pill.width : label.implicitWidth
+                    height: pill.height
+
+                    Rectangle {
+                        id: pill
+                        visible: format.onDevice
+                        width: pillContent.width + 2 * Units.dp(7)
+                        height: Units.dp(16)                    // 35px
+                        radius: height / 2
+                        color: "black"
+                    }
+                    Row {
+                        id: pillContent
+                        x: format.onDevice ? Units.dp(7) : 0
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Units.dp(3)
+
+                        // A small e-reader: screen outline and a button below it
+                        Rectangle {
+                            visible: format.onDevice
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Units.dp(5)                  // 11x17px
+                            height: Units.dp(8)
+                            radius: 2
+                            color: "black"
+                            border.width: 2
+                            border.color: "white"
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 3
+                                width: 3
+                                height: 1
+                                color: "white"
+                            }
+                        }
+                        Text {
+                            id: label
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: format.modelData.toUpperCase()
+                            color: format.onDevice ? "white" : "#606060"
+                            font.pointSize: 6
+                        }
+                    }
+                }
+            }
+        }
         // Status and series in italics, split by an upright grey bar about 32px either side
         Row {
             id: details
-            // Leave room for the on-device mark at the bottom right
-            width: parent.width - (row.onDevice ? deviceMark.width + Units.dp(8) : 0)
+            width: parent.width
             spacing: Units.dp(13)
 
             Text {
@@ -122,29 +200,6 @@ Item {
                 font.italic: true
                 elide: Text.ElideRight
             }
-        }
-    }
-
-    // On-device mark: a small e-reader outline, at the bottom right
-    Rectangle {
-        id: deviceMark
-        visible: row.onDevice
-        x: row.contentRight - Units.dp(2) - width
-        y: row.height - Units.dp(14) - height                  // 30px above the line
-        width: Units.dp(11)
-        height: Units.dp(17)
-        radius: height / 9
-        border.width: 2
-        border.color: "black"
-
-        // Button below the screen
-        Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: parent.height / 9
-            width: parent.width / 3
-            height: 2
-            color: "black"
         }
     }
 

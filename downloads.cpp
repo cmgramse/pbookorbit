@@ -2,6 +2,7 @@
 
 #include "bookorbitclient.h"
 #include "diagnostics.h"
+#include "formats.h"
 
 #include <common_utilities/einkinterface.h>
 #include <inkview.h>
@@ -20,12 +21,11 @@ static const char *BOOKS_DIR = FLASHDIR "/Books";
 static const char *AUDIOBOOKS_DIR = AUDIOBOOKS_DEFAULT_PATH;
 
 // Audiobook formats, as BookOrbit lists them (AUDIO_FORMAT_LIST)
-static const QStringList AUDIO_FORMATS{"m4b", "mp3", "m4a", "opus", "ogg", "flac"};
 
 // The folder a file of this format goes to
 static QString folderFor(const QString &format)
 {
-    return QString::fromUtf8(AUDIO_FORMATS.contains(format.toLower()) ? AUDIOBOOKS_DIR : BOOKS_DIR);
+    return QString::fromUtf8(isAudioFormat(format) ? AUDIOBOOKS_DIR : BOOKS_DIR);
 }
 
 // A name the device's file system takes: no path separators or other awkward characters
@@ -83,25 +83,40 @@ QVariantList Downloads::downloadedBooks() const
         if (entry.isEmpty() || !isOnDevice(id.toInt()))
             continue;
         QVariantMap book = QJsonDocument::fromJson(entry).object().toVariantMap();
-        // The format on the device, e.g. "epub", for the content type filter
-        book.insert("downloadedFormat", QFileInfo(pathFor(id.toInt())).suffix().toLower());
+        // The formats on the device, e.g. ["epub"], for the content type filter
+        book.insert("downloadedFormats", formatsOnDevice(id.toInt()));
         books.append(book);
     }
     return books;
 }
 
-QString Downloads::pathFor(int bookId) const
+QStringList Downloads::pathsFor(int bookId) const
 {
-    return m_settings.value(QString("downloads/%1").arg(bookId)).toString();
+    // A list since a record can hold an ebook and an audiobook; earlier versions kept a
+    // single path, which reads back as a list of one
+    return m_settings.value(QString("downloads/%1").arg(bookId)).toStringList();
+}
+
+QStringList Downloads::formatsOnDevice(int bookId) const
+{
+    QStringList formats;
+    for (const QString &path : pathsFor(bookId)) {
+        if (QFileInfo::exists(path))
+            formats.append(QFileInfo(path).suffix().toLower());
+    }
+    return formats;
 }
 
 bool Downloads::isOnDevice(int bookId) const
 {
-    const QString path = pathFor(bookId);
-    return !path.isEmpty() && QFileInfo::exists(path);
+    for (const QString &path : pathsFor(bookId)) {
+        if (QFileInfo::exists(path))
+            return true;
+    }
+    return false;
 }
 
-QVariantMap Downloads::fileToDownload(const QVariantMap &book) const
+QVariantMap Downloads::fileToDownload(const QVariantMap &book, int fileId) const
 {
     // files: [{id, format, role, sizeBytes}]. The role says what the file is: "primary"
     // is the book in the format the server holds it in first, "content" the same book in
@@ -112,6 +127,13 @@ QVariantMap Downloads::fileToDownload(const QVariantMap &book) const
         const QString role = file.value("role").toString();
         if (file.value("format").toString().isEmpty() || (role != "primary" && role != "content"))
             continue;
+        if (fileId >= 0) {
+            if (file.value("id").toInt() == fileId) {
+                chosen = file;
+                break;
+            }
+            continue;
+        }
         if (role == "primary") {
             chosen = file;
             break;
@@ -125,12 +147,12 @@ QVariantMap Downloads::fileToDownload(const QVariantMap &book) const
     return chosen;
 }
 
-void Downloads::download(const QVariantMap &book)
+void Downloads::download(const QVariantMap &book, int fileId)
 {
     if (m_bookId != -1)
         return;   // one at a time
     const int bookId = book.value("id").toInt();
-    const QVariantMap file = fileToDownload(book);
+    const QVariantMap file = fileToDownload(book, fileId);
     m_generation++;
     m_bookId = bookId;
     m_percent = 0;
@@ -219,7 +241,9 @@ void Downloads::download(const QVariantMap &book)
                     return;
                 }
                 m_part.setFileName(QString());   // the book now, not the part file
-                m_settings.setValue(QString("downloads/%1").arg(bookId), path);
+                QStringList paths = pathsFor(bookId);
+                paths.append(path);
+                m_settings.setValue(QString("downloads/%1").arg(bookId), paths);
                 m_settings.setValue(QString("downloadEntries/%1").arg(bookId),
                                     QJsonDocument(QJsonObject::fromVariantMap(m_entry)).toJson(QJsonDocument::Compact));
                 m_settings.sync();
@@ -286,8 +310,13 @@ void Downloads::setPercent(int percent)
 
 bool Downloads::open(int bookId)
 {
-    const QString path = pathFor(bookId);
-    if (path.isEmpty() || !QFileInfo::exists(path))
+    // The ebook if both are here
+    QString path;
+    for (const QString &candidate : pathsFor(bookId)) {
+        if (QFileInfo::exists(candidate) && (path.isEmpty() || isAudioFormat(QFileInfo(path).suffix())))
+            path = candidate;
+    }
+    if (path.isEmpty())
         return false;
     // Adds it to the system's recent books, and comes back here when the reader closes
     const int rc = OpenBook(path.toUtf8().constData(), "", OB_ADDTOLAST | OB_WITHRETURN);

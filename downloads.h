@@ -42,14 +42,17 @@ public:
     int revision() const { return m_revision; }
 
     Q_INVOKABLE bool isOnDevice(int bookId) const;
+    // The formats of a book's files on the device, e.g. ["epub"]
+    Q_INVOKABLE QStringList formatsOnDevice(int bookId) const;
     // The books on the device, as their list entries were when they downloaded, plus
-    // downloadedFormat: the format of the file on the device
+    // downloadedFormats: the formats of their files on the device
     Q_INVOKABLE QVariantList downloadedBooks() const;
     // The file a download would fetch: {id, format, sizeBytes, folder}, folder being
-    // "Books" or "Audio Books"; empty if there's none
-    Q_INVOKABLE QVariantMap fileToDownload(const QVariantMap &book) const;
-    // Downloads the book's primary file; downloaded(bookId) follows, or error is set
-    Q_INVOKABLE void download(const QVariantMap &book);
+    // "Books" or "Audio Books"; empty if there's none. The primary file, or fileId's.
+    Q_INVOKABLE QVariantMap fileToDownload(const QVariantMap &book, int fileId = -1) const;
+    // Downloads the book's primary file, or fileId's; downloaded(bookId) follows, or
+    // error is set
+    Q_INVOKABLE void download(const QVariantMap &book, int fileId = -1);
     Q_INVOKABLE void cancel();
     // Opens a downloaded book in the system reader
     Q_INVOKABLE bool open(int bookId);
@@ -59,7 +62,8 @@ signals:
     void downloaded(int bookId);
 
 private:
-    QString pathFor(int bookId) const;
+    // Where a book's files went: one, or two for a record with an ebook and audiobook
+    QStringList pathsFor(int bookId) const;
     // Asks the system to scan for new books, so a download shows in its library
     void requestLibraryScan();
     // Ends the download: deletes the part file unless it was kept, and sets error

@@ -26,3 +26,7 @@
   could open on the downloaded books when there is no network.
 - Check on the device that downloaded books show in the system library without a reboot
   (the app asks the scanner to scan; see NOTES.md for what else could be done).
+- Books with an ebook and an audiobook: once one version is downloaded, a tap opens it;
+  add a way to get or open the other version.
+- Search results don't merge an ebook and its audiobook kept as separate records (a search
+  can match only one of them, e.g. by narrator); both rows show both formats instead.

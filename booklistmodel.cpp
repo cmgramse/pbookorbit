@@ -16,6 +16,9 @@ static const QVariantMap &placeholder()
         {"coverVersion", QString()},
         {"sectionStart", false},
         {"sectionLabel", QString()},
+        {"variants", QVariantList()},
+        {"formats", QStringList()},
+        {"hidden", false},
     };
     return book;
 }

@@ -24,13 +24,21 @@ Window {
         searchPage.open()
     }
 
-    // A book on the device opens in the system reader; otherwise the dialog offers to
-    // download it first
+    // A book on the device opens in its reader (the ebook, if both versions are there);
+    // otherwise the dialog offers to download it first, asking which version if it has an
+    // ebook and an audiobook
     function openBook(book) {
+        const variants = book.variants || []
+        for (const variant of variants) {
+            if (downloads.isOnDevice(variant.bookId)) {
+                downloads.open(variant.bookId)
+                return
+            }
+        }
         if (downloads.isOnDevice(book.id))
             downloads.open(book.id)
         else
-            downloadDialog.show(book)
+            downloadDialog.show(book, variants)
     }
 
     // The book list is the only page for now, so home just goes back to its top

@@ -124,6 +124,9 @@ private:
         // the list still shows the old one
         int listGeneration = -1;
         int total = 0;
+        // Hide the audiobook record of a book whose ebook is a separate record, so the
+        // ebook's row stands for both. Only where the ebook is sure to be in the list too.
+        bool mergePairs = false;
     };
 
     // On the device, asks the system to bring up Wi-Fi if it isn't connected
@@ -154,8 +157,17 @@ private:
     void restartPages(PagedBooks &list);
     void loadPages(PagedBooks &list, int first, int last);
     void loadPage(PagedBooks &list, int page);
-    // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText
+    // Finds the other records of the books on a page just loaded (an audiobook kept as a
+    // separate record from its ebook, say: same title and first author) and adds their
+    // formats to the rows
+    void lookUpCompanions(PagedBooks *list, int first, const QVariantList &books, int generation);
+    // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText,
+    // and variants, formats and hidden (see addCompanions)
     QVariantMap decorateBook(const QVariantMap &book) const;
+    // Adds other records of the same book to a row: their versions to its variants and
+    // their formats to its formats. Hides the row (an audiobook record whose ebook is
+    // listed too) if hideAudio.
+    static void addCompanions(QVariantMap &row, const QList<QVariantMap> &companions, bool hideAudio);
     // Works out which of rows first to last start a section, so they show its box
     void updateSectionStarts(int first, int last);
     bool letterSections() const { return m_sortField == "title" || m_sortField == "author"; }

@@ -1,5 +1,6 @@
 #include "bookorbitclient.h"
 #include "diagnostics.h"
+#include "formats.h"
 
 #include <inkview.h>
 #include <QDateTime>
@@ -109,6 +110,8 @@ void BookOrbitClient::refreshBooks()
         if (generation != m_list.queryGeneration)
             return;
         m_list.query = bookQuery();
+        // With every type listed, an audiobook's ebook record is in the list too
+        m_list.mergePairs = m_formats.isEmpty();
         // The A-Z sorts need their sections first: they say which rows start one
         if (letterSections()) {
             loadJumpSections([this, generation]() {
@@ -196,16 +199,115 @@ void BookOrbitClient::loadLibrary(std::function<void()> then)
     });
 }
 
+// Filter parts for BookOrbit's book queries
+static QJsonObject rule(const QString &field, const QString &op, const QJsonValue &value)
+{
+    return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
+}
+
+static QJsonObject group(const QString &join, const QJsonArray &rules)
+{
+    return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
+}
+
+// What makes two records the same book: title and first author
+static QString companionKey(const QVariantMap &book)
+{
+    const QStringList authors = book.value("authors").toStringList();
+    return book.value("title").toString().trimmed().toLower() + '\n'
+           + (authors.isEmpty() ? QString() : authors.first().trimmed().toLower());
+}
+
+// A record's versions of the book, at most one ebook and one audiobook:
+// [{bookId, fileId, format, sizeBytes, kind: "ebook" | "audiobook", book}], book being the
+// record, to download from. The primary file comes first; "content" files are the same
+// book in other formats. Cover, metadata and supplement files aren't the book.
+static QVariantList ownVariants(const QVariantMap &book)
+{
+    QVariantList variants;
+    QStringList kinds;
+    QVariantList files = book.value("files").toList();
+    std::stable_sort(files.begin(), files.end(), [](const QVariant &a, const QVariant &b) {
+        return a.toMap().value("role") == "primary" && b.toMap().value("role") != "primary";
+    });
+    for (const QVariant &value : std::as_const(files)) {
+        const QVariantMap file = value.toMap();
+        const QString role = file.value("role").toString();
+        const QString format = file.value("format").toString();
+        if (format.isEmpty() || (role != "primary" && role != "content"))
+            continue;
+        const QString kind = mediaKind(format);
+        if (kinds.contains(kind))
+            continue;
+        kinds.append(kind);
+        variants.append(QVariantMap{
+            {"bookId", book.value("id")},
+            {"fileId", file.value("id")},
+            {"format", format.toLower()},
+            {"sizeBytes", file.value("sizeBytes")},
+            {"kind", kind},
+            {"book", book},
+        });
+    }
+    return variants;
+}
+
+// Every book format a record has, primary first: "epub", "azw3", ...
+static QStringList ownFormats(const QVariantMap &book)
+{
+    QStringList formats;
+    for (const QVariant &value : book.value("files").toList()) {
+        const QVariantMap file = value.toMap();
+        const QString role = file.value("role").toString();
+        const QString format = file.value("format").toString().toLower();
+        if (format.isEmpty() || (role != "primary" && role != "content") || formats.contains(format))
+            continue;
+        if (role == "primary")
+            formats.prepend(format);
+        else
+            formats.append(format);
+    }
+    return formats;
+}
+
+void BookOrbitClient::addCompanions(QVariantMap &row, const QList<QVariantMap> &companions, bool hideAudio)
+{
+    QVariantList variants = row.value("variants").toList();
+    QStringList formats = row.value("formats").toStringList();
+    QStringList kinds;
+    for (const QVariant &variant : std::as_const(variants))
+        kinds.append(variant.toMap().value("kind").toString());
+    const QString ownKind = kinds.isEmpty() ? QString() : kinds.first();
+
+    bool ebookElsewhere = false;
+    for (const QVariantMap &companion : companions) {
+        for (const QVariant &value : ownVariants(companion)) {
+            const QString kind = value.toMap().value("kind").toString();
+            if (kind == "ebook")
+                ebookElsewhere = true;
+            if (!kinds.contains(kind)) {
+                kinds.append(kind);
+                variants.append(value);
+            }
+        }
+        for (const QString &format : ownFormats(companion)) {
+            if (!formats.contains(format))
+                formats.append(format);
+        }
+    }
+    // Ebook versions first: a downloaded ebook opens before its audiobook
+    std::stable_sort(variants.begin(), variants.end(), [](const QVariant &a, const QVariant &b) {
+        return a.toMap().value("kind") == "ebook" && b.toMap().value("kind") != "ebook";
+    });
+    row.insert("variants", variants);
+    row.insert("formats", formats);
+    row.insert("hidden", hideAudio && ownKind == "audiobook" && ebookElsewhere);
+}
+
 QJsonObject BookOrbitClient::bookQuery() const
 {
     QJsonObject query{
         {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", m_sortDescending ? "desc" : "asc"}}}},
-    };
-    const auto rule = [](const QString &field, const QString &op, const QJsonValue &value) {
-        return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
-    };
-    const auto group = [](const QString &join, const QJsonArray &rules) {
-        return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
     };
 
     if (!m_formats.isEmpty())
@@ -239,11 +341,40 @@ void BookOrbitClient::showListedBooks()
         return book.value(m_sortField).toString();   // title, or an ISO date
     };
 
-    QList<QPair<QString, QVariantMap>> books;
+    // Records of the same book (an ebook and its audiobook kept apart) make one row, the
+    // ebook's, with the other's formats added
+    QHash<QString, QList<QVariantMap>> byKey;
+    QStringList keys;   // in the order first seen
     for (const QVariant &value : std::as_const(m_onlyBooks)) {
         const QVariantMap book = value.toMap();
-        if (m_formats.isEmpty() || m_formats.contains(book.value("downloadedFormat").toString()))
-            books.append({sortKey(book), book});
+        const QString key = companionKey(book);
+        if (!byKey.contains(key))
+            keys.append(key);
+        byKey[key].append(book);
+    }
+    QList<QPair<QString, QVariantMap>> books;   // sort key, row
+    for (const QString &key : std::as_const(keys)) {
+        QList<QVariantMap> records = byKey.value(key);
+        // Shown if any of its files on the device is of the type chosen
+        bool wanted = m_formats.isEmpty();
+        for (const QVariantMap &record : std::as_const(records)) {
+            for (const QString &format : record.value("downloadedFormats").toStringList())
+                wanted = wanted || m_formats.contains(format);
+        }
+        if (!wanted)
+            continue;
+        int shown = 0;
+        for (int i = 0; i < records.size(); i++) {
+            const QVariantList variants = ownVariants(records.at(i));
+            if (!variants.isEmpty() && variants.first().toMap().value("kind") == "ebook") {
+                shown = i;
+                break;
+            }
+        }
+        const QVariantMap book = records.takeAt(shown);
+        QVariantMap row = decorateBook(book);
+        addCompanions(row, records, false);
+        books.append({sortKey(book), row});
     }
     std::stable_sort(books.begin(), books.end(), [this](const auto &a, const auto &b) {
         const int order = QString::localeAwareCompare(a.first.toLower(), b.first.toLower());
@@ -253,7 +384,7 @@ void BookOrbitClient::showListedBooks()
     QVariantList rows;
     m_sectionStarts.clear();
     m_jumpSections.clear();
-    for (const auto &[key, book] : std::as_const(books)) {
+    for (const auto &[key, row] : std::as_const(books)) {
         if (letterSections()) {
             const QString letter = letterSection(key);
             if (m_jumpSections.isEmpty() || m_jumpSections.last().toMap().value("label") != letter) {
@@ -261,7 +392,7 @@ void BookOrbitClient::showListedBooks()
                 m_jumpSections.append(QVariantMap{{"label", letter}, {"index", rows.size()}});
             }
         }
-        rows.append(decorateBook(book));
+        rows.append(row);
     }
 
     // All there at once: no pages to load
@@ -352,10 +483,14 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
                 pages->model.reset(pages->total);
             }
             QVariantList books;
-            for (const QJsonValue &item : result.value("items").toArray())
-                books.append(decorateBook(item.toObject().toVariantMap()));
+            QVariantList records;
+            for (const QJsonValue &item : result.value("items").toArray()) {
+                records.append(item.toObject().toVariantMap());
+                books.append(decorateBook(records.last().toMap()));
+            }
             const int first = page * BOOKS_PAGE_SIZE;
             pages->model.setBooks(first, books);
+            lookUpCompanions(pages, first, records, generation);
             if (pages == &m_list) {
                 // Also the row after the page, whose section start depends on the last one here
                 updateSectionStarts(first, first + int(books.size()));
@@ -367,6 +502,54 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
         [pages, page, generation]() {
             if (generation == pages->queryGeneration)
                 pages->loadingPages.remove(page);   // try again when it is next on screen
+        });
+}
+
+void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVariantList &books, int generation)
+{
+    if (books.isEmpty())
+        return;
+    // Every record with the same title and first author as a book on the page, whatever
+    // the list's filter: any of (title is ... and an author is ...)
+    QJsonArray matches;
+    for (const QVariant &value : books) {
+        const QVariantMap book = value.toMap();
+        QJsonArray match{rule("title", "eq", book.value("title").toString())};
+        const QStringList authors = book.value("authors").toStringList();
+        if (!authors.isEmpty())
+            match.append(rule("author", "includesAny", QJsonArray{authors.first()}));
+        matches.append(group("AND", match));
+    }
+    const QJsonObject query{
+        {"filter", group("OR", matches)},
+        {"pagination", QJsonObject{{"page", 0}, {"size", 4 * BOOKS_PAGE_SIZE}}},
+    };
+    callJson("POST", QString("/libraries/%1/books").arg(m_libraryId), QJsonDocument(query),
+        [this, list, first, books, generation](const QJsonDocument &doc) {
+            if (generation != list->queryGeneration)
+                return;
+            QHash<QString, QList<QVariantMap>> byKey;
+            for (const QJsonValue &item : doc.object().value("items").toArray()) {
+                const QVariantMap record = item.toObject().toVariantMap();
+                byKey[companionKey(record)].append(record);
+            }
+            for (int i = 0; i < books.size(); i++) {
+                const QVariantMap book = books.at(i).toMap();
+                QList<QVariantMap> companions;
+                for (const QVariantMap &record : byKey.value(companionKey(book))) {
+                    if (record.value("id") != book.value("id"))
+                        companions.append(record);
+                }
+                if (companions.isEmpty())
+                    continue;
+                QVariantMap row = list->model.book(first + i);
+                addCompanions(row, companions, list->mergePairs);
+                for (const char *field : {"variants", "formats", "hidden"})
+                    list->model.setField(first + i, field, row.value(field));
+            }
+            // Hidden rows pass their section boxes on to the next row
+            if (list == &m_list)
+                updateSectionStarts(first, first + int(books.size()));
         });
 }
 
@@ -419,24 +602,41 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
     row.insert("statusText", statusText);
     row.insert("seriesText", seriesText);
 
+    // Its versions and formats; lookUpCompanions adds other records' later
+    row.insert("variants", ownVariants(book));
+    row.insert("formats", ownFormats(book));
+    row.insert("hidden", false);
     return row;
 }
 
 void BookOrbitClient::updateSectionStarts(int first, int last)
 {
     BookListModel &books = m_list.model;
+    const auto hidden = [&books](int row) { return books.book(row).value("hidden").toBool(); };
     for (int row = qMax(0, first); row <= last && row < books.count(); row++) {
         if (!books.isLoaded(row))
             continue;
+        if (hidden(row)) {
+            books.setField(row, "sectionStart", false);
+            continue;
+        }
+        // The visible row before: rows hidden in between don't count
+        int previous = row - 1;
+        while (previous >= 0 && books.isLoaded(previous) && hidden(previous))
+            previous--;
         if (letterSections()) {
-            books.setField(row, "sectionStart", m_sectionStarts.contains(row));
-            books.setField(row, "sectionLabel", m_sectionStarts.value(row));
+            // A section starting here, or on the hidden rows just before
+            QString label;
+            for (int r = row; r > previous && label.isEmpty(); r--)
+                label = m_sectionStarts.value(r);
+            books.setField(row, "sectionStart", !label.isEmpty());
+            books.setField(row, "sectionLabel", label);
         } else {
-            // A new day, if the row before is known to be a different one. Until that row
-            // loads, no box: its page fills this in.
+            // A new day, if the visible row before is known to be a different one. Until
+            // that row loads, no box: its page fills this in.
             const QString section = books.book(row).value("section").toString();
-            books.setField(row, "sectionStart", row == 0
-                || (books.isLoaded(row - 1) && books.book(row - 1).value("section").toString() != section));
+            books.setField(row, "sectionStart", previous < 0
+                || (books.isLoaded(previous) && books.book(previous).value("section").toString() != section));
         }
     }
 }
