@@ -293,7 +293,7 @@ Rectangle {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
         }
-        onMovementEnded: eink.leaveA2()
+        onMovementEnded: eink.leaveA2Soon()
         onVisibleChanged: if (!visible) eink.leaveA2()
 
         delegate: BookRow {

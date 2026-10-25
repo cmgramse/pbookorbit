@@ -220,7 +220,7 @@ Window {
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
         }
         // Sent once the momentum has stopped, not when the finger lifts
-        onMovementEnded: eink.leaveA2()
+        onMovementEnded: eink.leaveA2Soon()
         onVisibleChanged: if (!visible) eink.leaveA2()
         delegate: BookRow {
             required book

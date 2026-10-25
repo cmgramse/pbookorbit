@@ -19,9 +19,13 @@ public:
     using QObject::QObject;
 
     // Switches a screen rectangle (in window coordinates) to A2 for a flick. It stays in A2
-    // until leaveA2() is called, so call it when the movement ends, momentum included.
+    // until leaveA2Soon() or leaveA2() is called. Calling it again before a timed exit
+    // cancels the exit.
     Q_INVOKABLE void enterA2ForFlick(int x, int y, int width, int height);
-    // Ends A2 and redraws the region normally
+    // Ends A2 and redraws the region normally once the last frames have had time to show.
+    // Call it when the movement ends, momentum included.
+    Q_INVOKABLE void leaveA2Soon();
+    // Ends A2 and redraws the region normally now, for when the region goes away
     Q_INVOKABLE void leaveA2();
 
     // Turns dynamic updates on while a text field has focus. Turning them off redraws the

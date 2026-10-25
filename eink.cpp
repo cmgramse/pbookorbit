@@ -9,10 +9,19 @@
 
 using pocketbook::utilities::einkPlatform;
 
+// How long A2 lasts after a list stops moving. The last frames of a flick are still being
+// drawn when the movement ends, so leaving at once redraws the list at full quality and
+// then shows those frames over it. The system apps also wait a while before redrawing.
+static constexpr int a2SettleMs = 1000;
+
 void Eink::enterA2ForFlick(int x, int y, int width, int height)
 {
     // nullptr until the platform plugin has started
     if (auto *platform = einkPlatform()) {
+        // Moving again before the timed exit: carry on in the A2 already on
+        platform->cancelLeaveA2Timer();
+        if (platform->isInA2())
+            return;
         // auto_exit would leave A2 as soon as the finger lifts, while the list is still
         // coasting; leaveA2() ends it when the movement has really stopped
         platform->a2ForFlick({x, y, width, height, 0}, false);
@@ -20,9 +29,18 @@ void Eink::enterA2ForFlick(int x, int y, int width, int height)
     }
 }
 
+void Eink::leaveA2Soon()
+{
+    if (auto *platform = einkPlatform(); platform && platform->isInA2()) {
+        platform->timedLeaveA2(a2SettleMs);
+        diagnostics::log(QString("A2 off in %1 ms").arg(a2SettleMs));
+    }
+}
+
 void Eink::leaveA2()
 {
     if (auto *platform = einkPlatform(); platform && platform->isInA2()) {
+        platform->cancelLeaveA2Timer();
         platform->leaveA2();
         diagnostics::log("A2 off");
     }
