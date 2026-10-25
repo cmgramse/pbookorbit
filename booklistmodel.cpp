@@ -14,7 +14,6 @@ static const QVariantMap &placeholder()
         {"seriesText", QString()},
         {"hasCover", false},
         {"coverVersion", QString()},
-        {"onDevice", false},
         {"sectionStart", false},
         {"sectionLabel", QString()},
     };

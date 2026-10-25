@@ -10,6 +10,7 @@
 #include "bookorbitclient.h"
 #include "diagnostics.h"
 #include "covers.h"
+#include "downloads.h"
 #include "eink.h"
 #include "themeimageprovider.h"
 
@@ -31,11 +32,13 @@ int main(int argc, char *argv[])
     // /mnt/ext1/system/config on the device, ./system/config in the emulator.
     // BOOKORBIT_SETTINGS points automated tests at their own file, so they don't touch the
     // saved login.
-    BookOrbitClient client(qEnvironmentVariable("BOOKORBIT_SETTINGS",
-                                                QString::fromUtf8(CONFIGPATH "/bookorbit.ini")));
+    const QString settingsPath = qEnvironmentVariable("BOOKORBIT_SETTINGS",
+                                                      QString::fromUtf8(CONFIGPATH "/bookorbit.ini"));
+    BookOrbitClient client(settingsPath);
 
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/bookorbit-covers"));
+    Downloads downloads(&client, settingsPath);
     Eink eink;
     diagnostics::Log diagnosticsLog;
 
@@ -47,6 +50,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("windowHeight", ScreenHeight() - PanelHeight());
     engine.rootContext()->setContextProperty("bookOrbit", &client);
     engine.rootContext()->setContextProperty("covers", &covers);
+    engine.rootContext()->setContextProperty("downloads", &downloads);
     engine.rootContext()->setContextProperty("eink", &eink);
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>

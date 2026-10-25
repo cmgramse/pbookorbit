@@ -194,18 +194,15 @@ QJsonObject BookOrbitClient::bookQuery() const
     QJsonObject query{
         {"sort", QJsonArray{QJsonObject{{"field", m_sortField}, {"dir", m_sortDescending ? "desc" : "asc"}}}},
     };
-    if (!m_formats.isEmpty()) {
-        query.insert("filter", QJsonObject{
-            {"type", "group"},
-            {"join", "AND"},
-            {"rules", QJsonArray{QJsonObject{
-                {"type", "rule"},
-                {"field", "format"},
-                {"operator", "includesAny"},
-                {"value", QJsonArray::fromStringList(m_formats)},
-            }}},
-        });
-    }
+    const auto rule = [](const QString &field, const QString &op, const QJsonValue &value) {
+        return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
+    };
+    const auto group = [](const QString &join, const QJsonArray &rules) {
+        return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
+    };
+
+    if (!m_formats.isEmpty())
+        query.insert("filter", group("AND", {rule("format", "includesAny", QJsonArray::fromStringList(m_formats))}));
     return query;
 }
 
@@ -352,9 +349,6 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book) const
     row.insert("statusText", statusText);
     row.insert("seriesText", seriesText);
 
-    // TODO: real on-device detection. Until then, a fixed random answer per book (the
-    // same every run) so the row layout can be developed.
-    row.insert("onDevice", qHash(book.value("id").toInt()) % 3 != 0);
     return row;
 }
 
@@ -473,11 +467,10 @@ void BookOrbitClient::refreshSession(std::function<void()> then)
         });
 }
 
-void BookOrbitClient::send(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet)
+void BookOrbitClient::ensureNetwork()
 {
 #ifndef EMULATOR
-    // On the device, ask the system to bring up Wi-Fi first (shows its own dialog)
+    // Shows the system's own dialog while it connects
     if (!(QueryNetwork() & NET_CONNECTED)) {
         QElapsedTimer netTimer;
         netTimer.start();
@@ -485,6 +478,36 @@ void BookOrbitClient::send(const QByteArray &method, const QString &path, const 
         diagnostics::log(QString("NetConnect2 -> %1 after %2 ms").arg(rc).arg(netTimer.elapsed()));
     }
 #endif
+}
+
+void BookOrbitClient::startStream(const QString &path, std::function<void(QNetworkReply *)> onStarted,
+                                  ErrorHandler onError)
+{
+    if (m_refreshToken.isEmpty()) {
+        onError(0, "Not signed in");
+        return;
+    }
+    ensureNetwork();
+    refreshSession([=]() {
+        if (!m_signedIn || m_accessToken.isEmpty()) {
+            onError(0, m_error.isEmpty() ? QString("Not signed in") : m_error);
+            return;
+        }
+        QNetworkRequest request(QUrl(m_serverUrl + "/api/v1" + path));
+        request.setRawHeader("Accept", "*/*");
+        request.setRawHeader("Authorization", "Bearer " + m_accessToken.toUtf8());
+        // A book can take a while: only give up if nothing arrives for a minute
+        request.setTransferTimeout(60000);
+        diagnostics::log("GET " + path + " (streamed)");
+        onStarted(m_nam.get(request));
+    });
+}
+
+void BookOrbitClient::send(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                           DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet)
+{
+    // On the device, ask the system to bring up Wi-Fi first
+    ensureNetwork();
 
     QNetworkRequest request(QUrl(m_serverUrl + "/api/v1" + path));
     // Downloads (the only quiet requests) take whatever the server sends, e.g. a JPEG

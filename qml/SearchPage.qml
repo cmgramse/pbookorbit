@@ -21,6 +21,7 @@ Rectangle {
     readonly property bool showResults: searchField.text.trim().length >= 3
 
     signal back()
+    signal bookClicked(var book)
 
     // Set while going back, so the search box losing focus doesn't keep the search
     property bool closing: false
@@ -297,11 +298,10 @@ Rectangle {
 
         delegate: BookRow {
             required book
-
-            // TODO: open the book. For now a tap just ends the typing.
-            MouseArea {
-                anchors.fill: parent
-                onClicked: page.hideKeyboard()
+            // Ends the typing too, which keeps the search
+            onClicked: {
+                page.hideKeyboard()
+                page.bookClicked(book)
             }
         }
     }

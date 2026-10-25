@@ -88,6 +88,11 @@ public:
     // Authenticated GET for raw data such as cover thumbnails. Doesn't count as busy, so
     // background downloads don't redraw the status line.
     void download(const QString &path, DataHandler onSuccess, ErrorHandler onError);
+    // Authenticated GET for a large file, such as a book, that the caller reads as it
+    // arrives: gets a new access token first (so it lasts the whole download), then starts
+    // the request and hands over the reply, which the caller then owns
+    void startStream(const QString &path, std::function<void(QNetworkReply *)> onStarted,
+                     ErrorHandler onError);
 
 signals:
     void usernameChanged();
@@ -117,6 +122,8 @@ private:
         int total = 0;
     };
 
+    // On the device, asks the system to bring up Wi-Fi if it isn't connected
+    void ensureNetwork();
     // Sends a request; withToken adds the access token (login, refresh and logout go
     // without); quiet requests don't count as busy
     void send(const QByteArray &method, const QString &path, const QJsonDocument &body,
@@ -140,8 +147,7 @@ private:
     void restartPages(PagedBooks &list);
     void loadPages(PagedBooks &list, int first, int last);
     void loadPage(PagedBooks &list, int page);
-    // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText,
-    // onDevice
+    // Adds the fields the book rows show: section, sectionLabel, statusText, seriesText
     QVariantMap decorateBook(const QVariantMap &book) const;
     // Works out which of rows first to last start a section, so they show its box
     void updateSectionStarts(int first, int last);

@@ -24,6 +24,15 @@ Window {
         searchPage.open()
     }
 
+    // A book on the device opens in the system reader; otherwise the dialog offers to
+    // download it first
+    function openBook(book) {
+        if (downloads.isOnDevice(book.id))
+            downloads.open(book.id)
+        else
+            downloadDialog.show(book)
+    }
+
     // The book list is the only page for now, so home just goes back to its top
     function goHome() {
         menu.visible = false
@@ -191,6 +200,7 @@ Window {
         onVisibleChanged: if (!visible) eink.leaveA2()
         delegate: BookRow {
             required book
+            onClicked: root.openBook(book)
         }
     }
 
@@ -409,5 +419,13 @@ Window {
         visible: root.searching
         headerHeight: header.height
         onBack: root.searching = false
+        onBookClicked: (book) => root.openBook(book)
+    }
+
+    // Over everything, the search page too
+    DownloadDialog {
+        id: downloadDialog
+        anchors.fill: parent
+        onOpened: (bookId) => downloads.open(bookId)
     }
 }

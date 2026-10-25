@@ -6,9 +6,14 @@ import "units.js" as Units
 // first row carries a floating box at its left edge: the letter in a square, or the date
 // written upwards in a narrow box. A black line runs under each row. Books on the device
 // get a small e-reader mark at the bottom right (where the system shows its cloud icon).
+// Tapping the row sends clicked().
 Item {
     id: row
     property var book
+    // Downloaded by this app and still there; revision re-checks when a download arrives
+    readonly property bool onDevice: book.loaded === true && downloads.revision >= 0
+                                     && downloads.isOnDevice(book.id)
+    signal clicked()
     readonly property bool sectionStart: book.sectionStart
     readonly property bool letterSection: book.sectionLabel.length === 1
 
@@ -22,6 +27,12 @@ Item {
 
     width: ListView.view ? ListView.view.width : 0
     height: rowHeight
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: row.book.loaded === true
+        onClicked: row.clicked()
+    }
 
     // Cover, shrunk to fit; an outline while it downloads or if there isn't one
     Item {
@@ -81,7 +92,7 @@ Item {
         Row {
             id: details
             // Leave room for the on-device mark at the bottom right
-            width: parent.width - (row.book.onDevice ? deviceMark.width + Units.dp(8) : 0)
+            width: parent.width - (row.onDevice ? deviceMark.width + Units.dp(8) : 0)
             spacing: Units.dp(13)
 
             Text {
@@ -117,7 +128,7 @@ Item {
     // On-device mark: a small e-reader outline, at the bottom right
     Rectangle {
         id: deviceMark
-        visible: row.book.onDevice
+        visible: row.onDevice
         x: row.contentRight - Units.dp(2) - width
         y: row.height - Units.dp(14) - height                  // 30px above the line
         width: Units.dp(11)
