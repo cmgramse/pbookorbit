@@ -97,15 +97,17 @@ Window {
                                downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
         bookList.positionViewAtBeginning()
     }
-    // Choosing the current sort again turns it round; choosing another starts it the usual
-    // way. Either way the list reloads once, with both settled.
+    // Choosing another sort starts it the usual way. The list reloads once, with both
+    // settled.
     function chooseSort(index) {
-        if (index === sortIndex) {
-            sortReversed = !sortReversed
-        } else {
-            sortReversed = false
-            sortIndex = index
-        }
+        if (index === sortIndex)
+            return
+        sortReversed = false
+        sortIndex = index
+        applyBookQuery()
+    }
+    function reverseSort() {
+        sortReversed = !sortReversed
         applyBookQuery()
     }
     onFilterIndexChanged: applyBookQuery()
@@ -190,6 +192,7 @@ Window {
                 tabOverhang: filterMenu.border.width - 1
                 onFilterClicked: root.toggleDropdown(filterMenu)
                 onSortClicked: root.toggleDropdown(sortMenu)
+                onSortIconClicked: root.reverseSort()
             }
             Text {
                 id: status
