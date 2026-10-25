@@ -84,7 +84,8 @@ Window {
     // sort and sortReversed change together, that binding may not have caught up yet
     function applyBookQuery() {
         const descending = sortDescendingByDefault[sortIndex] !== sortReversed
-        bookOrbit.setBookQuery(sortFields[sortIndex], descending, filterFormats[filterIndex])
+        bookOrbit.setBookQuery(sortFields[sortIndex], descending, filterFormats[filterIndex],
+                               downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
         bookList.positionViewAtBeginning()
     }
     // Choosing the current sort again turns it round; choosing another starts it the usual
@@ -100,6 +101,12 @@ Window {
     }
     onFilterIndexChanged: applyBookQuery()
     property int filterIndex: 0
+    // Only the books on the device, along with the content type
+    property bool downloadedOnly: false
+    onDownloadedOnlyChanged: applyBookQuery()
+    // Books arriving on the device (or their details being looked up) change that list
+    readonly property int downloadsRevision: downloads.revision
+    onDownloadsRevisionChanged: if (downloadedOnly) applyBookQuery()
     property int sortIndex: 1   // Title, as bookOrbit starts out
     property bool sortReversed: false
     readonly property bool sortDescending: sortDescendingByDefault[sortIndex] !== sortReversed
@@ -181,9 +188,11 @@ Window {
                 width: parent.width - 2 * x
                 // Busy only until the first books arrive: later pages load as the list
                 // scrolls, and a line appearing above the rows would shift them
-                visible: bookOrbit.error !== "" || (bookOrbit.busy && bookList.count === 0)
+                visible: bookOrbit.error !== "" || (bookList.count === 0 && (bookOrbit.busy || root.downloadedOnly))
                 topPadding: Units.dp(8)
-                text: bookOrbit.busy && bookList.count === 0 ? "Working…" : bookOrbit.error
+                text: bookOrbit.error !== "" ? bookOrbit.error
+                      : bookOrbit.busy ? "Working…"
+                      : "No downloaded books" + (root.filterIndex === 0 ? "" : " of this type")
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -347,6 +356,12 @@ Window {
                     root.closeDropdowns()
                 }
             }
+        }
+        // Goes with the content type, so the menu stays open to choose that too
+        SwitchMenuItem {
+            text: "Downloaded only"
+            checked: root.downloadedOnly
+            onClicked: root.downloadedOnly = !root.downloadedOnly
         }
     }
     PopupMenu {

@@ -67,9 +67,13 @@ public:
     //   sortField   addedAt, title, author or lastReadAt (BookOrbit sort fields)
     //   descending  Z to A, or newest first
     //   formats     only books with one of these file formats; empty for all books
+    //   onlyListed  only the books in onlyBooks, listed from there without the server
+    //               (so offline too): the downloaded books, as Downloads.downloadedBooks()
+    //               gives them. The list sorts and filters them itself.
     // Reloads the list.
     Q_INVOKABLE void setBookQuery(const QString &sortField, bool descending,
-                                  const QStringList &formats);
+                                  const QStringList &formats, bool onlyListed = false,
+                                  const QVariantList &onlyBooks = {});
     // Reloads the book list from the first page
     Q_INVOKABLE void refreshBooks();
     // Loads the pages holding rows first to last, if they aren't loaded or loading. The
@@ -141,6 +145,9 @@ private:
     void loadLibrary(std::function<void()> then);
     // The sort, and the filter if there is one, as BookOrbit's book queries take them
     QJsonObject bookQuery() const;
+    // Fills the list with onlyBooks: filtered by the downloaded file's format, sorted, and
+    // split into sections like the server's lists
+    void showListedBooks();
     // Loads the A-Z sections (jump buckets), then calls then
     void loadJumpSections(std::function<void()> then);
     // Starts a new query for a list: replies to the old one are dropped from now on
@@ -173,6 +180,8 @@ private:
     PagedBooks m_list;
     QString m_sortField = "title";   // matches the sort menu's default, Title A to Z
     bool m_sortDescending = false;
+    bool m_onlyListed = false;
+    QVariantList m_onlyBooks;
     QStringList m_formats;
     QVariantList m_jumpSections;
     // For the A-Z sorts: the first row of each section -> its letter

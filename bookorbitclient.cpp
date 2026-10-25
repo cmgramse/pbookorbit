@@ -86,10 +86,13 @@ void BookOrbitClient::signOut()
 }
 
 void BookOrbitClient::setBookQuery(const QString &sortField, bool descending,
-                                   const QStringList &formats)
+                                   const QStringList &formats, bool onlyListed,
+                                   const QVariantList &onlyBooks)
 {
     m_sortField = sortField;
     m_sortDescending = descending;
+    m_onlyListed = onlyListed;
+    m_onlyBooks = onlyBooks;
     m_formats = formats;
     refreshBooks();
 }
@@ -97,6 +100,10 @@ void BookOrbitClient::setBookQuery(const QString &sortField, bool descending,
 void BookOrbitClient::refreshBooks()
 {
     restartPages(m_list);
+    if (m_onlyListed) {
+        showListedBooks();
+        return;
+    }
     const int generation = m_list.queryGeneration;
     loadLibrary([this, generation]() {
         if (generation != m_list.queryGeneration)
@@ -204,6 +211,69 @@ QJsonObject BookOrbitClient::bookQuery() const
     if (!m_formats.isEmpty())
         query.insert("filter", group("AND", {rule("format", "includesAny", QJsonArray::fromStringList(m_formats))}));
     return query;
+}
+
+// "George R.R. Martin" -> "Martin, George R.R.": near enough to the sort names BookOrbit
+// sorts authors by, which the list entries don't include
+static QString authorSortKey(const QString &name)
+{
+    const int space = name.trimmed().lastIndexOf(' ');
+    return space < 0 ? name.trimmed() : name.mid(space + 1) + ", " + name.left(space);
+}
+
+// "A" to "Z" for a key starting with a letter, otherwise "#", as BookOrbit's sections go
+static QString letterSection(const QString &key)
+{
+    const QChar first = key.isEmpty() ? QChar() : key.at(0).toUpper();
+    return first >= 'A' && first <= 'Z' ? QString(first) : QString("#");
+}
+
+void BookOrbitClient::showListedBooks()
+{
+    // The key each book sorts by, as the server would sort it
+    const auto sortKey = [this](const QVariantMap &book) -> QString {
+        if (m_sortField == "author") {
+            const QStringList authors = book.value("authors").toStringList();
+            return authors.isEmpty() ? QString() : authorSortKey(authors.first());
+        }
+        return book.value(m_sortField).toString();   // title, or an ISO date
+    };
+
+    QList<QPair<QString, QVariantMap>> books;
+    for (const QVariant &value : std::as_const(m_onlyBooks)) {
+        const QVariantMap book = value.toMap();
+        if (m_formats.isEmpty() || m_formats.contains(book.value("downloadedFormat").toString()))
+            books.append({sortKey(book), book});
+    }
+    std::stable_sort(books.begin(), books.end(), [this](const auto &a, const auto &b) {
+        const int order = QString::localeAwareCompare(a.first.toLower(), b.first.toLower());
+        return m_sortDescending ? order > 0 : order < 0;
+    });
+
+    QVariantList rows;
+    m_sectionStarts.clear();
+    m_jumpSections.clear();
+    for (const auto &[key, book] : std::as_const(books)) {
+        if (letterSections()) {
+            const QString letter = letterSection(key);
+            if (m_jumpSections.isEmpty() || m_jumpSections.last().toMap().value("label") != letter) {
+                m_sectionStarts.insert(rows.size(), letter);
+                m_jumpSections.append(QVariantMap{{"label", letter}, {"index", rows.size()}});
+            }
+        }
+        rows.append(decorateBook(book));
+    }
+
+    // All there at once: no pages to load
+    m_list.listGeneration = m_list.queryGeneration;
+    m_list.total = rows.size();
+    for (int page = 0; page * BOOKS_PAGE_SIZE < rows.size(); page++)
+        m_list.loadedPages.insert(page);
+    m_list.model.reset(rows.size());
+    m_list.model.setBooks(0, rows);
+    updateSectionStarts(0, rows.size() - 1);
+    emit jumpSectionsChanged();
+    emit booksChanged();
 }
 
 void BookOrbitClient::loadJumpSections(std::function<void()> then)

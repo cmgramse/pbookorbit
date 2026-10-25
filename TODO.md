@@ -17,6 +17,8 @@
 - Test data for reading status: the `app` test account has no reading progress or
   statuses, so "Completed" and "N% read" can't be seen in the emulator. Add a mock, e.g. an
   environment variable that makes `decorateBook()` give books sample progress and statuses.
+- Downloaded books list from what was saved at download time, so status and percentage
+  read can go stale: refresh them from the server in the background when online.
 - The list entries have no lastReadAt, so the Recently read sort shows every date section
   as "Never" (in the downloaded list it also can't order by it). Find where BookOrbit
   keeps the last read date.
