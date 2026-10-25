@@ -79,6 +79,12 @@ Rectangle {
 
     ListScrollbar {
         list: books
+        bottomInset: booksPages.height
+    }
+    PageButtons {
+        id: booksPages
+        list: books
+        anchors.bottom: books.bottom
     }
 
     // While the first books load, or if that failed

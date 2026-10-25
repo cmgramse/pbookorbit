@@ -24,6 +24,7 @@
         <file>qml/PageHeader.qml</file>
         <file>qml/BookInfoPage.qml</file>
         <file>qml/BooksOfPage.qml</file>
+        <file>qml/PageButtons.qml</file>
         <file>images/bookorbit-icon.png</file>
     </qresource>
 </RCC>

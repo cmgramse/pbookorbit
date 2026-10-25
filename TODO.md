@@ -1,8 +1,5 @@
 # To do
 
-- Page buttons: floating buttons at the bottom left and right of the book list that scroll
-  a whole page up or down, as in the system library (screenshots 9 and 10). Paging suits
-  e-ink better than scrolling: one clean redraw per page.
 - On-device detection only knows the books this app downloaded (`Downloads` records
   where each went). Books copied on some other way could be matched against the device's
   own library.

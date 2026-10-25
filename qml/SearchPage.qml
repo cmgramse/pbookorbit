@@ -314,6 +314,12 @@ Rectangle {
 
     ListScrollbar {
         list: results
+        bottomInset: resultsPages.height
+    }
+    PageButtons {
+        id: resultsPages
+        list: results
+        anchors.bottom: results.bottom
     }
 
     // While the first results load, or when nothing matches

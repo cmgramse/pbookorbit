@@ -241,10 +241,9 @@ Window {
         }
     }
 
-    // TODO: floating buttons at the bottom left and right that scroll a whole page, as in
-    // the system library (see TODO.md)
     ListScrollbar {
         list: bookList
+        bottomInset: pageButtons.height
     }
 
     // Jump rail, for the A-Z sorts: the whole alphabet down the right, between the rows and
@@ -275,7 +274,8 @@ Window {
         // sub-toolbar scrolls away
         readonly property real subToolbarHeight: bookList.headerItem ? bookList.headerItem.height : 0
         y: bookList.y + subToolbarHeight + Units.dp(7)
-        height: bookList.height - subToolbarHeight - 2 * Units.dp(7)
+        // Ends above the page buttons
+        height: bookList.height - subToolbarHeight - pageButtons.height - 2 * Units.dp(7)
 
         Column {
             id: railLetters
@@ -315,6 +315,13 @@ Window {
                 bookList.loadVisibleBooks()
             }
         }
+    }
+
+    // Over the bottom of the list, above the footer
+    PageButtons {
+        id: pageButtons
+        list: bookList
+        anchors.bottom: bookList.bottom
     }
 
     TabFooter {

@@ -7,9 +7,11 @@ import "units.js" as Units
 Rectangle {
     id: scrollbar
     property Flickable list
+    // Space kept clear at the bottom, e.g. for page buttons
+    property real bottomInset: 0
 
     readonly property real trackTop: list.y + Units.dp(7)
-    readonly property real trackHeight: list.height - 2 * Units.dp(7)
+    readonly property real trackHeight: list.height - bottomInset - 2 * Units.dp(7)
     readonly property real scrolled: Math.max(0, Math.min(1,
         (list.contentY - list.originY) / Math.max(1, list.contentHeight - list.height)))
 
