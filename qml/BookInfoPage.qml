@@ -4,8 +4,9 @@ import "units.js" as Units
 // A book's details, laid out like the system library's Book info page (screenshot 11):
 // the cover at the left with title, author, series and the file on the device beside it,
 // then a row of ADDED, SIZE and FORMAT. Below those come what BookOrbit knows besides
-// (published, pages, language, description), fetched when the page opens; offline they
-// just don't appear. The whole page scrolls when the description is long.
+// (published, pages or an audiobook's length, language, description), fetched when the
+// page opens; offline they just don't appear. The whole page scrolls when the
+// description is long.
 //
 // The system's page also has a favourite heart and a CHOOSE ACTION button.
 Rectangle {
@@ -39,6 +40,15 @@ Rectangle {
         return bytes >= 1024 * 1024 * 1024 ? (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB"
              : bytes >= 1024 * 1024 ? (bytes / (1024 * 1024)).toFixed(1) + " MB"
              : Math.max(1, Math.round(bytes / 1024)) + " KB"
+    }
+
+    // "13 h 56 min", "45 min"; "" without one
+    function durationText(seconds) {
+        if (!seconds)
+            return ""
+        const minutes = Math.max(1, Math.round(seconds / 60))
+        const hours = Math.floor(minutes / 60)
+        return hours > 0 ? hours + " h " + (minutes % 60) + " min" : minutes + " min"
     }
 
     // Its records: its own, and any other version of it (an audiobook kept apart)
@@ -188,7 +198,10 @@ Rectangle {
                     ["Published", page.details.publishedDate
                                   ? Qt.formatDate(new Date(page.details.publishedDate), "dd/MM/yyyy")
                                   : (page.details.publishedYear || "").toString()],
-                    ["Pages", (page.details.pageCount || "").toString()],
+                    // An audiobook has no pages, but a length
+                    page.details.pageCount || !page.details.audioMetadata
+                        ? ["Pages", (page.details.pageCount || "").toString()]
+                        : ["Length", page.durationText(page.details.audioMetadata.durationSeconds)],
                     ["Language", page.details.language || ""],
                 ]
             }
