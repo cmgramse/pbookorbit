@@ -14,6 +14,36 @@ using pocketbook::utilities::einkPlatform;
 // then shows those frames over it. The system apps also wait a while before redrawing.
 static constexpr int a2SettleMs = 1000;
 
+void Eink::followNightMode()
+{
+    IvSetAppCapability(IvGetAppCapability() | APP_CAPABILITY_SUPPORT_SCREEN_INVERSION);
+    m_nightMode = IvGetScreenModeInversion();
+    diagnostics::log(m_nightMode ? "night mode on" : "night mode off");
+
+    auto *platform = einkPlatform();
+    if (!platform)
+        return;
+    platform->addHandlerForInkvewEvents([this](int type, int, int) {
+        if (type != EVT_SCREEN_INVERSION_MODE_CHANGED)
+            return;
+        QMetaObject::invokeMethod(this, [this] {
+            // The change can arrive twice, and each full update is a flash
+            const bool nightMode = IvGetScreenModeInversion();
+            if (nightMode == m_nightMode)
+                return;
+            m_nightMode = nightMode;
+            diagnostics::log(m_nightMode ? "night mode on" : "night mode off");
+            // Nothing in the window has changed, so only a full update redraws it
+            if (auto *platform = einkPlatform())
+                platform->requireFullUpdate();
+            for (QWindow *window : QGuiApplication::topLevelWindows()) {
+                if (auto *quickWindow = qobject_cast<QQuickWindow *>(window))
+                    quickWindow->update();
+            }
+        }, Qt::QueuedConnection);
+    });
+}
+
 void Eink::enterA2ForFlick(int x, int y, int width, int height)
 {
     // nullptr until the platform plugin has started

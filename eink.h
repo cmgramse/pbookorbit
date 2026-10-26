@@ -18,6 +18,12 @@ class Eink : public QObject
 public:
     using QObject::QObject;
 
+    // Lets the system's night mode invert the app, as it does the built-in apps, and
+    // redraws the screen when night mode is turned on or off. InkView only inverts apps
+    // that say they support it, and only the ones in /ebrmain say so by default. Call it
+    // once the platform plugin has started.
+    void followNightMode();
+
     // Switches a screen rectangle (in window coordinates) to A2 for a flick. It stays in A2
     // until leaveA2Soon() or leaveA2() is called. Calling it again before a timed exit
     // cancels the exit.
@@ -34,4 +40,5 @@ public:
 
 private:
     bool m_dynamicUpdates = false;
+    bool m_nightMode = false;
 };

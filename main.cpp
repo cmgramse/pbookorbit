@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
     Downloads downloads(&client, settingsPath);
     BookFinder bookFinder(&client, &downloads, settingsPath);
     Eink eink;
+    eink.followNightMode();
     diagnostics::Log diagnosticsLog;
 
     QQmlApplicationEngine engine;
