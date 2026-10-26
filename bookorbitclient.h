@@ -25,7 +25,9 @@ class QNetworkReply;
 class BookOrbitClient : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QString serverUrl READ serverUrl CONSTANT)
+    // The server signed in to last, e.g. "https://books.example.com"; empty until a sign-in
+    // has worked. Kept after signing out, for the next sign-in.
+    Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
     Q_PROPERTY(QString username READ username NOTIFY usernameChanged)
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
@@ -131,7 +133,10 @@ public:
 
     // Loads the book list if there is a saved session (signedIn is already true then)
     Q_INVOKABLE void start();
-    Q_INVOKABLE void signIn(const QString &username, const QString &password);
+    // server is the address as typed, e.g. "books.example.com": https:// is assumed
+    Q_INVOKABLE void signIn(const QString &server, const QString &username, const QString &password);
+    // Forgets the saved server, for signing in to another. Not while signed in.
+    Q_INVOKABLE void forgetServer();
     Q_INVOKABLE void signOut();
 
     // How the book list is sorted and filtered, and so how it is split into sections:
@@ -231,6 +236,7 @@ public:
     void withLibrary(std::function<void(int libraryId)> then, ErrorHandler onError);
 
 signals:
+    void serverUrlChanged();
     void usernameChanged();
     void signedInChanged();
     void busyChanged();

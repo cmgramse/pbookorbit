@@ -4,12 +4,14 @@ import "units.js" as Units
 // Button in the style of PocketBook's own apps, measured from the OverDrive sign-in
 // screen on an Era Color: pill-shaped, 121px tall, 1px pure black border, about 77px
 // between border and content, label in capitals, optional theme icon on the left.
-// Inverted while pressed.
+// Inverted while pressed. While busy, a spinner turns at its right end and it can't be
+// pressed.
 Rectangle {
     id: button
     property alias text: label.text
     property string icon            // optional theme resource name, e.g. "search"
     property string pressedIcon     // shown while pressed, e.g. "search_inv"
+    property bool busy: false
     signal clicked()
 
     readonly property int padding: Units.dp(36)
@@ -21,7 +23,7 @@ Rectangle {
     border.width: 1
     border.color: "black"
     color: mouse.pressed ? "black" : "white"
-    opacity: enabled ? 1 : 0.4
+    opacity: enabled || busy ? 1 : 0.4
 
     Row {
         id: content
@@ -42,9 +44,17 @@ Rectangle {
             font.capitalization: Font.AllUppercase
         }
     }
+    SpinnerImage {
+        visible: button.busy
+        frames: "progress_indicator_"
+        anchors.right: parent.right
+        anchors.rightMargin: (parent.height - height) / 2
+        anchors.verticalCenter: parent.verticalCenter
+    }
     MouseArea {
         id: mouse
         anchors.fill: parent
+        enabled: !button.busy
         onClicked: button.clicked()
     }
 }

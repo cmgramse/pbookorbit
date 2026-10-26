@@ -16,9 +16,6 @@
 #include <QScopeGuard>
 #include <QUrl>
 
-// TODO: make the server configurable
-static const char *DEFAULT_SERVER_URL = "https://books.example.com";
-
 // Books per request for the book list; pages load as the list scrolls to them
 static const int BOOKS_PAGE_SIZE = 40;
 // Books asked for at a time just to read their series numbers: the most the server sends
@@ -44,16 +41,47 @@ static QJsonObject group(const QString &join, const QJsonArray &rules)
 BookOrbitClient::BookOrbitClient(Database *database, QObject *parent)
     : QObject(parent)
     , m_database(database)
-    , m_serverUrl(QString::fromUtf8(DEFAULT_SERVER_URL))
 {
     m_nam.setTransferTimeout(30000);
+    m_serverUrl = m_database->text("serverUrl");
     m_username = m_database->text("username");
     m_refreshToken = m_database->text("refreshToken");
     m_recentSearches = m_database->list("recentSearches");
     m_accent = m_database->text("accent");
     // A saved session counts as signed in straight away, so the app opens on the book list.
     // If the server has since rejected it, the first request finds out and signs out.
-    m_signedIn = !m_refreshToken.isEmpty();
+    m_signedIn = !m_serverUrl.isEmpty() && !m_refreshToken.isEmpty();
+}
+
+// "books.example.com" or "https://books.example.com/" -> "https://books.example.com";
+// empty if it isn't a web address
+static QString normalisedServerUrl(const QString &typed)
+{
+    QString text = typed.trimmed();
+    if (!text.contains("://"))
+        text.prepend("https://");
+    QUrl url(text, QUrl::StrictMode);
+    if (!url.isValid() || url.host().isEmpty() || (url.scheme() != "https" && url.scheme() != "http"))
+        return QString();
+    // Its web address, not the API's
+    QString path = url.path();
+    while (path.endsWith('/'))
+        path.chop(1);
+    if (path.endsWith("/api/v1"))
+        path.chop(7);
+    url.setPath(path);
+    url.setQuery(QString());
+    url.setFragment(QString());
+    return url.toString();
+}
+
+void BookOrbitClient::forgetServer()
+{
+    if (m_signedIn || m_serverUrl.isEmpty())
+        return;
+    m_serverUrl.clear();
+    m_database->remove("serverUrl");
+    emit serverUrlChanged();
 }
 
 void BookOrbitClient::start()
@@ -95,9 +123,16 @@ void BookOrbitClient::loadAccent()
         [](int, const QString &message) { diagnostics::log("accent: " + message); });
 }
 
-void BookOrbitClient::signIn(const QString &username, const QString &password)
+void BookOrbitClient::signIn(const QString &server, const QString &username, const QString &password)
 {
+    const QString serverUrl = normalisedServerUrl(server);
+    if (serverUrl.isEmpty()) {
+        setError("That isn't a server address");
+        return;
+    }
     setError(QString());
+    // Tried with this server, but only kept if the sign-in works
+    m_serverUrl = serverUrl;
     m_username = username.trimmed();
     emit usernameChanged();
 
@@ -113,11 +148,18 @@ void BookOrbitClient::signIn(const QString &username, const QString &password)
     send("POST", "/auth/login", QJsonDocument(body),
         [this](const QByteArray &data) {
             applyCredentials(QJsonDocument::fromJson(data).object());
+            if (m_database->text("serverUrl") != m_serverUrl) {
+                m_database->setText("serverUrl", m_serverUrl);
+                emit serverUrlChanged();
+            }
             m_database->setText("username", m_username);
             refreshBooks();
             loadAccent();
         },
-        [this](int, const QString &message) { setError(message); });
+        [this](int, const QString &message) {
+            m_serverUrl = m_database->text("serverUrl");
+            setError(message);
+        });
 }
 
 void BookOrbitClient::signOut()

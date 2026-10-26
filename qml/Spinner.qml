@@ -7,21 +7,13 @@ Item {
     id: spinner
     property ListView list
     readonly property real headerHeight: list.headerItem ? list.headerItem.height : 0
-    property int frame: 1
 
     x: list.x
     y: list.y + headerHeight
     width: list.width
     height: list.height - headerHeight
 
-    Image {
+    SpinnerImage {
         anchors.centerIn: parent
-        source: "image://theme/loading_icon_" + spinner.frame
-    }
-    Timer {
-        interval: 200
-        repeat: true
-        running: spinner.visible
-        onTriggered: spinner.frame = spinner.frame % 9 + 1
     }
 }

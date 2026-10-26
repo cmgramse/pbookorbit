@@ -8,15 +8,14 @@ in with a normal BookOrbit account and lists the 20 most recently added books.
 ./pb.sh arm apps/pbookorbit    # device -> build/pbookorbit/<sdk>/arm/pbookorbit.app
 ```
 
-The server is currently fixed at `https://books.example.com` (`DEFAULT_SERVER_URL` in
-`bookorbitclient.cpp`).
-
 ## Signing in
 
-Use the same username and password as the BookOrbit website. The app opens a session for
-the device, shown as "PocketBook <model>" in the account's session list. The password is
-not saved. The session's refresh token is saved in the app's database (see below). Signing
-out revokes the session on the server.
+Enter the server's address (`books.example.com`; https is assumed unless `http://` is
+typed) and the same username and password as the BookOrbit website. Once a sign-in has
+worked the server is saved and shown as a pill; its cross forgets it, to sign in to
+another. The app opens a session for the device, shown as "PocketBook <model>" in the
+account's session list. The password is not saved. The session's refresh token is saved
+in the app's database (see below). Signing out revokes the session on the server.
 
 ## Local data
 
@@ -24,7 +23,7 @@ The app keeps its data in an SQLite database, `pbookorbit.db`, in the system con
 `/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in the
 emulator. `PBOOKORBIT_DB` points the app at a different file, e.g. for automated tests.
 
-- `settings`: key/value. `username`, `refreshToken`, `accent`, `recentSearches` (a JSON
+- `settings`: key/value. `serverUrl`, `username`, `refreshToken`, `accent`, `recentSearches` (a JSON
   array) and `findBooksOffered` (0/1).
 - `books`: a local cache of BookOrbit books by id. `data` is the book's list entry as JSON,
   so what's kept can grow without changing the table. `title` and `series` are generated
