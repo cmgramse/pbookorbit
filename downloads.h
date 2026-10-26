@@ -57,6 +57,14 @@ public:
     Q_INVOKABLE void cancel();
     // Opens a downloaded book: an ebook in the reader, an audiobook in the audiobook app
     Q_INVOKABLE bool open(int bookId);
+    // The apps the system opens files of this format with, as its Open with menu lists
+    // them: [{app: "koreader.app", name: "KOReader"}], from extensions.cfg (the firmware's
+    // and /mnt/ext1/system/config/'s, where KOReader adds itself)
+    Q_INVOKABLE QVariantList appsFor(const QString &format) const;
+    // Opens the book's file of this format in app, one of appsFor(format), and keeps that
+    // choice for the file, as the system's Open with does (handlers.cfg), so the book
+    // opens there from the system library too
+    Q_INVOKABLE bool openWith(int bookId, const QString &format, const QString &app);
     // The book's files on the device
     Q_INVOKABLE QStringList pathsOnDevice(int bookId) const;
     // Deletes the book's files from the device and forgets them; false if one couldn't be

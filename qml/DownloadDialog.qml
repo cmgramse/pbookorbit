@@ -2,7 +2,8 @@ import QtQuick
 import "units.js" as Units
 
 // Offers to download a book that isn't on the device, shows the download, then opens the
-// book. A book with an ebook and an audiobook asks which to download.
+// book: in the app chosen from Open with, if it came from there. A book with an ebook and
+// an audiobook asks which to download.
 SystemDialog {
     id: dialog
     // The book being offered, as in the book list
@@ -15,16 +16,21 @@ SystemDialog {
     readonly property bool downloading: chosen !== null && downloads.bookId === chosen.bookId
     // Set when a download fails, until the next try
     property string error: ""
+    // The app to open it in, {app, name} as downloads.appsFor() gives it, or null for the
+    // usual one
+    property var app: null
 
-    signal opened(int bookId)
+    // format is the downloaded file's
+    signal opened(int bookId, string format, var app)
 
     icon: error !== "" || !hasFile ? "icon_error" : "icon_question"
     percent: downloading ? downloads.percent : -1
     onPressed: (action) => press(action)
 
     // variants as the book list gives them; without any, the book's primary file
-    function show(newBook, variants) {
+    function show(newBook, variants, newApp) {
         book = newBook
+        app = newApp || null
         let list = variants || []
         if (list.length === 0) {
             const file = downloads.fileToDownload(newBook)
@@ -69,7 +75,8 @@ SystemDialog {
             return "Download the " + options.map(o => o.kind + " (" + fileText(o) + ")").join(" or the ")
                    + " and open it?"
         }
-        return "Download " + fileText(chosen) + " to the " + folderOf(chosen) + " folder and open it?"
+        return "Download " + fileText(chosen) + " to the " + folderOf(chosen) + " folder and open it"
+               + (app ? " in " + app.name : "") + "?"
     }
 
     // The buttons, left to right: [label, action]; an option's index downloads it
@@ -95,7 +102,7 @@ SystemDialog {
             if (!dialog.visible || dialog.chosen === null || bookId !== dialog.chosen.bookId)
                 return
             dialog.visible = false
-            dialog.opened(bookId)
+            dialog.opened(bookId, dialog.chosen.format, dialog.app)
         }
         function onChanged() {
             // A download of this book ended without arriving

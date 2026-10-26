@@ -63,6 +63,17 @@ KOReader adds its `epub` line). On 6.10 it lists `mp3` and `m3u` for `music_play
 and no audiobook formats, so an `.m4b` gets "Unknown book type", while `OpenBook` still
 returns 0.
 
+Open with (the library's book menu, screenshot 16) lists every app on the format's
+`extensions.cfg` line, in order: on the Era Color `epub:@EPUB_file:1:koreader.app,
+eink-reader_with_blink.app,eink-reader_with_epub2.app:ICON_EPUB` (KOReader's line).
+InkView's `GetSupportedFileTypes()` returns these lines with `program` as that
+comma-separated list; the emulator reads its one `extensions.cfg` twice, so lines repeat.
+The names are language strings named after the app, `@eink-reader_with_blink` and so on;
+KOReader adds `@koreader=KOReader` to `/mnt/ext1/system/language/en.txt`. The SDK's
+emulator language file predates the blink and epub2 readers, so the emulator shows the
+apps' file names. Choosing an app records it for that file in `handlers.cfg`
+(`SetFileHandler`), so `OpenBook` and the system library open it there from then on.
+
 Audiobooks play in the system's Audiobooks app, `/ebrmain/bin/audio_books.app`. Its
 command line (`DataManager::parseArguments`, a `QCommandLineParser`) takes:
 

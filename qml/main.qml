@@ -742,6 +742,12 @@ Window {
                              title, field, values)
         }
         onDeleteChosen: (book) => deleteDialog.ask(book)
+        onOpenWithChosen: (target, app) => {
+            if (target.option === undefined)
+                downloads.openWith(target.bookId, target.format, app.app)
+            else
+                downloadDialog.show(target.option.book, [target.option], app)
+        }
     }
 
     // Asks before deleting a book from the device, as the system library does (screenshot
@@ -793,7 +799,7 @@ Window {
     DownloadDialog {
         id: downloadDialog
         anchors.fill: parent
-        onOpened: (bookId) => downloads.open(bookId)
+        onOpened: (bookId, format, app) => app ? downloads.openWith(bookId, format, app.app) : downloads.open(bookId)
     }
     FindBooksDialog {
         id: findBooksDialog

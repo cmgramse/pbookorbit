@@ -373,6 +373,54 @@ void Downloads::addExisting(const QList<Existing> &books)
     emit changed();
 }
 
+QVariantList Downloads::appsFor(const QString &format) const
+{
+    // One entry per extensions.cfg line for the format, and the emulator reads its one
+    // file twice, so the same app can come up more than once
+    QStringList apps;
+    const iv_filetype *types = GetSupportedFileTypes();
+    const int count = GetSupportedFileTypesLength();
+    for (int i = 0; types && i < count; i++) {
+        if (!types[i].extension || QString::fromUtf8(types[i].extension).compare(format, Qt::CaseInsensitive) != 0)
+            continue;
+        // "koreader.app,eink-reader_with_blink.app,eink-reader_with_epub2.app"
+        for (const QString &app : QString::fromUtf8(types[i].program ? types[i].program : "").split(',', Qt::SkipEmptyParts)) {
+            if (!apps.contains(app.trimmed()))
+                apps.append(app.trimmed());
+        }
+    }
+
+    QVariantList result;
+    for (const QString &app : apps) {
+        // The names are language strings named after the app: "@eink-reader_with_blink" is
+        // "PB Reader (EPUB 3)", and KOReader adds "@koreader" to the user's language file
+        QString base = app;
+        if (base.endsWith(".app"))
+            base.chop(4);
+        const QByteArray key = ("@" + base).toUtf8();
+        const char *text = GetLangText(key.constData());
+        const QString name = text && key != text ? QString::fromUtf8(text) : base;
+        result.append(QVariantMap{{"app", app}, {"name", name}});
+    }
+    return result;
+}
+
+bool Downloads::openWith(int bookId, const QString &format, const QString &app)
+{
+    QString path;
+    for (const QString &candidate : pathsFor(bookId)) {
+        if (QFileInfo::exists(candidate) && QFileInfo(candidate).suffix().compare(format, Qt::CaseInsensitive) == 0)
+            path = candidate;
+    }
+    if (path.isEmpty())
+        return false;
+    const QByteArray file = path.toUtf8();
+    SetFileHandler(file.constData(), app.toUtf8().constData());
+    const int rc = OpenBook(file.constData(), "", OB_ADDTOLAST | OB_WITHRETURN);
+    diagnostics::log(QString("OpenBook %1 with %2 -> %3").arg(path, app).arg(rc));
+    return true;
+}
+
 bool Downloads::open(int bookId)
 {
     // The ebook if both are here

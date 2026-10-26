@@ -6,9 +6,10 @@ import "units.js" as Units
 // row, and the menu opens to its right with an arrow pointing at it: level with the row
 // where it fits, otherwise moved up to stay on screen. A tap outside the menu closes it.
 //
-// For now: Book info, All books of author, All books of series (for a book in one), and
-// Delete (for a book on the device). The system's menu also has Mark as read, Add to
-// collection, Add to Favorites, Select and Open with.
+// For now: Book info, All books of author, All books of series (for a book in one), Delete
+// (for a book on the device) and Open with, which opens in place to list the apps the
+// system has for the book's format (screenshot 16). The system's menu also has Mark as
+// read, Add to collection, Add to Favorites and Select.
 Item {
     id: bookMenu
     // The book whose menu it is, as the book list has it
@@ -23,6 +24,8 @@ Item {
     // field "author" or "series", values the names to look for, title for the page
     signal booksOfChosen(string field, var values, string title)
     signal deleteChosen(var book)
+    // target as openWithTarget has it, app one of its apps
+    signal openWithChosen(var target, var app)
 
     visible: false
 
@@ -63,6 +66,7 @@ Item {
         rowRect = Qt.rect(rowPos.x, rowPos.y, row.width, row.height)
         listRect = Qt.rect(listPos.x, listPos.y, view.width, view.height)
         book = row.book
+        openWithOpen = false
         visible = true
     }
 
@@ -78,6 +82,37 @@ Item {
     readonly property bool onDevice: downloads.revision >= 0 && bookIds.some(id => downloads.isOnDevice(id))
     readonly property var authors: book.authors || []
     readonly property string series: book.seriesName || ""
+
+    // What Open with opens, and in what: the book's file of a format the system has apps
+    // for, {bookId, format, apps}, plus option (as DownloadDialog takes it) for a file
+    // that has to download first; null if there's none. A file on the device comes first.
+    readonly property var openWithTarget: {
+        if (book.id === undefined || downloads.revision < 0)
+            return null
+        for (const id of bookIds) {
+            for (const format of downloads.formatsOnDevice(id)) {
+                const apps = downloads.appsFor(format)
+                if (apps.length > 0)
+                    return { bookId: id, format: format, apps: apps }
+            }
+        }
+        // The files a download would fetch, as openBook() offers them
+        let options = book.variants || []
+        if (options.length === 0) {
+            const file = downloads.fileToDownload(book)
+            if (file.format !== undefined)
+                options = [{ bookId: book.id, fileId: file.id, format: file.format,
+                             sizeBytes: file.sizeBytes, kind: "", book: book }]
+        }
+        for (const option of options) {
+            const apps = downloads.appsFor(option.format)
+            if (apps.length > 0)
+                return { bookId: option.bookId, format: option.format, apps: apps, option: option }
+        }
+        return null
+    }
+    // Whether Open with is showing its apps
+    property bool openWithOpen: false
 
     // The faded window
     Rectangle {
@@ -122,7 +157,7 @@ Item {
         PopupMenuItem {
             icon: "info"
             text: "Book info"
-            showSeparator: authorItem.visible || seriesItem.visible || deleteItem.visible
+            showSeparator: authorItem.visible || seriesItem.visible || deleteItem.visible || openWithItem.visible
             onClicked: {
                 bookMenu.close()
                 bookMenu.infoChosen(bookMenu.book)
@@ -133,7 +168,7 @@ Item {
             visible: bookMenu.authors.length > 0
             icon: "search"
             text: "All books of author"
-            showSeparator: seriesItem.visible || deleteItem.visible
+            showSeparator: seriesItem.visible || deleteItem.visible || openWithItem.visible
             onClicked: {
                 bookMenu.close()
                 bookMenu.booksOfChosen("author", bookMenu.authors, bookMenu.authors.join(", "))
@@ -144,7 +179,7 @@ Item {
             visible: bookMenu.series !== ""
             icon: "search"
             text: "All books of series"
-            showSeparator: deleteItem.visible
+            showSeparator: deleteItem.visible || openWithItem.visible
             onClicked: {
                 bookMenu.close()
                 bookMenu.booksOfChosen("series", [bookMenu.series], bookMenu.series)
@@ -155,10 +190,34 @@ Item {
             visible: bookMenu.onDevice
             icon: "trash"
             text: "Delete"
-            showSeparator: false
+            showSeparator: openWithItem.visible
             onClicked: {
                 bookMenu.close()
                 bookMenu.deleteChosen(bookMenu.book)
+            }
+        }
+        PopupMenuItem {
+            id: openWithItem
+            visible: bookMenu.openWithTarget !== null
+            icon: "e3_menu_open"
+            text: "Open with"
+            arrow: bookMenu.openWithOpen ? "up" : "down"
+            showSeparator: bookMenu.openWithOpen
+            onClicked: bookMenu.openWithOpen = !bookMenu.openWithOpen
+        }
+        Repeater {
+            model: bookMenu.openWithOpen && bookMenu.openWithTarget ? bookMenu.openWithTarget.apps : []
+            PopupMenuItem {
+                required property var modelData
+                required property int index
+                subItem: true
+                text: modelData.name
+                showSeparator: index < bookMenu.openWithTarget.apps.length - 1
+                onClicked: {
+                    const target = bookMenu.openWithTarget
+                    bookMenu.close()
+                    bookMenu.openWithChosen(target, modelData)
+                }
             }
         }
     }
