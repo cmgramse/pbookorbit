@@ -10,10 +10,10 @@ import "units.js" as Units
 // book's status goes. The first row of a section (a letter, when sorted by name) carries
 // the letter in a floating square at its left edge, as a book row does. A black line runs
 // under each row. Tapping the row sends clicked().
-// An author's row (in the Authors list) has their photo where the cover goes, or the theme's
-// author icon in an outline without one, their name in the title's place, just their books'
+// An author's row (in the Authors list) has their photo where the cover goes, or their
+// initials without one (AuthorPortrait), their name in the title's place, just their books'
 // formats on the line below, and how many books they have and how many series those are in,
-// "6 books · 2 series".
+// "6 books | 2 series".
 Item {
     id: row
     // A row of bookOrbit.collections, seriesList or authorsList
@@ -122,35 +122,13 @@ Item {
             border.color: "#cccccc"
         }
 
-        // An author's photo, shrunk to fit and centred; without one (or while it downloads),
-        // the theme's author icon in an outline
-        Rectangle {
-            anchors.fill: parent
-            visible: row.isAuthor && photo.status !== Image.Ready
-            border.width: 1
-            border.color: "#cccccc"
-            Image {
-                anchors.centerIn: parent
-                source: "image://theme/e3_filter_author"
-            }
-        }
-        Image {
-            id: photo
-            anchors.centerIn: parent
+        // An author's photo, or their initials, 3:4 and as wide as a cover, centred
+        AuthorPortrait {
             visible: row.isAuthor
-            // As for the covers: bumped to ask again when the download arrives
-            property int revision: 0
-            property string url: revision >= 0 && row.isAuthor && (row.group.photo || "") !== ""
-                                 ? covers.authorPhoto(row.group.id, row.group.photo, row.coverWidth, row.coverHeight) : ""
-            Connections {
-                target: covers
-                function onPhotoReady(authorId) {
-                    if (row.isAuthor && authorId === row.group.id)
-                        photo.revision++
-                }
-            }
-            source: url
-            asynchronous: true
+            anchors.centerIn: parent
+            width: row.coverWidth
+            height: Math.round(row.coverWidth * 4 / 3)
+            author: row.isAuthor ? row.group : ({})
         }
 
         // A collection's icon, in a white disc with a black edge
@@ -209,16 +187,40 @@ Item {
             font.pointSize: 7.25
             elide: Text.ElideRight
         }
-        Text {
-            y: Units.dp(73) - baselineOffset
+        // How many books, and for an author how many series, split as a book row's status
+        // and series are, by an upright grey bar
+        Row {
+            id: counts
             width: parent.width
-            readonly property int count: row.group.bookCount || 0
+            spacing: Units.dp(13)
+            readonly property int books: row.group.bookCount || 0
             // An author's series, once their books are in
             readonly property int series: row.isAuthor && row.group.seriesCount !== undefined ? row.group.seriesCount : 0
-            text: count + (count === 1 ? " book" : " books") + (series > 0 ? " · " + series + " series" : "")
-            font.pointSize: 7.25
-            font.italic: true
-            elide: Text.ElideRight
+
+            Text {
+                y: Units.dp(73) - baselineOffset
+                width: Math.min(implicitWidth, counts.width)
+                text: counts.books + (counts.books === 1 ? " book" : " books")
+                font.pointSize: 7.25
+                font.italic: true
+                elide: Text.ElideRight
+            }
+            Text {
+                y: Units.dp(73) - baselineOffset
+                visible: counts.series > 0
+                text: "|"
+                color: "#6e6e71"
+                font.pointSize: 7.25
+            }
+            Text {
+                y: Units.dp(73) - baselineOffset
+                visible: counts.series > 0
+                width: Math.max(0, counts.width - x)
+                text: counts.series + " series"
+                font.pointSize: 7.25
+                font.italic: true
+                elide: Text.ElideRight
+            }
         }
         // The formats, centred on the author line: "EPUB  AZW3  M4B"
         Row {

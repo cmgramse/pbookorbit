@@ -74,3 +74,14 @@ The client refreshes when a request gets a 401, then retries the request once.
 It returns `{items, total, page, size}`. Each item has `id`, `title`, `authors`, `seriesName`,
 `seriesIndex`, `files: [{id, format, role, sizeBytes}]`, `hasCover`, `readingProgress`,
 `readStatus` and more. The sort fields are listed in `StaticSortField`.
+
+### Authors and series
+
+Found by trying the endpoints against the server:
+
+- `GET /authors/:id` returns one author: `name`, `sortName`, `description` (plain text),
+  `bookCount`, `birthDate`/`birthYear`, `deathDate`/`deathYear`, `website`, `genres`,
+  `imageUrl` and more.
+- `GET /series?libraryId=&author=<text>` lists the series with an author whose name
+  contains the text, ignoring case. `author=Martin` finds every Martin's series, so the
+  client keeps only those whose `authors` include the exact name.

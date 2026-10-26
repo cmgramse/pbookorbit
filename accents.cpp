@@ -2,6 +2,8 @@
 
 #include <QtMath>
 
+#include <cmath>
+
 namespace {
 
 struct Accent {
@@ -103,12 +105,45 @@ QColor fromOklch(double lightness, double chroma, double hue)
 
 } // namespace
 
-AccentColors accentColors(const QString &name)
+static const Accent *findAccent(const QString &name)
 {
     for (const Accent &accent : ACCENTS) {
         if (name == QLatin1String(accent.name))
-            return {fromOklch(accent.lightness, accent.chroma, accent.hue),
-                    accent.pastel ? QColor(Qt::black) : QColor(Qt::white)};
+            return &accent;
     }
+    return nullptr;
+}
+
+AccentColors accentColors(const QString &name)
+{
+    if (const Accent *accent = findAccent(name))
+        return {fromOklch(accent->lightness, accent->chroma, accent->hue),
+                accent->pastel ? QColor(Qt::black) : QColor(Qt::white)};
     return accentColors(QStringLiteral("teal"));   // BookOrbit's default
+}
+
+CoverPalette coverPalette(const QString &seed, const QString &accentName)
+{
+    const Accent *accent = findAccent(accentName);
+    if (!accent)
+        accent = findAccent(QStringLiteral("teal"));
+    // djb2 over the UTF-16 code units, as JavaScript's charCodeAt gives them
+    quint32 n = 5381;
+    for (const QChar c : seed)
+        n = (n << 5) + n + c.unicode();
+    // Within 36 degrees of the accent's hue (its --tint-h), in steps of 12
+    static const int hueOffsets[] = {-36, -24, -12, 0, 12, 24, 36};
+    double hue = std::fmod(accent->hue + hueOffsets[n % 7], 360.0);
+    if (hue < 0)
+        hue += 360;
+    hue = qRound(hue);
+    const int n2 = (n >> 8) & 0xff;
+    const int n3 = (n >> 16) & 0xff;
+    // Paler and greyer for the pastel accents
+    const bool pastel = accent->pastel;
+    const double lightness = pastel ? 0.66 + (n2 % 5) * 0.03 : 0.45 + (n2 % 6) * 0.05;
+    const double chroma = pastel ? 0.04 + (n3 % 4) * 0.012 : 0.12 + (n3 % 5) * 0.02;
+    return {fromOklch(lightness, chroma, hue),
+            fromOklch(lightness - (pastel ? 0.16 : 0.2), chroma, hue),
+            fromOklch(0.99, 0.01, hue)};
 }

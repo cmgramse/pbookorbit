@@ -73,8 +73,19 @@ void Covers::startDownloads()
                 m_wanted.remove(request.file);
                 QImage image;
                 if (image.loadFromData(data)) {
-                    // Shrink to fit the space it is shown in, keeping its shape
-                    image = image.scaled(request.size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                    if (request.authorId >= 0) {
+                        // A photo fills its space, as BookOrbit's portraits do (object-fit:
+                        // cover; object-position: 50% 26%): what doesn't fit is cut from
+                        // the sides equally, and from the top and bottom about 1 to 3,
+                        // as faces are usually in the upper part of a portrait
+                        image = image.scaled(request.size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+                        image = image.copy((image.width() - request.size.width()) / 2,
+                                           qRound((image.height() - request.size.height()) * 0.26),
+                                           request.size.width(), request.size.height());
+                    } else {
+                        // Shrink to fit the space it is shown in, keeping its shape
+                        image = image.scaled(request.size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                    }
                     // Adjusted for the colour screen, as the system library shows covers
                     adjustForEink(image);
                     if (image.save(request.file, "PNG")) {

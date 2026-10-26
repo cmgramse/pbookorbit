@@ -1037,27 +1037,116 @@ void BookOrbitClient::loadSeries()
     const int generation = ++m_series.generation;
     loadLibrary([this, generation]() {
         if (generation == m_series.generation)
-            loadSeriesPage(0, generation);
+            loadSeriesPage(&m_series, 0, generation);
     });
 }
 
-void BookOrbitClient::loadSeriesPage(int page, int generation)
+void BookOrbitClient::showAuthorSeries(const QString &author)
+{
+    const int generation = ++m_authorSeries.generation;
+    // Another author's series don't show meanwhile
+    if (author != m_authorSeriesName) {
+        m_authorSeries.rows.clear();
+        m_authorSeries.loaded = false;
+        showGroups(m_authorSeries);
+    }
+    m_authorSeriesName = author;
+    loadLibrary([this, generation]() {
+        if (generation == m_authorSeries.generation)
+            loadSeriesPage(&m_authorSeries, 0, generation);
+    });
+}
+
+void BookOrbitClient::setAuthorSeriesSort(const QString &field, bool descending)
+{
+    m_authorSeries.sort = field;
+    m_authorSeries.descending = descending;
+    showGroups(m_authorSeries);
+}
+
+QVariantMap BookOrbitClient::authorRow(int authorId) const
+{
+    for (const QVariantMap &row : m_authors.rows) {
+        if (row.value("id").toInt() == authorId)
+            return row;
+    }
+    return QVariantMap();
+}
+
+// As the web client's authorInitials(): the first letters of the first and last words,
+// leaving out anything in brackets and reading "Surname, Forename" the right way round
+static QString authorInitials(const QString &name)
+{
+    static const QRegularExpression brackets("\\(.*?\\)");
+    static const QRegularExpression punctuation("[^\\p{L}\\p{N}\\s.'-]");
+    static const QRegularExpression spaces("\\s+");
+    static const QRegularExpression letter("\\p{L}");
+    QString ordered = QString(name).replace(brackets, " ");
+    if (ordered.contains(',')) {
+        QStringList parts = ordered.split(',');
+        std::reverse(parts.begin(), parts.end());
+        ordered = parts.join(' ');
+    }
+    ordered = ordered.replace(punctuation, " ").trimmed();
+    QStringList letters;
+    for (const QString &word : ordered.split(spaces, Qt::SkipEmptyParts)) {
+        const QRegularExpressionMatch match = letter.match(word);
+        if (match.hasMatch())
+            letters.append(match.captured());
+    }
+    if (letters.isEmpty())
+        return "?";
+    return (letters.first() + (letters.size() > 1 ? letters.last() : QString())).toUpper();
+}
+
+QVariantMap BookOrbitClient::authorMonogram(const QString &name) const
+{
+    const CoverPalette palette = coverPalette(name, m_accent);
+    return QVariantMap{
+        {"initials", authorInitials(name)},
+        {"from", einkColor(palette.from)},
+        {"to", einkColor(palette.to)},
+        {"color", palette.text},
+    };
+}
+
+void BookOrbitClient::loadAuthorDetails(int authorId)
+{
+    // Quiet, as a book's details are: offline the page just shows less
+    download(QString("/authors/%1").arg(authorId),
+        [this, authorId](const QByteArray &data) {
+            emit authorDetails(authorId, QJsonDocument::fromJson(data).object().toVariantMap());
+        },
+        [this, authorId](int, const QString &message) {
+            diagnostics::log(QString("author %1 details: %2").arg(authorId).arg(message));
+            emit authorDetails(authorId, QVariantMap());
+        });
+}
+
+void BookOrbitClient::loadSeriesPage(Groups *groups, int page, int generation)
 {
     // {items: [{id, name, bookCount, readCount, authors, coverBookIds (in the series'
-    // order), lastAddedAt, ...}], total}
-    const QString path = QString("/series?libraryId=%1&sort=name&order=asc&page=%2&size=%3")
-                             .arg(m_libraryId).arg(page).arg(SERIES_PAGE_SIZE);
-    callJson("GET", path, QJsonDocument(), [this, page, generation](const QJsonDocument &doc) {
-        if (generation != m_series.generation)
+    // order), lastAddedAt, ...}], total}. For an author's, author= finds any series with
+    // an author whose name has it in, any case.
+    const bool ofAuthor = groups == &m_authorSeries;
+    QString path = QString("/series?libraryId=%1&sort=name&order=asc&page=%2&size=%3")
+                       .arg(m_libraryId).arg(page).arg(SERIES_PAGE_SIZE);
+    if (ofAuthor)
+        path += "&author=" + QString::fromUtf8(QUrl::toPercentEncoding(m_authorSeriesName));
+    callJson("GET", path, QJsonDocument(), [this, groups, ofAuthor, page, generation](const QJsonDocument &doc) {
+        if (generation != groups->generation)
             return;
         const QJsonObject result = doc.object();
         const QJsonArray items = result.value("items").toArray();
         // The old rows stay until the first page of new ones
         if (page == 0)
-            m_series.rows.clear();
+            groups->rows.clear();
         for (const QJsonValue &value : items) {
             const QJsonObject series = value.toObject();
             QStringList authors = series.value("authors").toVariant().toStringList();
+            // Just the author's own, not those of another whose name has theirs in
+            if (ofAuthor && !authors.contains(m_authorSeriesName, Qt::CaseInsensitive))
+                continue;
             sortAuthors(authors);
             // The list doesn't give the covers' versions; the cache keeps the first it got
             QVariantList covers;
@@ -1066,7 +1155,7 @@ void BookOrbitClient::loadSeriesPage(int page, int generation)
                     covers.append(QVariantMap{{"id", bookId.toInt()}, {"coverVersion", QString()}});
             }
             const int bookCount = series.value("bookCount").toInt();
-            m_series.rows.append(QVariantMap{
+            groups->rows.append(QVariantMap{
                 {"id", series.value("id").toInt()},
                 {"name", series.value("name").toString()},
                 {"bookCount", bookCount},
@@ -1079,12 +1168,12 @@ void BookOrbitClient::loadSeriesPage(int page, int generation)
                 {"readProgress", bookCount > 0 ? series.value("readCount").toDouble() / bookCount : 0.0},
             });
         }
-        m_series.loaded = true;
-        showGroups(m_series);
+        groups->loaded = true;
+        showGroups(*groups);
         if ((page + 1) * SERIES_PAGE_SIZE < result.value("total").toInt() && !items.isEmpty())
-            loadSeriesPage(page + 1, generation);
+            loadSeriesPage(groups, page + 1, generation);
         else
-            loadGroupBooks(&m_series, 0, 0, generation);
+            loadGroupBooks(groups, 0, 0, generation);
     });
 }
 
@@ -1119,7 +1208,7 @@ void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int ge
     }
     // The books of as many series or authors as one request holds (at least one, and at
     // most as many as a rule takes), by name
-    const bool series = groups == &m_series;
+    const bool series = groups != &m_authors;
     QStringList names;
     int books = 0;
     int last = first;
@@ -1399,6 +1488,8 @@ void BookOrbitClient::showGroups(Groups &groups)
         emit collectionsChanged();
     else if (&groups == &m_series)
         emit seriesListChanged();
+    else if (&groups == &m_authorSeries)
+        emit authorSeriesChanged();
     else
         emit authorsChanged();
 }
@@ -1633,7 +1724,7 @@ void BookOrbitClient::clearSession()
     m_settings.remove("refreshToken");
     m_settings.sync();
     m_libraryId = -1;
-    for (Groups *groups : {&m_collections, &m_series, &m_authors}) {
+    for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
         groups->generation++;
         groups->rows.clear();
         groups->loaded = false;
@@ -1643,6 +1734,7 @@ void BookOrbitClient::clearSession()
     emit collectionsChanged();
     emit seriesListChanged();
     emit authorsChanged();
+    emit authorSeriesChanged();
     for (PagedBooks *list : {&m_list, &m_search, &m_booksOf}) {
         restartPages(*list);
         list->listGeneration = -1;

@@ -17,8 +17,11 @@ Window {
 
     // Search page open over everything else
     property bool searching: false
-    // Pages opened from the book menu or a collection, over the search page: the books of
-    // an author, series or collection, and over that a book's info
+    // Pages opened from the book menu, a collection or an author, over the search page:
+    // an author's info and over that their series, then the books of an author, series or
+    // collection, and over that a book's info
+    property bool showingAuthor: false
+    property bool showingAuthorSeries: false
     property bool showingBooksOf: false
     property bool showingInfo: false
 
@@ -26,6 +29,8 @@ Window {
         bookMenu.close()
         showingInfo = false
         showingBooksOf = false
+        showingAuthorSeries = false
+        showingAuthor = false
         searching = false
     }
 
@@ -65,6 +70,7 @@ Window {
     readonly property bool showingAuthors: footer.currentIndex === 3
     // The list under the sub-toolbar whose menus are in use
     readonly property ListView activeList: showingBooksOf ? booksOfPage.list
+                                           : showingAuthorSeries ? authorSeriesPage.list
                                            : showingCollections ? collectionsPage.list
                                            : showingSeries ? seriesPage.list
                                            : showingAuthors ? authorsPage.list : bookList
@@ -160,6 +166,24 @@ Window {
             authorsPage.list.positionViewAtBeginning()
         }
     }
+    // An author's series: the Series view's sorts, kept from one author to the next
+    ListQuery {
+        id: authorSeriesQuery
+        sortOptions: seriesQuery.sortOptions
+        sortFields: seriesQuery.sortFields
+        sortDescendingByDefault: seriesQuery.sortDescendingByDefault
+        hasFilter: false
+        onApplied: {
+            bookOrbit.setAuthorSeriesSort(sortFields[sortIndex], descending())
+            authorSeriesPage.list.positionViewAtBeginning()
+        }
+    }
+    function openAuthorSeries(name) {
+        authorSeriesView.name = name
+        bookOrbit.showAuthorSeries(name)
+        authorSeriesPage.list.positionViewAtBeginning()
+        showingAuthorSeries = true
+    }
     // The books of an author, series or collection, as bookOrbit.showBooksOf() takes them,
     // each kind with its own sort and filter, kept from one to the next as the library's are
     property string booksOfField
@@ -222,6 +246,7 @@ Window {
 
     // The sort and filter that the menus show and change: those of the page in front
     readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
+                                             : showingAuthorSeries ? authorSeriesQuery
                                              : showingCollections ? collectionsQuery
                                              : showingSeries ? seriesQuery
                                              : showingAuthors ? authorsQuery : libraryQuery
@@ -439,7 +464,10 @@ Window {
         onSortIconClicked: authorsQuery.reverseSort()
         // Listed the first time the view opens, as the series are
         onVisibleChanged: if (visible && !bookOrbit.authorsLoaded) bookOrbit.loadAuthors()
-        onGroupClicked: (author) => root.openBooksOf("Author", author.name, "author", [author.name])
+        onGroupClicked: (author) => {
+            authorInfoPage.show(author.id)
+            root.showingAuthor = true
+        }
     }
 
     TabFooter {
@@ -602,6 +630,67 @@ Window {
         onBack: root.searching = false
         onBookClicked: (book) => root.openBook(book)
         onBookHeld: (row) => bookMenu.open(row)
+    }
+
+    AuthorInfoPage {
+        id: authorInfoPage
+        anchors.fill: parent
+        visible: root.showingAuthor
+        onBack: root.showingAuthor = false
+        onBooksClicked: {
+            const name = authorInfoPage.author.name
+            root.openBooksOf("Author", name, "author", [name])
+        }
+        // Straight to the one series, if that's all there is
+        onSeriesClicked: {
+            const names = authorInfoPage.seriesNames
+            if (authorInfoPage.seriesCount === 1 && names.length === 1)
+                root.openBooksOf("Series", names[0], "series", [names[0]])
+            else
+                root.openAuthorSeries(authorInfoPage.author.name)
+        }
+    }
+
+    // An author's series, from their info page: the Series view's rows under a toolbar
+    // with a back button, e.g. "SERIES / ADRIAN TCHAIKOVSKY"
+    Rectangle {
+        id: authorSeriesView
+        property string name
+        anchors.fill: parent
+        visible: root.showingAuthorSeries
+        color: "white"
+
+        PageHeader {
+            id: authorSeriesHeader
+            width: parent.width
+            title: "Series / " + authorSeriesView.name
+            onBack: {
+                root.closeDropdowns()
+                root.showingAuthorSeries = false
+            }
+        }
+        GroupsPage {
+            id: authorSeriesPage
+            anchors.top: authorSeriesHeader.bottom
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            model: bookOrbit.authorSeriesList
+            jumpSections: bookOrbit.authorSeriesJumpSections
+            loaded: bookOrbit.authorSeriesLoaded
+            emptyText: "No series"
+            sortText: "By " + authorSeriesQuery.sortOptions[authorSeriesQuery.sortIndex]
+            sortReversed: authorSeriesQuery.sortReversed
+            descending: authorSeriesQuery.sortDescending
+            // Its jump rail level with the library's, spaced the same
+            jumpRailTop: libraryRail.entriesY - y
+            jumpRailPitch: libraryRail.pitch
+            sortOpen: sortMenu.visible
+            tabOverhang: sortMenu.border.width - 1
+            onSortClicked: root.toggleDropdown(sortMenu)
+            onSortIconClicked: authorSeriesQuery.reverseSort()
+            onGroupClicked: (series) => root.openBooksOf("Series", series.name, "series", [series.name])
+        }
     }
 
     BooksOfPage {

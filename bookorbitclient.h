@@ -77,6 +77,11 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(bool authorsLoaded READ authorsLoaded NOTIFY authorsChanged)
     // Whether every author's books have been looked up, which their filter needs
     Q_PROPERTY(bool authorBooksLoaded READ authorBooksLoaded NOTIFY authorsChanged)
+    // One author's series, as showAuthorSeries() lists them, in rows like seriesList's;
+    // the letters to jump to when sorted by name, and whether they have been listed
+    Q_PROPERTY(BookListModel *authorSeriesList READ authorSeriesList CONSTANT)
+    Q_PROPERTY(QVariantList authorSeriesJumpSections READ authorSeriesJumpSections NOTIFY authorSeriesChanged)
+    Q_PROPERTY(bool authorSeriesLoaded READ authorSeriesLoaded NOTIFY authorSeriesChanged)
     // jumpSections for booksOf: for an author's books (by title) the letters, for a
     // series' the numbers in the series: [{label: "12", index: 11}, ...]
     Q_PROPERTY(QVariantList booksOfJumpSections READ booksOfJumpSections NOTIFY jumpSectionsChanged)
@@ -117,6 +122,9 @@ public:
     bool authorsLoaded() const { return m_authors.loaded; }
     bool authorBooksLoaded() const { return m_authors.booksLoaded; }
     QVariantList authorJumpSections() const { return m_authors.jumpSections; }
+    BookListModel *authorSeriesList() { return &m_authorSeries.model; }
+    bool authorSeriesLoaded() const { return m_authorSeries.loaded; }
+    QVariantList authorSeriesJumpSections() const { return m_authorSeries.jumpSections; }
     QStringList recentSearches() const { return m_recentSearches; }
     QColor accentColor() const;
     QColor accentTextColor() const;
@@ -183,6 +191,22 @@ public:
     // downloadedBooks (as Downloads.downloadedBooks() gives them)
     Q_INVOKABLE void setAuthorQuery(const QString &sortField, bool descending, const QStringList &formats,
                                     bool downloadedOnly = false, const QVariantList &downloadedBooks = {});
+    // Lists in authorSeriesList the series with books by the author (as named in their
+    // books), then looks up their books' formats, as loadSeries() does the library's
+    Q_INVOKABLE void showAuthorSeries(const QString &author);
+    // How authorSeriesList is sorted, as setSeriesSort() takes it
+    Q_INVOKABLE void setAuthorSeriesSort(const QString &field, bool descending);
+    // The author's row of authorsList as loaded, without the filter's counts: their books
+    // and the series those are in, as far as they have been looked up. Empty if not listed.
+    Q_INVOKABLE QVariantMap authorRow(int authorId) const;
+    // What stands in for an author's photo, as in BookOrbit: their initials ("AT" for
+    // "Adrian Tchaikovsky" or "Tchaikovsky, Adrian") on a gradient picked by their name,
+    // near the accent's hue: {initials, from, to, color (of the initials)}, the colours
+    // made more vivid for the screen
+    Q_INVOKABLE QVariantMap authorMonogram(const QString &name) const;
+    // Fetches an author's details (GET /authors/:id: description, genres, website, birth
+    // and death); authorDetails(authorId, details) follows, with empty details if it failed
+    Q_INVOKABLE void loadAuthorDetails(int authorId);
     // Fetches a book's full details (GET /books/:id: description, publisher, genres...);
     // bookDetails(bookId, details) follows, with empty details if it failed
     Q_INVOKABLE void loadBookDetails(int bookId);
@@ -218,6 +242,8 @@ signals:
     void collectionsChanged();
     void seriesListChanged();
     void authorsChanged();
+    void authorSeriesChanged();
+    void authorDetails(int authorId, const QVariantMap &details);
     void bookDetails(int bookId, const QVariantMap &details);
     void recentSearchesChanged();
     void accentChanged();
@@ -264,7 +290,7 @@ private:
         QHash<int, QString> sectionStarts;
     };
 
-    // A list of groups of books, the collections or the series: one row each, sorted on
+    // A list of groups of books, the collections, series or authors: one row each, sorted on
     // the device
     struct Groups {
         // In the server's order, and as listed, sorted
@@ -291,8 +317,8 @@ private:
     void loadCollectionBooks(int collectionId, int page, int generation);
     // Fills a list of groups' model from its rows, sorted, in A-Z sections by name
     void showGroups(Groups &groups);
-    // Loads a page of series, then the rest
-    void loadSeriesPage(int page, int generation);
+    // Loads a page of series, the library's or an author's, then the rest
+    void loadSeriesPage(Groups *groups, int page, int generation);
     // Looks up the books of the series or authors from row first on, a request's worth
     // at a time (page for a request's later pages), for their formats and counts
     void loadGroupBooks(Groups *groups, int first, int page, int generation);
@@ -381,6 +407,9 @@ private:
     Groups m_collections;
     Groups m_series;
     Groups m_authors;
+    Groups m_authorSeries;
+    // The author whose series m_authorSeries lists
+    QString m_authorSeriesName;
     QStringList m_recentSearches;
     QString m_accent;   // a BookOrbit accent name, e.g. "teal"; empty for the default
     bool m_refreshing = false;

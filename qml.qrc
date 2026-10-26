@@ -29,6 +29,10 @@
         <file>qml/GroupRow.qml</file>
         <file>qml/GroupsPage.qml</file>
         <file>qml/ListQuery.qml</file>
+        <file>qml/AuthorInfoPage.qml</file>
+        <file>qml/AuthorPortrait.qml</file>
+        <file>qml/InfoField.qml</file>
+        <file>qml/InfoCells.qml</file>
         <file>lucide/lucide-icons.json</file>
         <file>images/bookorbit-icon.png</file>
     </qresource>
