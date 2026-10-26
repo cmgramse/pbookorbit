@@ -1,0 +1,5 @@
+/build/
+*.pro.user
+
+# Era Color screenshots, for matching the system UI while the app is built (see TODO.md)
+/scr*.bmp

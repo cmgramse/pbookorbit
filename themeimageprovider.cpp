@@ -18,7 +18,8 @@ static bool looksLikeBitmap(const ibitmap *bmp)
 
 // Grey levels (1, 2, 4 or 8 bits, high bits first) or colour (24-bit R, G, B; 32-bit
 // R, G, B, A). Bit 15 of depth means a 1-bit transparency mask follows the pixels.
-// Checked against a PocketBook Era Color's theme with apps/theme-icons.
+// Checked against a PocketBook Era Color's theme, with the icons that pocketbook-kit's
+// pb device import saves.
 static QImage toImage(const ibitmap *bmp)
 {
     const int depth = bmp->depth & 0xff;

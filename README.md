@@ -3,16 +3,26 @@
 PocketBook client for a [BookOrbit](https://github.com/bookorbit/bookorbit) server. It signs
 in with a normal BookOrbit account and lists the 20 most recently added books.
 
+It builds with [pocketbook-kit](kit), which runs the PocketBook SDK in a
+container, so the host needs only `git`, `make` and podman or docker:
+
 ```sh
-./pb.sh run apps/pbookorbit    # emulator
-./pb.sh arm apps/pbookorbit    # device -> build/pbookorbit/<sdk>/arm/pbookorbit.app
+git clone --recurse-submodules <this repo> pbookorbit
+cd pbookorbit
+make setup    # one-off: the kit's container image and SDK download
+make run      # emulator
+make arm      # device -> build/pbookorbit/<sdk>/arm/pbookorbit.app
 ```
+
+The kit is pinned as a submodule in `kit/`. See its README for choosing the SDK (`kit/pb.sh
+use B300-6.10` for B300 devices such as the Era Color), making the emulator look like your
+device, and headless tests (`kit/pb.sh test . <script>`).
 
 To hand the app to someone who uses a particular server, build it with that server filled
 in (it can still be deleted or changed):
 
 ```sh
-PB_QMAKE_ARGS="SUGGESTED_SERVER=books.example.com" ./pb.sh arm apps/pbookorbit
+make release SERVER=books.example.com
 ```
 
 The next build without it is back to an empty field.
