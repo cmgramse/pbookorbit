@@ -1,5 +1,6 @@
 import QtQuick
 import "units.js" as Units
+import "night.js" as Night
 
 // One group of books, a collection or a series, in the Collections or Series list, laid
 // out like a book row (BookRow): where the cover goes, a stack of two of its books' covers,
@@ -89,7 +90,7 @@ Item {
         }
         Image {
             id: image
-            source: stackCover.url
+            source: Night.image(stackCover.url)
             asynchronous: true
         }
     }

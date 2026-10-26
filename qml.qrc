@@ -4,6 +4,7 @@
         <file>qml/AppHeader.qml</file>
         <file>qml/IconButton.qml</file>
         <file>qml/units.js</file>
+        <file>qml/night.js</file>
         <file>qml/LoginPage.qml</file>
         <file>qml/PillButton.qml</file>
         <file>qml/SectionHeading.qml</file>

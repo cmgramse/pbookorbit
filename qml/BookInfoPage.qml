@@ -1,5 +1,6 @@
 import QtQuick
 import "units.js" as Units
+import "night.js" as Night
 
 // A book's details, laid out like the system library's Book info page (screenshot 11):
 // the cover at the left with title, author, series and the file on the device beside it,
@@ -150,7 +151,7 @@ Rectangle {
                         width: Math.min(implicitWidth, parent.width)
                         height: Math.min(implicitHeight, parent.height)
                         fillMode: Image.PreserveAspectFit
-                        source: cover.url
+                        source: Night.image(cover.url)
                         asynchronous: true
                     }
                 }

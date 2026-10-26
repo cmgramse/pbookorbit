@@ -14,6 +14,7 @@
 #include "covers.h"
 #include "downloads.h"
 #include "eink.h"
+#include "invertedimageprovider.h"
 #include "themeimageprovider.h"
 
 int main(int argc, char *argv[])
@@ -62,6 +63,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>
     engine.addImageProvider("theme", new ThemeImageProvider);
+    // Pictures drawn inverted for night mode: image://inverted/<file or qrc URL>
+    engine.addImageProvider("inverted", new InvertedImageProvider);
     engine.load(QUrl("qrc:/qml/main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

@@ -33,7 +33,8 @@ void Eink::followNightMode()
                 return;
             m_nightMode = nightMode;
             diagnostics::log(m_nightMode ? "night mode on" : "night mode off");
-            // Nothing in the window has changed, so only a full update redraws it
+            emit nightModeChanged();
+            // Most of the window is unchanged, so only a full update redraws it all
             if (auto *platform = einkPlatform())
                 platform->requireFullUpdate();
             for (QWindow *window : QGuiApplication::topLevelWindows()) {

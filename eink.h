@@ -14,6 +14,9 @@
 class Eink : public QObject
 {
     Q_OBJECT
+    // Whether the system's night mode is on, for pictures and colours that keep their
+    // real colours (night.js)
+    Q_PROPERTY(bool nightMode READ nightMode NOTIFY nightModeChanged)
 
 public:
     using QObject::QObject;
@@ -23,6 +26,7 @@ public:
     // that say they support it, and only the ones in /ebrmain say so by default. Call it
     // once the platform plugin has started.
     void followNightMode();
+    bool nightMode() const { return m_nightMode; }
 
     // Switches a screen rectangle (in window coordinates) to A2 for a flick. It stays in A2
     // until leaveA2Soon() or leaveA2() is called. Calling it again before a timed exit
@@ -37,6 +41,9 @@ public:
     // Turns dynamic updates on while a text field has focus. Turning them off redraws the
     // window at normal quality.
     Q_INVOKABLE void setDynamicUpdates(bool enabled);
+
+signals:
+    void nightModeChanged();
 
 private:
     bool m_dynamicUpdates = false;

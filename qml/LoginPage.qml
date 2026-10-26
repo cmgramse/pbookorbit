@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import "units.js" as Units
+import "night.js" as Night
 
 // Sign-in form, centred on the page: logo, labelled fields, status line, button.
 // Uses the same username and password as the BookOrbit website.
@@ -79,7 +80,7 @@ Item {
 
         Image {
             anchors.horizontalCenter: parent.horizontalCenter
-            source: "qrc:/images/bookorbit-icon.png"
+            source: Night.image("qrc:/images/bookorbit-icon.png")
             width: Units.dp(96)
             height: width
             sourceSize: Qt.size(width, height)

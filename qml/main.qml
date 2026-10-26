@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import "units.js" as Units
+import "night.js" as Night
 
 Window {
     id: root
@@ -81,7 +82,7 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         // "Orbit" in the user's BookOrbit accent colour
-        title: "PocketBook × Book<font color=\"" + bookOrbit.accentColor + "\">Orbit</font>"
+        title: "PocketBook × Book<font color=\"" + Night.color(bookOrbit.accentColor) + "\">Orbit</font>"
         menuOpen: menu.visible
         showSearch: bookOrbit.signedIn
         // Its only item is signing out

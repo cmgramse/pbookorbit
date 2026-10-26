@@ -1,5 +1,6 @@
 import QtQuick
 import "units.js" as Units
+import "night.js" as Night
 
 // One book in the list, after the system library on an Era Color (screenshots 9 and 10):
 // cover, then title, author, and a line with the reading status and series. A section's
@@ -85,7 +86,7 @@ Item {
         Image {
             id: image
             anchors.centerIn: parent
-            source: cover.url
+            source: Night.image(cover.url)
             asynchronous: true
         }
     }
@@ -140,7 +141,7 @@ Item {
                         width: pillContent.width + 2 * Units.dp(7)
                         height: Units.dp(16)                    // 35px
                         radius: height / 2
-                        color: bookOrbit.accentColor
+                        color: Night.color(bookOrbit.accentColor)
                     }
                     Row {
                         id: pillContent
@@ -157,21 +158,21 @@ Item {
                             radius: 2
                             color: "transparent"
                             border.width: 2
-                            border.color: bookOrbit.accentTextColor
+                            border.color: Night.color(bookOrbit.accentTextColor)
                             Rectangle {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 anchors.bottom: parent.bottom
                                 anchors.bottomMargin: 3
                                 width: 3
                                 height: 1
-                                color: bookOrbit.accentTextColor
+                                color: Night.color(bookOrbit.accentTextColor)
                             }
                         }
                         Text {
                             id: label
                             anchors.verticalCenter: parent.verticalCenter
                             text: format.modelData.toUpperCase()
-                            color: format.onDevice ? bookOrbit.accentTextColor : "#606060"
+                            color: format.onDevice ? Night.color(bookOrbit.accentTextColor) : "#606060"
                             font.pointSize: 6
                         }
                     }

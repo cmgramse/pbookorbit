@@ -1,4 +1,5 @@
 import QtQuick
+import "night.js" as Night
 
 // An author's photo, filling the item (covers.authorPhoto() crops it to the size, as
 // BookOrbit's portraits are), or without one their initials, as BookOrbit shows them: in
@@ -24,15 +25,15 @@ Item {
             height: width
             rotation: -45
             gradient: Gradient {
-                GradientStop { position: 0; color: portrait.monogram.from }
-                GradientStop { position: 1; color: portrait.monogram.to }
+                GradientStop { position: 0; color: Night.color(portrait.monogram.from) }
+                GradientStop { position: 1; color: Night.color(portrait.monogram.to) }
             }
         }
     }
     Text {
         anchors.centerIn: parent
         text: portrait.monogram.initials
-        color: portrait.monogram.color
+        color: Night.color(portrait.monogram.color)
         // 36% of the width, as BookOrbit's are
         font.family: "PT Serif"
         font.bold: true
@@ -44,8 +45,8 @@ Item {
         anchors.fill: parent
         // Bumped to ask again when the download arrives
         property int revision: 0
-        source: revision >= 0 && (portrait.author.photo || "") !== ""
-                ? covers.authorPhoto(portrait.author.id, portrait.author.photo, portrait.width, portrait.height) : ""
+        source: Night.image(revision >= 0 && (portrait.author.photo || "") !== ""
+                ? covers.authorPhoto(portrait.author.id, portrait.author.photo, portrait.width, portrait.height) : "")
         Connections {
             target: covers
             function onPhotoReady(authorId) {
