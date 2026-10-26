@@ -64,13 +64,16 @@ Item {
         width: row.coverWidth
         height: row.coverHeight
 
-        property string url: row.book.hasCover
+        // Bumped when the download arrives, to ask again; a binding rather than setting url,
+        // so a row that changes to another book (when the list is sorted) follows it
+        property int revision: 0
+        property string url: revision >= 0 && row.book.hasCover
                              ? covers.source(row.book.id, row.book.coverVersion, row.coverWidth, row.coverHeight) : ""
         Connections {
             target: covers
             function onReady(bookId) {
                 if (bookId === row.book.id)
-                    cover.url = covers.source(row.book.id, row.book.coverVersion, row.coverWidth, row.coverHeight)
+                    cover.revision++
             }
         }
         Rectangle {

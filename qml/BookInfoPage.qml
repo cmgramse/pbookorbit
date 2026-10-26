@@ -116,13 +116,16 @@ Rectangle {
                     width: Units.dp(197)
                     height: Units.dp(297)
 
-                    property string url: page.book.hasCover
+                    // Bumped when the download arrives, to ask again; a binding rather than
+                    // setting url, so the page follows the next book it shows
+                    property int revision: 0
+                    property string url: revision >= 0 && page.book.hasCover
                                          ? covers.source(page.book.id, page.book.coverVersion, width, height) : ""
                     Connections {
                         target: covers
                         function onReady(bookId) {
                             if (bookId === page.book.id)
-                                cover.url = covers.source(page.book.id, page.book.coverVersion, cover.width, cover.height)
+                                cover.revision++
                         }
                     }
                     Rectangle {
