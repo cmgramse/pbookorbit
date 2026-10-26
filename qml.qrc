@@ -18,6 +18,7 @@
         <file>qml/TabFooter.qml</file>
         <file>qml/BookRow.qml</file>
         <file>qml/ListScrollbar.qml</file>
+        <file>qml/Spinner.qml</file>
         <file>qml/DownloadDialog.qml</file>
         <file>qml/SystemDialog.qml</file>
         <file>qml/FindBooksDialog.qml</file>

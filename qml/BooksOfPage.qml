@@ -136,17 +136,21 @@ Rectangle {
         anchors.bottom: books.bottom
     }
 
-    // While the first books load, or if that failed
+    Spinner {
+        id: spinner
+        list: books
+        visible: books.count === 0 && bookOrbit.booksOfTotal !== 0 && bookOrbit.error === ""
+    }
+    // If there are no books, or loading them failed
     Text {
-        visible: books.count === 0
+        visible: books.count === 0 && !spinner.visible
         anchors.top: header.bottom
         anchors.topMargin: (books.headerItem ? books.headerItem.height : 0) + Units.dp(26)
         anchors.horizontalCenter: parent.horizontalCenter
         width: parent.width - 2 * Units.dp(26)
         horizontalAlignment: Text.AlignHCenter
         text: bookOrbit.booksOfTotal === 0 ? (page.downloadedOnly ? "No downloaded books" : "No books found")
-              : bookOrbit.error !== "" ? bookOrbit.error
-              : "Loading…"
+              : bookOrbit.error
         color: "#737373"
         font.pointSize: 8
         wrapMode: Text.Wrap

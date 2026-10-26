@@ -328,12 +328,10 @@ Window {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                // Busy only until the first books arrive: later pages load as the list
-                // scrolls, and a line appearing above the rows would shift them
-                visible: bookOrbit.error !== "" || (bookList.count === 0 && (bookOrbit.busy || libraryQuery.downloadedOnly))
+                // While the first books load, the spinner shows instead
+                visible: bookOrbit.error !== "" || (bookList.count === 0 && !bookOrbit.busy && libraryQuery.downloadedOnly)
                 topPadding: Units.dp(8)
                 text: bookOrbit.error !== "" ? bookOrbit.error
-                      : bookOrbit.busy ? "Working…"
                       : "No downloaded books" + (libraryQuery.filterIndex === 0 ? "" : " of this type")
                 font.pointSize: 8
                 wrapMode: Text.Wrap
@@ -360,6 +358,11 @@ Window {
     ListScrollbar {
         list: bookList
         bottomInset: pageButtons.height
+    }
+    // Only until the first books arrive: later pages load as the list scrolls
+    Spinner {
+        list: bookList
+        visible: bookList.visible && bookOrbit.error === "" && bookList.count === 0 && bookOrbit.busy
     }
 
     // For the A-Z sorts. Starts below the sub-toolbar, clear of the sort button, and stays

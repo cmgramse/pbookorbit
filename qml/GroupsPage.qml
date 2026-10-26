@@ -65,11 +65,9 @@ Item {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                visible: bookOrbit.error !== "" || groupList.count === 0
+                visible: bookOrbit.error !== "" || (groupList.count === 0 && page.loaded)
                 topPadding: Units.dp(8)
-                text: bookOrbit.error !== "" ? bookOrbit.error
-                      : !page.loaded ? "Working…"
-                      : page.emptyText
+                text: bookOrbit.error !== "" ? bookOrbit.error : page.emptyText
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -93,6 +91,10 @@ Item {
     ListScrollbar {
         list: groupList
         bottomInset: pageButtons.height
+    }
+    Spinner {
+        list: groupList
+        visible: bookOrbit.error === "" && groupList.count === 0 && !page.loaded
     }
     JumpRail {
         list: groupList

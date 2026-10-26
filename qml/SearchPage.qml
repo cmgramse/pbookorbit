@@ -322,13 +322,18 @@ Rectangle {
         anchors.bottom: results.bottom
     }
 
-    // While the first results load, or when nothing matches
+    // While the first results load
+    Spinner {
+        list: results
+        visible: page.showResults && results.count === 0 && bookOrbit.searchTotal !== 0
+    }
+    // When nothing matches
     Text {
-        visible: page.showResults && results.count === 0
+        visible: page.showResults && results.count === 0 && bookOrbit.searchTotal === 0
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(26)
         anchors.horizontalCenter: parent.horizontalCenter
-        text: bookOrbit.searchTotal === 0 ? "No books found" : "Searching…"
+        text: "No books found"
         color: "#737373"
         font.pointSize: 8
     }
