@@ -139,11 +139,12 @@ Item {
             }
         }
     }
-    // Wider than the letters, reaching a little over the ends of the rows, so the
-    // rail is easier to hit
+    // Wider than the letters, reaching a little over the ends of the rows and on over
+    // the scrollbar to the edge of the screen, so the rail is easier to hit; a tap that
+    // misses it opens the book behind
     MouseArea {
         x: -Units.dp(16)                           // 35px
-        width: parent.width - x
+        width: jumpRail.parent.width - jumpRail.x - x
         height: parent.height
         onClicked: (mouse) => {
             const entry = jumpRail.entries[Math.floor((mouse.y - railEntries.y) / jumpRail.pitch)]
