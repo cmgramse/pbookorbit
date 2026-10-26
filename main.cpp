@@ -10,6 +10,7 @@
 #include "bookfinder.h"
 #include "bookorbitclient.h"
 #include "collectionicons.h"
+#include "database.h"
 #include "diagnostics.h"
 #include "covers.h"
 #include "downloads.h"
@@ -33,17 +34,16 @@ int main(int argc, char *argv[])
     app.styleHints()->setCursorFlashTime(0);
 
     // /mnt/ext1/system/config on the device, ./system/config in the emulator.
-    // PBOOKORBIT_SETTINGS points automated tests at their own file, so they don't touch the
+    // PBOOKORBIT_DB points automated tests at their own database, so they don't touch the
     // saved login.
-    const QString settingsPath = qEnvironmentVariable("PBOOKORBIT_SETTINGS",
-                                                      QString::fromUtf8(CONFIGPATH "/pbookorbit.ini"));
-    BookOrbitClient client(settingsPath);
+    Database database(qEnvironmentVariable("PBOOKORBIT_DB", QString::fromUtf8(CONFIGPATH "/pbookorbit.db")));
+    BookOrbitClient client(&database);
 
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
     CollectionIcons collectionIcons(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-icons"));
-    Downloads downloads(&client, settingsPath);
-    BookFinder bookFinder(&client, &downloads, settingsPath);
+    Downloads downloads(&client, &database);
+    BookFinder bookFinder(&client, &downloads, &database);
     Eink eink;
     eink.followNightMode();
     diagnostics::Log diagnosticsLog;

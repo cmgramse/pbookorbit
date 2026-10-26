@@ -11,10 +11,10 @@
 #include <QList>
 #include <QNetworkAccessManager>
 #include <QObject>
-#include <QSettings>
 #include <QStringList>
 #include <functional>
 
+class Database;
 class QNetworkReply;
 
 // Talks to a BookOrbit server through its web API, signed in as a normal BookOrbit user.
@@ -97,7 +97,7 @@ public:
     using DataHandler = std::function<void(const QByteArray &)>;
     using ErrorHandler = std::function<void(int status, const QString &message)>;
 
-    explicit BookOrbitClient(const QString &settingsPath, QObject *parent = nullptr);
+    explicit BookOrbitClient(Database *database, QObject *parent = nullptr);
 
     QString serverUrl() const { return m_serverUrl; }
     QString username() const { return m_username; }
@@ -385,7 +385,7 @@ private:
     void setSignedIn(bool signedIn);
     void setError(const QString &error);
 
-    QSettings m_settings;
+    Database *m_database;
     QNetworkAccessManager m_nam;
     QString m_serverUrl;
     QString m_username;

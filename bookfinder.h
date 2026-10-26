@@ -5,11 +5,11 @@
 #include <QHash>
 #include <QList>
 #include <QObject>
-#include <QSettings>
 #include <QVariantList>
 #include <QVariantMap>
 
 class BookOrbitClient;
+class Database;
 
 // Finds books that were on the device before the app, such as ones downloaded through
 // KOReader, and records the ones in the BookOrbit library as downloaded.
@@ -41,7 +41,7 @@ class BookFinder : public QObject
     Q_PROPERTY(QString error READ error NOTIFY changed)
 
 public:
-    BookFinder(BookOrbitClient *client, Downloads *downloads, const QString &settingsPath,
+    BookFinder(BookOrbitClient *client, Downloads *downloads, Database *database,
                QObject *parent = nullptr);
 
     QString state() const { return m_state; }
@@ -92,7 +92,7 @@ private:
 
     BookOrbitClient *m_client;
     Downloads *m_downloads;
-    QSettings m_settings;
+    Database *m_database;
     QString m_state = "idle";
     int m_percent = 0;
     int m_foundCount = 0;

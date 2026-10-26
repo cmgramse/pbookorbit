@@ -1,6 +1,7 @@
 #include "bookfinder.h"
 
 #include "bookorbitclient.h"
+#include "database.h"
 #include "diagnostics.h"
 #include "formats.h"
 
@@ -217,12 +218,12 @@ private:
     int m_pos = 0;
 };
 
-BookFinder::BookFinder(BookOrbitClient *client, Downloads *downloads, const QString &settingsPath,
+BookFinder::BookFinder(BookOrbitClient *client, Downloads *downloads, Database *database,
                        QObject *parent)
     : QObject(parent)
     , m_client(client)
     , m_downloads(downloads)
-    , m_settings(settingsPath, QSettings::IniFormat)
+    , m_database(database)
 {
 }
 
@@ -270,13 +271,12 @@ int BookFinder::unrecordedCount() const
 
 bool BookFinder::shouldOffer() const
 {
-    return !m_settings.value("findBooksOffered").toBool() && unrecordedCount() > 0;
+    return !m_database->flag("findBooksOffered") && unrecordedCount() > 0;
 }
 
 void BookFinder::markOffered()
 {
-    m_settings.setValue("findBooksOffered", true);
-    m_settings.sync();
+    m_database->setFlag("findBooksOffered", true);
 }
 
 QHash<QString, BookFinder::KoreaderMatch> BookFinder::koreaderMatches() const

@@ -5,20 +5,20 @@
 #include <QObject>
 #include <QPointer>
 #include <QSet>
-#include <QSettings>
 #include <QStringList>
 #include <QVariantMap>
 
 class BookOrbitClient;
+class Database;
 class QNetworkReply;
 
 // Books downloaded to the device, and opening them in the system reader.
 //
 // A book downloads to the device's Books folder (/mnt/ext1/Books), or Audio Books for an
 // audiobook, under the file name the server gives it. Its primary file is the one taken
-// when it has several formats. The app remembers where each book went, in its settings
-// file, so a book counts as on the device while that file is still there. It keeps each
-// book's list entry too, so the downloaded books can be listed without the server.
+// when it has several formats. The app records where each book went in its database, so
+// a book counts as on the device while that file is still there. It saves each book's
+// list entry there too, so the downloaded books can be listed without the server.
 //
 // One download at a time. It streams to a hidden ".part" file in the folder it is going
 // to, which is renamed once complete, so the system library never sees half a book.
@@ -35,7 +35,7 @@ class Downloads : public QObject
     Q_PROPERTY(int revision READ revision NOTIFY changed)
 
 public:
-    Downloads(BookOrbitClient *client, const QString &settingsPath, QObject *parent = nullptr);
+    Downloads(BookOrbitClient *client, Database *database, QObject *parent = nullptr);
 
     int bookId() const { return m_bookId; }
     int percent() const { return m_percent; }
@@ -87,8 +87,6 @@ signals:
     void downloaded(int bookId);
 
 private:
-    // Where a book's files went: one, or two for a record with an ebook and audiobook
-    QStringList pathsFor(int bookId) const;
     // Asks the system to scan for new books, so a download shows in its library
     void requestLibraryScan();
     // Ends the download: deletes the part file unless it was kept, and sets error
@@ -96,8 +94,7 @@ private:
     void setPercent(int percent);
 
     BookOrbitClient *m_client;
-    // mutable: reading a group's keys means entering it
-    mutable QSettings m_settings;
+    Database *m_database;
     int m_bookId = -1;
     int m_percent = 0;
     QString m_error;

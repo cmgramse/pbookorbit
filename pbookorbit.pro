@@ -2,8 +2,8 @@ TARGET = pbookorbit.app
 QT += quick network
 CONFIG += c++17 qtquickcompiler
 
-SOURCES += main.cpp accents.cpp bookfinder.cpp bookorbitclient.cpp booklistmodel.cpp collectionicons.cpp covers.cpp downloads.cpp einkcolors.cpp diagnostics.cpp eink.cpp invertedimageprovider.cpp themeimageprovider.cpp
-HEADERS += accents.h bookfinder.h bookorbitclient.h booklistmodel.h collectionicons.h covers.h downloads.h einkcolors.h formats.h diagnostics.h eink.h invertedimageprovider.h themeimageprovider.h
+SOURCES += main.cpp accents.cpp bookfinder.cpp bookorbitclient.cpp booklistmodel.cpp collectionicons.cpp covers.cpp database.cpp downloads.cpp einkcolors.cpp diagnostics.cpp eink.cpp invertedimageprovider.cpp themeimageprovider.cpp
+HEADERS += accents.h bookfinder.h bookorbitclient.h booklistmodel.h collectionicons.h covers.h database.h downloads.h einkcolors.h formats.h diagnostics.h eink.h invertedimageprovider.h themeimageprovider.h
 RESOURCES += qml.qrc
 
 contains(PLATFORM, arm) {
@@ -24,4 +24,4 @@ contains(PLATFORM, arm) {
     system(echo [Paths] > $$OUT_PWD/qt.conf; echo Prefix = $$(PB_SDK_DIR)/usr/local/qt6 >> $$OUT_PWD/qt.conf)
 }
 
-LIBS += -ldl -lz -lhwconfig -linkview -lcommon_utilities
+LIBS += -ldl -lz -lsqlite3 -lhwconfig -linkview -lcommon_utilities

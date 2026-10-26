@@ -15,9 +15,25 @@ The server is currently fixed at `https://books.example.com` (`DEFAULT_SERVER_UR
 
 Use the same username and password as the BookOrbit website. The app opens a session for
 the device, shown as "PocketBook <model>" in the account's session list. The password is
-not saved. The session's refresh token is saved to `pbookorbit.ini` in the system config
-folder: `/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in the
-emulator. Signing out revokes the session on the server.
+not saved. The session's refresh token is saved in the app's database (see below). Signing
+out revokes the session on the server.
+
+## Local data
+
+The app keeps its data in an SQLite database, `pbookorbit.db`, in the system config folder:
+`/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in the
+emulator. `PBOOKORBIT_DB` points the app at a different file, e.g. for automated tests.
+
+- `settings`: key/value. `username`, `refreshToken`, `accent`, `recentSearches` (a JSON
+  array) and `findBooksOffered` (0/1).
+- `books`: a local cache of BookOrbit books by id. `data` is the book's list entry as JSON,
+  so what's kept can grow without changing the table. `title` and `series` are generated
+  columns pulled out of it for querying; add more the same way with
+  `ALTER TABLE books ADD COLUMN ... GENERATED ALWAYS AS (json_extract(data, '$.field'))`.
+- `book_files`: the books' files on the device (`path`, `book_id`), downloaded or found.
+
+Only the downloaded books are cached so far. Deleting a book's files keeps its cache entry.
+With the device on USB, `sqlite3 <mount>/system/config/pbookorbit.db` opens it on a PC.
 
 ## Diagnostics
 

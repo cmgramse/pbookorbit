@@ -1,6 +1,7 @@
 #include "downloads.h"
 
 #include "bookorbitclient.h"
+#include "database.h"
 #include "diagnostics.h"
 #include "formats.h"
 
@@ -8,8 +9,6 @@
 #include <inkview.h>
 #include <QDir>
 #include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QNetworkReply>
 #include <QRegularExpression>
 #include <QUrl>
@@ -56,10 +55,10 @@ static QString dispositionFileName(const QByteArray &header)
     return match.hasMatch() ? match.captured(1) : QString();
 }
 
-Downloads::Downloads(BookOrbitClient *client, const QString &settingsPath, QObject *parent)
+Downloads::Downloads(BookOrbitClient *client, Database *database, QObject *parent)
     : QObject(parent)
     , m_client(client)
-    , m_settings(settingsPath, QSettings::IniFormat)
+    , m_database(database)
 {
     // The system scanner's replies to requestLibraryScan(), logged to see it working
     if (auto *platform = pocketbook::utilities::einkPlatform()) {
@@ -73,31 +72,26 @@ Downloads::Downloads(BookOrbitClient *client, const QString &settingsPath, QObje
 QVariantList Downloads::downloadedBooks() const
 {
     QVariantList books;
-    m_settings.beginGroup("downloads");
-    const QStringList ids = m_settings.childKeys();
-    m_settings.endGroup();
-    for (const QString &id : ids) {
-        const QByteArray entry = m_settings.value("downloadEntries/" + id).toByteArray();
-        if (entry.isEmpty() || !isOnDevice(id.toInt()))
-            continue;
-        QVariantMap book = QJsonDocument::fromJson(entry).object().toVariantMap();
+    for (const Database::Book &record : m_database->booksWithFiles()) {
         // The formats on the device, e.g. ["epub"], for the content type filter
-        book.insert("downloadedFormats", formatsOnDevice(id.toInt()));
+        QStringList formats;
+        for (const QString &path : record.files) {
+            if (QFileInfo::exists(path))
+                formats.append(QFileInfo(path).suffix().toLower());
+        }
+        if (formats.isEmpty())
+            continue;
+        QVariantMap book = record.entry;
+        book.insert("downloadedFormats", formats);
         books.append(book);
     }
     return books;
 }
 
-QStringList Downloads::pathsFor(int bookId) const
-{
-    // A list since a record can hold an ebook and an audiobook
-    return m_settings.value(QString("downloads/%1").arg(bookId)).toStringList();
-}
-
 QStringList Downloads::formatsOnDevice(int bookId) const
 {
     QStringList formats;
-    for (const QString &path : pathsFor(bookId)) {
+    for (const QString &path : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(path))
             formats.append(QFileInfo(path).suffix().toLower());
     }
@@ -107,7 +101,7 @@ QStringList Downloads::formatsOnDevice(int bookId) const
 QStringList Downloads::pathsOnDevice(int bookId) const
 {
     QStringList paths;
-    for (const QString &path : pathsFor(bookId)) {
+    for (const QString &path : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(path))
             paths.append(path);
     }
@@ -117,33 +111,29 @@ QStringList Downloads::pathsOnDevice(int bookId) const
 bool Downloads::remove(int bookId)
 {
     // Files already gone count as deleted. Reading positions and notes kept beside a book
-    // (KOReader's .sdr folder) stay.
-    QStringList kept;
-    for (const QString &path : pathsFor(bookId)) {
-        if (QFileInfo::exists(path) && !QFile::remove(path)) {
-            diagnostics::log(QString("book %1: can't delete %2").arg(bookId).arg(path));
-            kept.append(path);
-        } else {
-            diagnostics::log(QString("book %1 deleted from %2").arg(bookId).arg(path));
+    // (KOReader's .sdr folder) stay, and so does the book's entry in the database.
+    bool deleted = true;
+    m_database->transaction([&] {
+        for (const QString &path : m_database->bookFiles(bookId)) {
+            if (QFileInfo::exists(path) && !QFile::remove(path)) {
+                diagnostics::log(QString("book %1: can't delete %2").arg(bookId).arg(path));
+                deleted = false;
+            } else {
+                diagnostics::log(QString("book %1 deleted from %2").arg(bookId).arg(path));
+                m_database->removeBookFile(path);
+            }
         }
-    }
-    if (kept.isEmpty()) {
-        m_settings.remove(QString("downloads/%1").arg(bookId));
-        m_settings.remove(QString("downloadEntries/%1").arg(bookId));
-    } else {
-        m_settings.setValue(QString("downloads/%1").arg(bookId), kept);
-    }
-    m_settings.sync();
+    });
     // So the system library drops it too
     requestLibraryScan();
     m_revision++;
     emit changed();
-    return kept.isEmpty();
+    return deleted;
 }
 
 bool Downloads::isOnDevice(int bookId) const
 {
-    for (const QString &path : pathsFor(bookId)) {
+    for (const QString &path : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(path))
             return true;
     }
@@ -275,12 +265,10 @@ void Downloads::download(const QVariantMap &book, int fileId)
                     return;
                 }
                 m_part.setFileName(QString());   // the book now, not the part file
-                QStringList paths = pathsFor(bookId);
-                paths.append(path);
-                m_settings.setValue(QString("downloads/%1").arg(bookId), paths);
-                m_settings.setValue(QString("downloadEntries/%1").arg(bookId),
-                                    QJsonDocument(QJsonObject::fromVariantMap(m_entry)).toJson(QJsonDocument::Compact));
-                m_settings.sync();
+                m_database->transaction([&] {
+                    m_database->saveBook(bookId, m_entry);
+                    m_database->addBookFile(bookId, path);
+                });
                 diagnostics::log(QString("book %1 saved as %2").arg(bookId).arg(path));
                 requestLibraryScan();
                 m_reply = nullptr;
@@ -344,31 +332,20 @@ void Downloads::setPercent(int percent)
 
 QSet<QString> Downloads::recordedPaths() const
 {
-    QSet<QString> paths;
-    m_settings.beginGroup("downloads");
-    const QStringList ids = m_settings.childKeys();
-    m_settings.endGroup();
-    for (const QString &id : ids) {
-        for (const QString &path : pathsFor(id.toInt()))
-            paths.insert(path);
-    }
-    return paths;
+    return m_database->allBookFiles();
 }
 
 void Downloads::addExisting(const QList<Existing> &books)
 {
     if (books.isEmpty())
         return;
-    for (const Existing &book : books) {
-        QStringList paths = pathsFor(book.bookId);
-        if (!paths.contains(book.path))
-            paths.append(book.path);
-        m_settings.setValue(QString("downloads/%1").arg(book.bookId), paths);
-        m_settings.setValue(QString("downloadEntries/%1").arg(book.bookId),
-                            QJsonDocument(QJsonObject::fromVariantMap(book.entry)).toJson(QJsonDocument::Compact));
-        diagnostics::log(QString("book %1 found at %2").arg(book.bookId).arg(book.path));
-    }
-    m_settings.sync();
+    m_database->transaction([&] {
+        for (const Existing &book : books) {
+            m_database->saveBook(book.bookId, book.entry);
+            m_database->addBookFile(book.bookId, book.path);
+            diagnostics::log(QString("book %1 found at %2").arg(book.bookId).arg(book.path));
+        }
+    });
     m_revision++;
     emit changed();
 }
@@ -408,7 +385,7 @@ QVariantList Downloads::appsFor(const QString &format) const
 bool Downloads::openWith(int bookId, const QString &format, const QString &app)
 {
     QString path;
-    for (const QString &candidate : pathsFor(bookId)) {
+    for (const QString &candidate : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(candidate) && QFileInfo(candidate).suffix().compare(format, Qt::CaseInsensitive) == 0)
             path = candidate;
     }
@@ -425,7 +402,7 @@ bool Downloads::open(int bookId)
 {
     // The ebook if both are here
     QString path;
-    for (const QString &candidate : pathsFor(bookId)) {
+    for (const QString &candidate : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(candidate) && (path.isEmpty() || isAudioFormat(QFileInfo(path).suffix())))
             path = candidate;
     }

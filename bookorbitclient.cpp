@@ -1,5 +1,6 @@
 #include "bookorbitclient.h"
 #include "accents.h"
+#include "database.h"
 #include "diagnostics.h"
 #include "einkcolors.h"
 #include "formats.h"
@@ -40,16 +41,16 @@ static QJsonObject group(const QString &join, const QJsonArray &rules)
     return QJsonObject{{"type", "group"}, {"join", join}, {"rules", rules}};
 }
 
-BookOrbitClient::BookOrbitClient(const QString &settingsPath, QObject *parent)
+BookOrbitClient::BookOrbitClient(Database *database, QObject *parent)
     : QObject(parent)
-    , m_settings(settingsPath, QSettings::IniFormat)
+    , m_database(database)
     , m_serverUrl(QString::fromUtf8(DEFAULT_SERVER_URL))
 {
     m_nam.setTransferTimeout(30000);
-    m_username = m_settings.value("username").toString();
-    m_refreshToken = m_settings.value("refreshToken").toString();
-    m_recentSearches = m_settings.value("recentSearches").toStringList();
-    m_accent = m_settings.value("accent").toString();
+    m_username = m_database->text("username");
+    m_refreshToken = m_database->text("refreshToken");
+    m_recentSearches = m_database->list("recentSearches");
+    m_accent = m_database->text("accent");
     // A saved session counts as signed in straight away, so the app opens on the book list.
     // If the server has since rejected it, the first request finds out and signs out.
     m_signedIn = !m_refreshToken.isEmpty();
@@ -88,8 +89,7 @@ void BookOrbitClient::loadAccent()
             if (accent == m_accent)
                 return;
             m_accent = accent;
-            m_settings.setValue("accent", m_accent);
-            m_settings.sync();
+            m_database->setText("accent", m_accent);
             emit accentChanged();
         },
         [](int, const QString &message) { diagnostics::log("accent: " + message); });
@@ -113,8 +113,7 @@ void BookOrbitClient::signIn(const QString &username, const QString &password)
     send("POST", "/auth/login", QJsonDocument(body),
         [this](const QByteArray &data) {
             applyCredentials(QJsonDocument::fromJson(data).object());
-            m_settings.setValue("username", m_username);
-            m_settings.sync();
+            m_database->setText("username", m_username);
             refreshBooks();
             loadAccent();
         },
@@ -132,10 +131,9 @@ void BookOrbitClient::signOut()
     setError(QString());
     // They belong to this user
     m_recentSearches.clear();
-    m_settings.remove("recentSearches");
+    m_database->remove("recentSearches");
     m_accent.clear();
-    m_settings.remove("accent");
-    m_settings.sync();
+    m_database->remove("accent");
     emit recentSearchesChanged();
     emit accentChanged();
 }
@@ -329,8 +327,7 @@ void BookOrbitClient::addRecentSearch(const QString &text)
     if (searches == m_recentSearches)
         return;
     m_recentSearches = searches;
-    m_settings.setValue("recentSearches", m_recentSearches);
-    m_settings.sync();
+    m_database->setList("recentSearches", m_recentSearches);
     emit recentSearchesChanged();
 }
 
@@ -1712,8 +1709,7 @@ void BookOrbitClient::applyCredentials(const QJsonObject &credentials)
 {
     m_accessToken = credentials.value("accessToken").toString();
     m_refreshToken = credentials.value("refreshToken").toString();
-    m_settings.setValue("refreshToken", m_refreshToken);
-    m_settings.sync();
+    m_database->setText("refreshToken", m_refreshToken);
     setSignedIn(true);
 }
 
@@ -1721,8 +1717,7 @@ void BookOrbitClient::clearSession()
 {
     m_accessToken.clear();
     m_refreshToken.clear();
-    m_settings.remove("refreshToken");
-    m_settings.sync();
+    m_database->remove("refreshToken");
     m_libraryId = -1;
     for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
         groups->generation++;
