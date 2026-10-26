@@ -28,6 +28,9 @@ class BookOrbitClient : public QObject
     // The server signed in to last, e.g. "https://books.example.com"; empty until a sign-in
     // has worked. Kept after signing out, for the next sign-in.
     Q_PROPERTY(QString serverUrl READ serverUrl NOTIFY serverUrlChanged)
+    // What the server field starts with when no server is saved: empty, unless the build
+    // was given one (SUGGESTED_SERVER in the .pro)
+    Q_PROPERTY(QString suggestedServer READ suggestedServer CONSTANT)
     Q_PROPERTY(QString username READ username NOTIFY usernameChanged)
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
@@ -102,6 +105,7 @@ public:
     explicit BookOrbitClient(Database *database, QObject *parent = nullptr);
 
     QString serverUrl() const { return m_serverUrl; }
+    QString suggestedServer() const;
     QString username() const { return m_username; }
     bool signedIn() const { return m_signedIn; }
     bool busy() const { return m_pending > 0; }

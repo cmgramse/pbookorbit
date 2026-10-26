@@ -8,6 +8,15 @@ in with a normal BookOrbit account and lists the 20 most recently added books.
 ./pb.sh arm apps/pbookorbit    # device -> build/pbookorbit/<sdk>/arm/pbookorbit.app
 ```
 
+To hand the app to someone who uses a particular server, build it with that server filled
+in (it can still be deleted or changed):
+
+```sh
+PB_QMAKE_ARGS="SUGGESTED_SERVER=books.example.com" ./pb.sh arm apps/pbookorbit
+```
+
+The next build without it is back to an empty field.
+
 ## Signing in
 
 Enter the server's address (`books.example.com`; https is assumed unless `http://` is

@@ -99,6 +99,7 @@ Item {
             FormField {
                 id: serverField
                 visible: bookOrbit.serverUrl === ""
+                text: bookOrbit.suggestedServer
                 inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
                 onAccepted: usernameField.forceActiveFocus()
                 onActiveFocusChanged: Qt.callLater(page.updateKeyboardShift)
@@ -137,7 +138,7 @@ Item {
                     fallbackText: "×"
                     enabled: !bookOrbit.busy
                     onClicked: {
-                        serverField.text = ""
+                        serverField.text = bookOrbit.suggestedServer
                         bookOrbit.forgetServer()
                     }
                 }
