@@ -17,6 +17,7 @@
         <file>qml/SwitchMenuItem.qml</file>
         <file>qml/TabFooter.qml</file>
         <file>qml/BookRow.qml</file>
+        <file>qml/CoverPlaceholder.qml</file>
         <file>qml/ListScrollbar.qml</file>
         <file>qml/Spinner.qml</file>
         <file>qml/SpinnerImage.qml</file>

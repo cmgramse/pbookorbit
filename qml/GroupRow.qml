@@ -44,8 +44,8 @@ Item {
         onClicked: row.clicked()
     }
 
-    // A cover shrunk to fit width x height, set in its corner of the stack; an outline
-    // while it downloads
+    // A cover shrunk to fit width x height, set in its corner of the stack; the system's
+    // blank book while it downloads
     component StackCover: Item {
         id: stackCover
         property var book
@@ -81,12 +81,9 @@ Item {
             anchors.margins: -2
             color: "white"
         }
-        Rectangle {
-            anchors.fill: parent
+        // Opaque, so it hides the cover behind
+        CoverPlaceholder {
             visible: image.status !== Image.Ready
-            color: "white"
-            border.width: 1
-            border.color: "#cccccc"
         }
         Image {
             id: image

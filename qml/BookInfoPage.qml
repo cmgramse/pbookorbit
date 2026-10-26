@@ -120,8 +120,8 @@ Rectangle {
                 width: parent.width
                 height: Math.max(cover.height, fields.height)
 
-                // 429x645px, the cover shrunk to fit; an outline while it downloads or if
-                // there isn't one
+                // 429x645px, the cover shrunk to fit; the system's blank book while it
+                // downloads or if there isn't one
                 Item {
                     id: cover
                     width: Units.dp(197)
@@ -139,11 +139,9 @@ Rectangle {
                                 cover.revision++
                         }
                     }
-                    Rectangle {
-                        anchors.fill: parent
+                    CoverPlaceholder {
                         visible: coverImage.status !== Image.Ready
-                        border.width: 1
-                        border.color: "#cccccc"
+                        icon: "book_card_dummy_cover_land"
                     }
                     Image {
                         id: coverImage

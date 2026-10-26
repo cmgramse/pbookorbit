@@ -57,7 +57,7 @@ Item {
         onPressAndHold: row.held()
     }
 
-    // Cover, shrunk to fit; an outline while it downloads or if there isn't one
+    // Cover, shrunk to fit; the system's blank book while it downloads or if there isn't one
     Item {
         id: cover
         x: row.contentLeft
@@ -77,11 +77,8 @@ Item {
                     cover.revision++
             }
         }
-        Rectangle {
-            anchors.fill: parent
+        CoverPlaceholder {
             visible: image.status !== Image.Ready
-            border.width: 1
-            border.color: "#cccccc"
         }
         Image {
             id: image
