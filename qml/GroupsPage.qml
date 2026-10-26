@@ -7,6 +7,8 @@ import "units.js" as Units
 // it does the library's.
 Item {
     id: page
+    // For the device's page-turn keys, which main.qml sends to the page in front
+    readonly property alias pageButtons: pageButtons
     property string sortText
     property bool sortReversed: false
     property bool sortOpen: false

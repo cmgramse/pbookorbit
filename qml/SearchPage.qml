@@ -11,6 +11,8 @@ import "units.js" as Units
 // doesn't keep it.
 Rectangle {
     id: page
+    // For the device's page-turn keys, which main.qml sends to the page in front
+    readonly property alias pageButtons: resultsPages
     color: "white"
 
     // Same height as the main toolbar, so the page below doesn't jump when switching

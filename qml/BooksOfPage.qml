@@ -11,6 +11,8 @@ import "units.js" as Units
 // Loads as it scrolls, like the library list. bookOrbit.showBooksOf() fills it.
 Rectangle {
     id: page
+    // For the device's page-turn keys, which main.qml sends to the page in front
+    readonly property alias pageButtons: booksPages
     color: "white"
 
     // "Author", "Series" or "Collection", and the name

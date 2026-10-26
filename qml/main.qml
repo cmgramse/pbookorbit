@@ -253,6 +253,38 @@ Window {
                                              : showingAuthors ? authorsQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
+    // The device's page-turn keys page the list in front, as its on-screen page buttons
+    // do. The platform plugin sends them as Page Up and Page Down. Pages without a list
+    // have none; nor does anything while a menu or dialog is over the page, since a tap
+    // there would only close it.
+    readonly property PageButtons frontPageButtons: showingInfo ? null
+                                                    : showingBooksOf ? booksOfPage.pageButtons
+                                                    : showingAuthorSeries ? authorSeriesPage.pageButtons
+                                                    : showingAuthor ? null
+                                                    : searching ? searchPage.pageButtons
+                                                    : !bookOrbit.signedIn ? null
+                                                    : showingCollections ? collectionsPage.pageButtons
+                                                    : showingSeries ? seriesPage.pageButtons
+                                                    : showingAuthors ? authorsPage.pageButtons
+                                                    : pageButtons
+    readonly property bool overlayOpen: dropdownOpen || menu.visible || bookMenu.visible
+                                        || deleteDialog.visible || downloadDialog.visible
+                                        || findBooksDialog.visible
+
+    function pageFront(direction) {
+        if (frontPageButtons && frontPageButtons.visible && !overlayOpen)
+            frontPageButtons.page(direction)
+    }
+
+    Shortcut {
+        sequence: "PgUp"
+        onActivated: root.pageFront(-1)
+    }
+    Shortcut {
+        sequence: "PgDown"
+        onActivated: root.pageFront(1)
+    }
+
     function closeDropdowns() {
         filterMenu.visible = false
         sortMenu.visible = false
