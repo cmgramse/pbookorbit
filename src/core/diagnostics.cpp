@@ -16,7 +16,7 @@ namespace diagnostics {
 static const char *const SETTING = "diagnosticsLogging";
 
 static bool tracing = false;
-// The frame and memory counter, run while tracing
+// Frame and memory counter, running while tracing
 static QTimer *statsTimer = nullptr;
 
 static QFile *logFile()
@@ -82,7 +82,7 @@ static void setTracing(bool on)
 
 void start(QQuickWindow *window)
 {
-    // afterRendering is emitted on the render thread
+    // afterRendering fires on the render thread
     static std::atomic<int> frames{0};
     QObject::connect(window, &QQuickWindow::afterRendering, window, [] { frames++; },
                      Qt::DirectConnection);
@@ -94,8 +94,8 @@ void start(QQuickWindow *window)
     });
     setTracing(tracing);
     log("started, " + processStats() + (tracing ? ", diagnostics logging on" : ""));
-    // The QML is compiled at build time for exactly this Qt; on any other the engine
-    // ignores it and compiles every file from source on each launch.
+    // QML is compiled at build time for this exact Qt version. Any other version ignores it
+    // and compiles from source on every launch.
     log(QString("Qt %1, QML compiled for %2%3")
             .arg(qVersion(), QT_VERSION_STR,
                  strcmp(qVersion(), QT_VERSION_STR) ? " - mismatch, compiling QML at startup"

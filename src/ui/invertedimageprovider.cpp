@@ -10,7 +10,7 @@ QImage InvertedImageProvider::requestImage(const QString &id, QSize *size, const
     const QUrl url(id);
     const QString path = url.scheme() == "qrc" ? ":" + url.path() : url.toLocalFile();
     QImageReader reader(path);
-    // As Image's sourceSize does: one side 0 keeps the aspect ratio
+    // As with Image's sourceSize, a 0 side keeps the aspect ratio
     if (requestedSize.width() > 0 || requestedSize.height() > 0) {
         QSize scaled = reader.size();
         if (scaled.isValid())
@@ -24,8 +24,8 @@ QImage InvertedImageProvider::requestImage(const QString &id, QSize *size, const
         return image;
     }
 
-    // Not premultiplied, so the inverted colours blend with the inverted page beneath
-    // exactly as the real ones would with the real page
+    // Not premultiplied, so the inverted colours blend with the inverted page exactly as
+    // the real ones would with the real page
     image = image.convertToFormat(image.hasAlphaChannel() ? QImage::Format_ARGB32 : QImage::Format_RGB32);
     image.invertPixels(QImage::InvertRgb);
     if (size)

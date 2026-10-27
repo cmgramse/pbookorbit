@@ -2,10 +2,10 @@
 
 #include <QQuickImageProvider>
 
-// Serves an image with its colours inverted: "image://inverted/" followed by its file:
-// or qrc: URL. In night mode the screen inverts everything the app draws, so the system's
-// own apps draw pictures inverted for it to turn back: covers and photos keep their real
-// colours while the rest of the page goes dark (night.js picks the URL).
+// Serves an image with inverted colours: "image://inverted/" followed by a file: or qrc:
+// URL. Night mode inverts everything the app draws, so the system apps pre-invert images
+// and the inversion restores them: covers and photos keep their colours while the page goes
+// dark (night.js picks the URL).
 class InvertedImageProvider : public QQuickImageProvider
 {
 public:

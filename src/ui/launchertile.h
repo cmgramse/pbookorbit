@@ -2,12 +2,11 @@
 
 #include <QObject>
 
-// Gives the app its own tile on the PocketBook home screen, named PBookOrbit and with its
-// own icon (src/icons: 110x110 8-bit grey, the size of the Era Color's theme icons). The
-// launcher lists its tiles in system/config/desktop/view.json, which only the user's
-// storage holds, so the app adds itself there each time it starts. The launcher reads it
-// at boot: the tile appears after the device restarts. The same name and icon go to the
-// task manager. See NOTES.md.
+// Adds a PBookOrbit tile with its own icon to the PocketBook home screen (src/icons:
+// 110x110 8-bit grey, the Era Color's theme icon size). The launcher reads its tiles from
+// system/config/desktop/view.json on user storage, so the app adds itself there on each
+// start. The launcher only reads the file at boot, so the tile appears after a restart. The
+// task manager gets the same name and icon. See NOTES.md.
 class LauncherTile : public QObject
 {
     Q_OBJECT
@@ -15,15 +14,14 @@ class LauncherTile : public QObject
     Q_PROPERTY(bool added READ added CONSTANT)
 
 public:
-    // Writes the icons to applications/icons, unless they are there already (the user may
-    // have changed them), and adds the app to view.json if it isn't there as it should be.
-    // Then gives the running task the same name and icon, for the task manager.
-    // Anything that fails is logged and skipped, so the app starts anyway. The emulator
-    // has no view.json: there it only writes the icons.
+    // Writes the icons to applications/icons unless already there (the user may have
+    // replaced them), and adds or fixes the app's view.json entry. Then gives the running
+    // task the same name and icon. Failures are logged and skipped so the app still starts.
+    // The emulator has no view.json, so there it only writes the icons.
     explicit LauncherTile(QObject *parent = nullptr);
     bool added() const { return m_added; }
 
-    // Restarts the device, for the launcher to show the tile. Only logs in the emulator.
+    // Restarts the device so the launcher shows the tile. Only logs in the emulator.
     Q_INVOKABLE void restartDevice();
 
 private:

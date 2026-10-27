@@ -1,9 +1,8 @@
 import QtQuick
 import "units.js" as Units
 
-// Option row in an options menu, after Libby's filter menu on an Era Color: radio button
-// centred 87px from the menu's border, label at 143px, grey line underneath inset 33px.
-// Inverted while pressed.
+// Option row in an options menu, modelled on Libby's filter menu on an Era Color: radio
+// button, label, and an inset grey line below. Inverted while pressed.
 Item {
     id: item
     property alias text: label.text
@@ -13,7 +12,7 @@ Item {
 
     width: parent ? parent.width : 0
     implicitWidth: label.x + label.implicitWidth + Units.dp(15)
-    height: Units.dp(50)   // 109px
+    height: Units.dp(50)
 
     Rectangle {
         anchors.fill: parent

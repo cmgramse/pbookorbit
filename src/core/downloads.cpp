@@ -13,23 +13,22 @@
 #include <QRegularExpression>
 #include <QUrl>
 
-// Where downloads go on the main storage: ebooks to Books, audiobooks to Audio Books,
-// where the system's audiobook player looks (/mnt/ext1/... on the device,
-// ./system/mnt/ext1/... in the emulator)
+// Download folders: ebooks to Books, audiobooks to Audio Books (where the audiobook player
+// looks). /mnt/ext1/... on the device, ./system/mnt/ext1/... in the emulator.
 static const char *BOOKS_DIR = FLASHDIR "/Books";
 static const char *AUDIOBOOKS_DIR = AUDIOBOOKS_DEFAULT_PATH;
-// The system's audiobook player (Audiobooks on the home screen)
+// The system audiobook player (Audiobooks on the home screen)
 static const char *AUDIOBOOKS_APP = "/ebrmain/bin/audio_books.app";
 
-// Audiobook formats, as BookOrbit lists them (AUDIO_FORMAT_LIST)
+// Audiobook formats, as in BookOrbit's AUDIO_FORMAT_LIST
 
-// The folder a file of this format goes to
+// Folder for a file of this format
 static QString folderFor(const QString &format)
 {
     return QString::fromUtf8(isAudioFormat(format) ? AUDIOBOOKS_DIR : BOOKS_DIR);
 }
 
-// A name the device's file system takes: no path separators or other awkward characters
+// A file name the device accepts: no path separators or other awkward characters
 static QString safeFileName(QString name)
 {
     name.replace(QRegularExpression(R"([/\\:*?"<>|\x00-\x1f])"), "_");
@@ -39,8 +38,8 @@ static QString safeFileName(QString name)
     return name.left(200);
 }
 
-// The file name in a Content-Disposition header: the UTF-8 filename* if there is one,
-// e.g. attachment; filename="Dune (2007).m4b"; filename*=UTF-8''Dune%20%282007%29.m4b
+// The file name from a Content-Disposition header, preferring the UTF-8 filename*, e.g.
+// attachment; filename="Dune (2007).m4b"; filename*=UTF-8''Dune%20%282007%29.m4b
 static QString dispositionFileName(const QByteArray &header)
 {
     static const QRegularExpression extended(R"(filename\*\s*=\s*UTF-8''([^;\s]+))",
@@ -60,7 +59,7 @@ Downloads::Downloads(BookOrbitClient *client, Database *database, QObject *paren
     , m_client(client)
     , m_database(database)
 {
-    // The system scanner's replies to requestLibraryScan(), logged to see it working
+    // Logs the scanner's replies to requestLibraryScan()
     if (auto *platform = pocketbook::utilities::einkPlatform()) {
         platform->addHandlerForInkvewEvents([](int type, int, int) {
             if (type == EVT_SCANSTOPPED)
@@ -73,7 +72,7 @@ QVariantList Downloads::downloadedBooks() const
 {
     QVariantList books;
     for (const Database::Book &record : m_database->booksWithFiles()) {
-        // The formats on the device, e.g. ["epub"], for the content type filter
+        // Formats on the device, e.g. ["epub"], for the content type filter
         QStringList formats;
         for (const QString &path : record.files) {
             if (QFileInfo::exists(path))
@@ -110,8 +109,8 @@ QStringList Downloads::pathsOnDevice(int bookId) const
 
 bool Downloads::remove(int bookId)
 {
-    // Files already gone count as deleted. Reading positions and notes kept beside a book
-    // (KOReader's .sdr folder) stay, and so does the book's entry in the database.
+    // Missing files count as deleted. Notes and positions beside the book (KOReader's .sdr
+    // folder) are left, as is the database entry.
     bool deleted = true;
     m_database->transaction([&] {
         for (const QString &path : m_database->bookFiles(bookId)) {
@@ -142,9 +141,9 @@ bool Downloads::isOnDevice(int bookId) const
 
 QVariantMap Downloads::fileToDownload(const QVariantMap &book, int fileId) const
 {
-    // files: [{id, format, role, sizeBytes}]. The role says what the file is: "primary"
-    // is the book in the format the server holds it in first, "content" the same book in
-    // another format; "cover", "metadata" and "supplement" files aren't the book at all.
+    // files: [{id, format, role, sizeBytes}]. "primary" is the book in its main format and
+    // "content" the same book in another. "cover", "metadata" and "supplement" files aren't
+    // the book.
     QVariantMap chosen;
     for (const QVariant &value : book.value("files").toList()) {
         const QVariantMap file = value.toMap();
@@ -165,7 +164,7 @@ QVariantMap Downloads::fileToDownload(const QVariantMap &book, int fileId) const
         if (chosen.isEmpty())
             chosen = file;
     }
-    // Where it will go: "Books" or "Audio Books"
+    // Destination: "Books" or "Audio Books"
     if (!chosen.isEmpty())
         chosen.insert("folder", QFileInfo(folderFor(chosen.value("format").toString())).fileName());
     return chosen;
@@ -181,7 +180,7 @@ void Downloads::download(const QVariantMap &book, int fileId)
     m_bookId = bookId;
     m_percent = 0;
     m_error.clear();
-    // finish() deletes whatever this names, so never a finished book
+    // finish() deletes whatever this names, so never point it at a finished book
     m_part.setFileName(QString());
     emit changed();
     if (file.isEmpty()) {
@@ -192,7 +191,7 @@ void Downloads::download(const QVariantMap &book, int fileId)
     const QString format = file.value("format").toString();
     m_fileName.clear();
     m_fallbackName = safeFileName(book.value("title").toString()) + "." + format;
-    // The book's list entry as the server sent it, without the fields the list adds
+    // The server's list entry, without the fields the list adds
     m_entry = book;
     for (const char *added : {"loaded", "section", "sectionLabel", "sectionStart", "statusText", "seriesText"})
         m_entry.remove(added);
@@ -254,7 +253,8 @@ void Downloads::download(const QVariantMap &book, int fileId)
                 }
                 m_part.close();
 
-                // Under the server's name, without replacing a different book of the same name
+                // Keep the server's name, without overwriting a different book with the
+                // same name
                 const QString name = m_fileName.isEmpty() ? m_fallbackName : m_fileName;
                 const QFileInfo info(name);
                 QString path = QString("%1/%2").arg(folder, name);
@@ -288,9 +288,9 @@ void Downloads::download(const QVariantMap &book, int fileId)
 void Downloads::requestLibraryScan()
 {
     // Undocumented: the SDK has no call to add a book to the library. This broadcasts
-    // EVT_STARTSCAN to the other tasks (OTHERTASKS, -3), asking the system's resident
-    // scanner service to scan for new books, as pbweb does and says the firmware does
-    // (PBScanClient::startDeviceScan). It answers with EVT_SCANSTOPPED. See NOTES.md.
+    // EVT_STARTSCAN to other tasks (OTHERTASKS, -3) so the resident scanner service
+    // rescans, as pbweb does and the firmware does in PBScanClient::startDeviceScan. It
+    // replies with EVT_SCANSTOPPED. See NOTES.md.
     const int rc = SendEventTo(OTHERTASKS, EVT_STARTSCAN, 0, 0);
     (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("library scan requested -> %1").arg(rc));
 }
@@ -307,7 +307,7 @@ void Downloads::cancel()
 
 void Downloads::finish(const QString &error)
 {
-    // The part file, if there is one (download() and a successful save clear its name)
+    // The part file, if any (download() and a successful save clear its name)
     if (m_part.isOpen())
         m_part.close();
     if (!m_part.fileName().isEmpty() && m_part.exists())
@@ -352,8 +352,8 @@ void Downloads::addExisting(const QList<Existing> &books)
 
 QVariantList Downloads::appsFor(const QString &format) const
 {
-    // One entry per extensions.cfg line for the format, and the emulator reads its one
-    // file twice, so the same app can come up more than once
+    // One entry per extensions.cfg line for the format. The emulator reads its file twice,
+    // so apps can repeat.
     QStringList apps;
     const iv_filetype *types = GetSupportedFileTypes();
     const int count = GetSupportedFileTypesLength();
@@ -369,9 +369,9 @@ QVariantList Downloads::appsFor(const QString &format) const
 
     QVariantList result;
     for (const QString &app : apps) {
-        // The names are language strings named after the app: "@eink-reader_with_blink" is
-        // "PB Reader (EPUB 3)". Other apps have none unless the user adds one, as
-        // "@koreader=KOReader", to the language file on their storage
+        // Names come from language strings named after the app: "@eink-reader_with_blink"
+        // is "PB Reader (EPUB 3)". Other apps have none unless the user adds one (e.g.
+        // "@koreader=KOReader") to the language file on their storage.
         QString base = app;
         if (base.endsWith(".app"))
             base.chop(4);
@@ -401,7 +401,7 @@ bool Downloads::openWith(int bookId, const QString &format, const QString &app)
 
 bool Downloads::open(int bookId)
 {
-    // The ebook if both are here
+    // The ebook, if both are present
     QString path;
     for (const QString &candidate : m_database->bookFiles(bookId)) {
         if (QFileInfo::exists(candidate) && (path.isEmpty() || isAudioFormat(QFileInfo(path).suffix())))
@@ -410,17 +410,17 @@ bool Downloads::open(int bookId)
     if (path.isEmpty())
         return false;
     if (isAudioFormat(QFileInfo(path).suffix())) {
-        // OpenBook() goes by extensions.cfg, which has no audiobook formats (only mp3, for
-        // the music player), so it says "Unknown book type". The system's audiobook app
-        // plays a book given --bookPlay <path>, read from its parseArguments(); OpenTask
-        // starts it, or hands a running one the arguments and brings it to the front.
+        // OpenBook() uses extensions.cfg, which lists no audiobook formats (only mp3, for
+        // the music player), so it fails with "Unknown book type". The audiobook app takes
+        // --bookPlay <path> (see its parseArguments()). OpenTask starts it, or passes the
+        // arguments to a running instance and brings it forward.
         const QByteArray file = path.toUtf8();
         const char *args[] = {"--bookPlay", file.constData()};
         const int rc = OpenTask(AUDIOBOOKS_APP, 2, args, TASK_MAKEACTIVE);
         (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenTask %1 --bookPlay %2 -> %3").arg(AUDIOBOOKS_APP, path).arg(rc));
         return rc >= 0;
     }
-    // Adds it to the system's recent books, and comes back here when the reader closes
+    // Adds it to the system's recent books, and returns here when the reader closes
     const int rc = OpenBook(path.toUtf8().constData(), "", OB_ADDTOLAST | OB_WITHRETURN);
     (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenBook %1 -> %2").arg(path).arg(rc));
     return true;

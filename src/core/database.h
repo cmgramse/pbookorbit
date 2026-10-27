@@ -11,23 +11,22 @@
 struct sqlite3;
 struct sqlite3_stmt;
 
-// The app's own data, in an SQLite database (pbookorbit.db, in the system config folder):
+// The app's SQLite database (pbookorbit.db, in the system config folder):
 //
-//   settings     key/value: the login (username, refreshToken) and the app's settings.
-//                Values keep SQLite's type: text, 0/1, or a JSON array for a list.
-//   books        a local cache of BookOrbit books, by BookOrbit id. Each row holds the
-//                book's list entry as the server sent it, as JSON (data), so what's kept
-//                about a book can change without changing the table. Fields worth
-//                querying are generated columns pulled out of that JSON (title, series);
-//                another is one ALTER TABLE ... ADD COLUMN ... GENERATED away.
-//   book_files   the files of those books on the device, which the app downloaded or
-//                found. A book can have two: an ebook and an audiobook.
+//   settings     key/value: the login (username, refreshToken) and app settings. Values
+//                are text, 0/1, or a JSON array for lists.
+//   books        cache of BookOrbit books by id. data holds the server's list entry as
+//                JSON, so the stored fields can change without a schema change. Fields
+//                worth querying (title, series) are generated columns; add more with
+//                ALTER TABLE ... ADD COLUMN ... GENERATED.
+//   book_files   files of those books on the device, downloaded or found. A book can have
+//                two: an ebook and an audiobook.
 //
-// The SDK's libsqlite3 is the system's own (libcommon_utilities links it), so it is on
-// every device. Qt's Sql module isn't used: the firmware needn't have it.
+// Uses the system libsqlite3 (linked by libcommon_utilities), which every device has. Qt's
+// Sql module isn't used because the firmware may not ship it.
 //
-// If the database can't be opened, reads come back empty and writes do nothing, so the
-// app still runs, signed out.
+// If the database can't be opened, reads return empty and writes do nothing, so the app
+// still runs, signed out.
 class Database
 {
 public:
@@ -36,7 +35,7 @@ public:
     Database(const Database &) = delete;
     Database &operator=(const Database &) = delete;
 
-    // Settings; a missing key reads as "", false or an empty list
+    // Settings. A missing key reads as "", false or an empty list.
     QString text(const QString &key) const;
     void setText(const QString &key, const QString &value);
     bool flag(const QString &key) const;
@@ -45,16 +44,16 @@ public:
     void setList(const QString &key, const QStringList &value);
     void remove(const QString &key);
 
-    // Saves a book's list entry, replacing what was kept for it
+    // Saves a book's list entry, replacing any existing one
     void saveBook(int bookId, const QVariantMap &entry);
-    // A file of the book on the device. The book must be saved.
+    // Records a downloaded file for a book. The book must already be saved.
     void addBookFile(int bookId, const QString &path);
     void removeBookFile(const QString &path);
-    // The book's files, whether or not they are still there
+    // The book's recorded files, whether or not they still exist
     QStringList bookFiles(int bookId) const;
-    // Every book file recorded, whether or not it is still there
+    // Every recorded book file, whether or not it still exists
     QSet<QString> allBookFiles() const;
-    // The books with files recorded, by title
+    // Books with recorded files, by title
     struct Book {
         int id;
         QVariantMap entry;
@@ -62,7 +61,7 @@ public:
     };
     QList<Book> booksWithFiles() const;
 
-    // Runs the writes in one transaction: one write to storage, and all or none of them
+    // Runs writes in a single transaction: one write to storage, all or nothing
     void transaction(const std::function<void()> &writes);
 
 private:

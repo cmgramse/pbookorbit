@@ -1,12 +1,12 @@
 import QtQuick
 import "units.js" as Units
 
-// Finds the books already on the device that are in the BookOrbit library (see
-// BookFinder), so they show as downloaded. offer() asks first, after the first sign-in;
-// search() starts straight away, from the menu.
+// Finds books on the device that are in the BookOrbit library (see BookFinder) and marks
+// them as downloaded. offer() asks first, after the first sign-in; search() starts
+// immediately, from the menu.
 SystemDialog {
     id: dialog
-    // Asking whether to search, before it starts
+    // Asking whether to search, before starting
     property bool offering: false
     property int fileCount: 0
     readonly property string step: offering ? "offer" : bookFinder.state
@@ -35,7 +35,7 @@ SystemDialog {
         return count === 1 ? "1 book" : count + " books"
     }
 
-    // "Dune.epub as Dune", a line each, the first few
+    // "Dune.epub as Dune", one per line, the first few
     function unsureLines() {
         const lines = unsure.slice(0, 4).map(u => "• " + u.fileName + " as " + u.title)
         if (unsure.length > 4)

@@ -5,8 +5,8 @@
 #include <inkview.h>
 #include <cstdlib>
 
-// Some theme resources aren't images (layouts, for one) but GetResource still returns
-// them as an ibitmap, with nonsense in the header. Accept only plausible bitmaps.
+// Some theme resources aren't images (layouts, for example), but GetResource still returns
+// them as an ibitmap with a garbage header. Only accept plausible bitmaps.
 static bool looksLikeBitmap(const ibitmap *bmp)
 {
     const int depth = bmp->depth & 0xff;
@@ -16,10 +16,9 @@ static bool looksLikeBitmap(const ibitmap *bmp)
            && bmp->scanline >= minScanline && bmp->scanline <= minScanline + 8;
 }
 
-// Grey levels (1, 2, 4 or 8 bits, high bits first) or colour (24-bit R, G, B; 32-bit
-// R, G, B, A). Bit 15 of depth means a 1-bit transparency mask follows the pixels.
-// Checked against a PocketBook Era Color's theme, with the icons that pocketbook-kit's
-// pb device import saves.
+// Grey levels (1, 2, 4 or 8 bits, high bits first) or colour (24-bit RGB, 32-bit RGBA). Bit
+// 15 of depth means a 1-bit transparency mask follows the pixels. Checked against an Era
+// Color theme using the icons pb device import saves.
 static QImage toImage(const ibitmap *bmp)
 {
     const int depth = bmp->depth & 0xff;
@@ -73,7 +72,7 @@ QImage ThemeImageProvider::requestImage(const QString &id, QSize *size, const QS
 
     if (size)
         *size = image.size();
-    // Scaled only to a real size: QML sends 0x0 (valid, but empty) for "its own size"
+    // Only scale to a real size; QML passes 0x0 (valid but empty) to mean natural size
     if (!requestedSize.isEmpty() && requestedSize != image.size())
         return image.scaled(requestedSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     return image;

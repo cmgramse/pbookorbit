@@ -3,21 +3,20 @@
 #include <QColor>
 #include <QString>
 
-// The colours of one of BookOrbit's accents (its "Accent color" appearance setting)
+// Colours of one of BookOrbit's accents (its "Accent color" setting)
 struct AccentColors {
     QColor color;   // the accent itself
-    QColor text;    // for text and icons on it: black on the pastel accents, else white
+    QColor text;    // text and icons on it: black on pastel accents, otherwise white
 };
 
-// For an accent name such as "teal" or "wisteria"; BookOrbit's default, teal, for any
-// name it doesn't know
+// Colours for an accent name such as "teal" or "wisteria". Unknown names get BookOrbit's
+// default, teal.
 AccentColors accentColors(const QString &name);
 
-// BookOrbit's colours for artwork it makes up, such as an author's monogram when they
-// have no photo: a diagonal gradient from one colour to the other, top left to bottom
-// right, and the colour for text on it. Picked by a hash of seed (the author's name)
-// from shades near the accent's hue, as the web client's bookCoverPalette() does for
-// its light theme.
+// BookOrbit's colours for generated artwork such as an author's monogram: a diagonal
+// gradient (top left to bottom right) and a text colour. Chosen by hashing seed (the
+// author's name) among shades near the accent hue, like the web client's bookCoverPalette()
+// in its light theme.
 struct CoverPalette {
     QColor from;
     QColor to;

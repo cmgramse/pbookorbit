@@ -1,15 +1,15 @@
 import QtQuick
 
-// A toolbar button showing a system theme icon at its own size, with `pressedIcon` shown
-// over it while pressed (like BitmapButton in the SDK's qml_test example). If the theme
-// has no pressed icon the normal one stays; if it has neither, `fallbackText` shows.
+// Toolbar button showing a system theme icon at natural size, with pressedIcon drawn over
+// it while pressed (like BitmapButton in the SDK's qml_test). Without a pressed icon the
+// normal one stays; with neither, fallbackText shows.
 Item {
     id: button
     property string icon          // theme resource name, e.g. "home"
     property string pressedIcon   // e.g. "home_inv"
     property string fallbackText
-    // Draws the icon this many pixels square instead of at its own size; 0 for its own
-    // size. Give the button a width and height to keep a bigger tap target.
+    // Draws the icon at this many pixels square instead of natural size (0 for natural).
+    // Set the button's width and height to keep a larger tap target.
     property int iconSize: 0
     signal clicked()
 

@@ -3,11 +3,10 @@
 #include <QAbstractListModel>
 #include <QVariantList>
 
-// The book list: one row for every book the query matches, loaded or not. Rows start as
-// blank placeholders and are filled in as their pages arrive, so the list is full length
-// from the start: it can jump to any book, and its scrollbar is exact.
-// Each row has one role, "book": the book's fields as a map, with "loaded" false for a
-// placeholder.
+// The book list: a row for every book the query matches, loaded or not. Rows start as blank
+// placeholders and fill in as pages arrive, so the list has its full length from the start
+// and can jump anywhere with an exact scrollbar. Each row has one role, "book": a map of
+// its fields, with "loaded" false for placeholders.
 class BookListModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -21,14 +20,14 @@ public:
 
     int count() const { return m_books.size(); }
     bool isLoaded(int row) const;
-    // The book at row, or an empty map while it isn't loaded
+    // The book at row, or an empty map if not loaded yet
     QVariantMap book(int row) const;
 
-    // Replaces the list with count placeholders
+    // Resets the list to count placeholders
     void reset(int count);
     // Fills in rows from first onwards
     void setBooks(int first, const QVariantList &books);
-    // Changes one field of a loaded row
+    // Sets one field of a loaded row
     void setField(int row, const QString &name, const QVariant &value);
 
 private:

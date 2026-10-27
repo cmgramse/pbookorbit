@@ -14,7 +14,7 @@ struct Accent {
     bool pastel;        // light enough for dark text on it
 };
 
-// BookOrbit's accent palette (the web client's accent definitions), light theme
+// BookOrbit's accent palette (from the web client's accent definitions), light theme
 const Accent ACCENTS[] = {
     {"acid-green", 0.7, 0.2, 112.0, false},
     {"aloe", 0.68, 0.09, 152.0, true},
@@ -127,11 +127,11 @@ CoverPalette coverPalette(const QString &seed, const QString &accentName)
     const Accent *accent = findAccent(accentName);
     if (!accent)
         accent = findAccent(QStringLiteral("teal"));
-    // djb2 over the UTF-16 code units, as JavaScript's charCodeAt gives them
+    // djb2 over UTF-16 code units, matching JavaScript's charCodeAt
     quint32 n = 5381;
     for (const QChar c : seed)
         n = (n << 5) + n + c.unicode();
-    // Within 36 degrees of the accent's hue (its --tint-h), in steps of 12
+    // Within 36 degrees of the accent hue (its --tint-h), in steps of 12
     static const int hueOffsets[] = {-36, -24, -12, 0, 12, 24, 36};
     double hue = std::fmod(accent->hue + hueOffsets[n % 7], 360.0);
     if (hue < 0)

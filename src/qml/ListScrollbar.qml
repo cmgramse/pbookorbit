@@ -1,9 +1,9 @@
 import QtQuick
 import "units.js" as Units
 
-// Scrollbar on the far right of a list, as in the system library: a black bar, sized and
-// placed by how much of the list is on screen. Goes beside the list, in the same parent.
-// The book lists have a row for every book, loaded or not, so it covers the whole list.
+// Scrollbar at the far right of a list, as in the system library: a black bar sized and
+// positioned by how much of the list is visible. Place beside the list in the same parent.
+// Book lists have a row per book, loaded or not, so it spans the whole list.
 Rectangle {
     id: scrollbar
     property Flickable list

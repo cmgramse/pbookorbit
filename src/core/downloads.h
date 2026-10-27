@@ -12,26 +12,25 @@ class BookOrbitClient;
 class Database;
 class QNetworkReply;
 
-// Books downloaded to the device, and opening them in the system reader.
+// Downloads books to the device and opens them in the system reader.
 //
-// A book downloads to the device's Books folder (/mnt/ext1/Books), or Audio Books for an
-// audiobook, under the file name the server gives it. Its primary file is the one taken
-// when it has several formats. The app records where each book went in its database, so
-// a book counts as on the device while that file is still there. It saves each book's
-// list entry there too, so the downloaded books can be listed without the server.
+// Ebooks go to /mnt/ext1/Books and audiobooks to Audio Books, under the server's file name.
+// Where a book has several formats, the primary file is used. Each download's path and list
+// entry are saved in the database, so a book counts as downloaded while its file exists,
+// and downloaded books can be listed without the server.
 //
-// One download at a time. It streams to a hidden ".part" file in the folder it is going
-// to, which is renamed once complete, so the system library never sees half a book.
+// One download at a time. It streams to a hidden ".part" file that's renamed when complete,
+// so the system library never sees a partial book.
 class Downloads : public QObject
 {
     Q_OBJECT
     // The book downloading now, or -1
     Q_PROPERTY(int bookId READ bookId NOTIFY changed)
-    // How much of it has arrived, 0-100, in whole percent so the screen redraws rarely
+    // Progress, 0-100, in whole percent so the screen redraws rarely
     Q_PROPERTY(int percent READ percent NOTIFY changed)
     // Why the last download failed, or ""
     Q_PROPERTY(QString error READ error NOTIFY changed)
-    // Bumped whenever a book arrives on the device, so QML can check isOnDevice() again
+    // Bumped when a book arrives, so QML re-checks isOnDevice()
     Q_PROPERTY(int revision READ revision NOTIFY changed)
 
 public:
@@ -43,43 +42,40 @@ public:
     int revision() const { return m_revision; }
 
     Q_INVOKABLE bool isOnDevice(int bookId) const;
-    // The formats of a book's files on the device, e.g. ["epub"]
+    // Formats of a book's files on the device, e.g. ["epub"]
     Q_INVOKABLE QStringList formatsOnDevice(int bookId) const;
-    // The books on the device, as their list entries were when they downloaded, plus
-    // downloadedFormats: the formats of their files on the device
+    // Downloaded books' list entries as saved at download time, plus downloadedFormats
     Q_INVOKABLE QVariantList downloadedBooks() const;
-    // The file a download would fetch: {id, format, sizeBytes, folder}, folder being
-    // "Books" or "Audio Books"; empty if there's none. The primary file, or fileId's.
+    // The file a download would fetch, {id, format, sizeBytes, folder} where folder is
+    // "Books" or "Audio Books". The primary file, or fileId's. Empty if none.
     Q_INVOKABLE QVariantMap fileToDownload(const QVariantMap &book, int fileId = -1) const;
-    // Downloads the book's primary file, or fileId's; downloaded(bookId) follows, or
-    // error is set
+    // Downloads the primary file, or fileId's. Emits downloaded(bookId), or sets error.
     Q_INVOKABLE void download(const QVariantMap &book, int fileId = -1);
     Q_INVOKABLE void cancel();
-    // Opens a downloaded book: an ebook in the reader, an audiobook in the audiobook app
+    // Opens a downloaded book: ebooks in the reader, audiobooks in the audiobook app
     Q_INVOKABLE bool open(int bookId);
-    // The apps the system opens files of this format with, as its Open with menu lists
-    // them: [{app: "koreader.app", name: "KOReader"}], from extensions.cfg (the firmware's
-    // and /mnt/ext1/system/config/'s, where KOReader adds itself)
+    // Apps that can open this format, as the system's Open with menu lists them, e.g.
+    // [{app: "koreader.app", name: "KOReader"}]. Read from the firmware's and
+    // /mnt/ext1/system/config's extensions.cfg (KOReader registers itself in the latter).
     Q_INVOKABLE QVariantList appsFor(const QString &format) const;
-    // Opens the book's file of this format in app, one of appsFor(format), and keeps that
-    // choice for the file, as the system's Open with does (handlers.cfg), so the book
-    // opens there from the system library too
+    // Opens the book's file in app (from appsFor()) and saves that choice in handlers.cfg,
+    // like the system's Open with, so the system library uses it too
     Q_INVOKABLE bool openWith(int bookId, const QString &format, const QString &app);
     // The book's files on the device
     Q_INVOKABLE QStringList pathsOnDevice(int bookId) const;
-    // Deletes the book's files from the device and forgets them; false if one couldn't be
-    // deleted (it stays recorded)
+    // Deletes the book's files and forgets them. Returns false if a file couldn't be
+    // deleted (it stays recorded).
     Q_INVOKABLE bool remove(int bookId);
 
-    // Every book file the app has recorded, whether or not it is still there
+    // Every recorded book file, whether or not it still exists
     QSet<QString> recordedPaths() const;
-    // A book file that was on the device already, and the book it is
+    // A book file found on the device, and the book it matched
     struct Existing {
         int bookId;
         QString path;
         QVariantMap entry;   // the book's list entry
     };
-    // Records them as if the app had downloaded them
+    // Records them as though the app had downloaded them
     void addExisting(const QList<Existing> &books);
 
 signals:
@@ -87,9 +83,9 @@ signals:
     void downloaded(int bookId);
 
 private:
-    // Asks the system to scan for new books, so a download shows in its library
+    // Asks the system to scan for new books, so downloads show in its library
     void requestLibraryScan();
-    // Ends the download: deletes the part file unless it was kept, and sets error
+    // Ends the download, deleting the part file unless it was kept, and sets error
     void finish(const QString &error);
     void setPercent(int percent);
 
@@ -99,12 +95,12 @@ private:
     int m_percent = 0;
     QString m_error;
     int m_revision = 0;
-    // The download under way
+    // The current download
     QPointer<QNetworkReply> m_reply;
     QFile m_part;
     QString m_fileName;      // from the server's Content-Disposition
     QString m_fallbackName;  // "<title>.<format>" if it doesn't give one
-    QVariantMap m_entry;     // the book downloading, as the list has it, for the records
-    // Bumped by each download, so callbacks for a cancelled one are ignored
+    QVariantMap m_entry;     // the list entry of the book downloading, to save
+    // Bumped per download, so callbacks for a cancelled one are ignored
     int m_generation = 0;
 };

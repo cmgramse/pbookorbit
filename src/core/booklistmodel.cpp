@@ -2,7 +2,7 @@
 
 static const int BOOK_ROLE = Qt::UserRole + 1;
 
-// What a row shows before its page arrives: nothing, but every field BookRow reads is there
+// Placeholder row: empty, but with every field BookRow reads
 static const QVariantMap &placeholder()
 {
     static const QVariantMap book{

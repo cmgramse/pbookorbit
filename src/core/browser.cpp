@@ -11,7 +11,7 @@ Browser::Browser(QObject *parent)
 #ifdef EMULATOR
     m_app = "browser.app";
 #else
-    // Where firmware versions keep it, newest first
+    // Locations across firmware versions, newest first
     static const char *const apps[] = {"/usr/bin/browser.app", "/ebrmain/bin/browser.app"};
     if (MultitaskingSupported()) {
         for (const char *app : apps) {

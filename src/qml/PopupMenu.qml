@@ -1,12 +1,12 @@
 import QtQuick
 import "units.js" as Units
 
-// Drop-down menu in the style of the system apps, measured from the library app on an
-// Era Color: thick black border, rounded corners, rows inset from the border. The system
-// squares off a corner only where a menu joins a tab control (the library's "ALL BOOKS"
-// tab, Libby's filter tab): set joinedCorner for that. A menu opened from a button keeps
-// all four corners rounded.
-// Put PopupMenuItems inside (the last visible one should set showSeparator: false), or
+// Drop-down menu in the system style, measured from the library app on an Era Color: thick
+// black border, rounded corners, rows inset from the border. The system squares off a
+// corner only where a menu joins a tab (the library's "ALL BOOKS", Libby's filter tab); set
+// joinedCorner for that. Menus opened from buttons keep all four corners rounded.
+//
+// Fill with PopupMenuItems (the last visible one should set showSeparator: false), or
 // MenuHeadings and RadioMenuItems with sidePadding: 0 for a Libby-style options menu.
 Rectangle {
     id: menu
@@ -15,7 +15,7 @@ Rectangle {
     property string joinedCorner: ""
     property int sidePadding: padding
 
-    // At least 484px (the Sudoku menu, whose rows are short), otherwise as wide as the
+    // At least as wide as the Sudoku menu (whose rows are short), otherwise as wide as the
     // widest visible row (the library menu)
     width: Math.max(Units.dp(222), contentWidth + 2 * (border.width + sidePadding))
     readonly property real contentWidth: {
@@ -27,11 +27,11 @@ Rectangle {
         return widest
     }
     height: column.height + 2 * (border.width + padding)
-    readonly property int padding: Units.dp(8)  // 16px
-    radius: Units.dp(9)  // 20px
+    readonly property int padding: Units.dp(8)
+    radius: Units.dp(9)
     topLeftRadius: joinedCorner === "topLeft" ? 0 : radius
     topRightRadius: joinedCorner === "topRight" ? 0 : radius
-    border.width: Units.dp(4)  // 9px
+    border.width: Units.dp(4)
     border.color: "black"
     color: "white"
 

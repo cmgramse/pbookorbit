@@ -1,23 +1,22 @@
 import QtQuick
 import "units.js" as Units
 
-// Offers to download a book that isn't on the device, shows the download, then opens the
-// book: in the app chosen from Open with, if it came from there. A book with an ebook and
-// an audiobook asks which to download.
+// Offers to download a book that isn't on the device, shows progress, then opens it (in the
+// app picked from Open with, if that's where it came from). Asks which version for books
+// with an ebook and an audiobook.
 SystemDialog {
     id: dialog
-    // The book being offered, as in the book list
+    // The book on offer, as a list entry
     property var book: ({})
-    // Its versions to choose from: [{bookId, fileId, format, sizeBytes, kind, book}]
+    // Versions to choose from: [{bookId, fileId, format, sizeBytes, kind, book}]
     property var options: []
-    // The one downloading, or last tried
+    // The version downloading, or last attempted
     property var chosen: null
     readonly property bool hasFile: options.length > 0
     readonly property bool downloading: chosen !== null && downloads.bookId === chosen.bookId
-    // Set when a download fails, until the next try
+    // Set when a download fails, until the next attempt
     property string error: ""
-    // The app to open it in, {app, name} as downloads.appsFor() gives it, or null for the
-    // usual one
+    // App to open it in, {app, name} from downloads.appsFor(), or null for the default
     property var app: null
 
     // format is the downloaded file's
@@ -27,7 +26,7 @@ SystemDialog {
     percent: downloading ? downloads.percent : -1
     onPressed: (action) => press(action)
 
-    // variants as the book list gives them; without any, the book's primary file
+    // variants from the book list; falls back to the primary file
     function show(newBook, variants, newApp) {
         book = newBook
         app = newApp || null
@@ -79,7 +78,7 @@ SystemDialog {
                + (app ? " in " + app.name : "") + "?"
     }
 
-    // The buttons, left to right: [label, action]; an option's index downloads it
+    // Buttons left to right, as [label, action]; an option's index downloads it
     buttons: downloading ? [["Cancel", "close"]]
              : !hasFile ? [["Close", "close"]]
              : error !== "" ? [["Try again", options.indexOf(chosen)], ["Cancel", "close"]]
@@ -105,7 +104,7 @@ SystemDialog {
             dialog.opened(bookId, dialog.chosen.format, dialog.app)
         }
         function onChanged() {
-            // A download of this book ended without arriving
+            // This book's download ended without the file arriving
             if (dialog.visible && downloads.bookId === -1 && downloads.error !== "")
                 dialog.error = downloads.error
         }

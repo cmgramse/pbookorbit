@@ -98,7 +98,7 @@ void Database::exec(const char *sql, const QVariantList &values)
     sqlite3_finalize(statement);
 }
 
-// The text in a column of the current row
+// Text of a column in the current row
 static QString columnText(sqlite3_stmt *statement, int column)
 {
     return QString::fromUtf8(reinterpret_cast<const char *>(sqlite3_column_text(statement, column)),
@@ -176,7 +176,7 @@ void Database::removeBookFile(const QString &path)
 QStringList Database::bookFiles(int bookId) const
 {
     QStringList paths;
-    // In the order they were added
+    // In insertion order
     if (sqlite3_stmt *statement = prepare("SELECT path FROM book_files WHERE book_id = ? ORDER BY rowid", {bookId})) {
         while (sqlite3_step(statement) == SQLITE_ROW)
             paths.append(columnText(statement, 0));

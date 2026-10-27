@@ -1,30 +1,31 @@
 import QtQuick
 import "units.js" as Units
 
-// The menu for a book, after the system library's (screenshot 12). A row held for two
-// seconds is framed for a moment (BookRow's focused), then the window fades, all but that
-// row, and the menu opens to its right with an arrow pointing at it: level with the row
-// where it fits, otherwise moved up to stay on screen. A tap outside the menu closes it.
+// A book's menu, modelled on the system library's (screenshot 12). Holding a row for two
+// seconds frames it briefly (BookRow's focused), then everything but that row fades and the
+// menu opens to its right with an arrow pointing at it, level with the row if it fits or
+// moved up to stay on screen. Tapping outside closes it.
 //
-// For now: Book info, All books of author, All books of series (for a book in one), Delete
-// (for a book on the device) and Open with, which opens in place to list the apps the
-// system has for the book's format (screenshot 16). The system's menu also has Mark as
-// read, Add to collection, Add to Favorites and Select.
+// Items: Book info, All books of author, All books of series (if in one), Delete (if on the
+// device) and Open with, which expands in place to list the system's apps for the format
+// (screenshot 16). The system menu also has Mark as read, Add to collection, Add to
+// Favorites and Select.
 Item {
     id: bookMenu
-    // The book whose menu it is, as the book list has it
+    // The book's list entry
     property var book: ({})
-    // The row held, until the menu opens; null if it goes meanwhile (the list reloaded)
+    // The held row, until the menu opens; null if it went away meanwhile (the list
+    // reloaded)
     property BookRow heldRow: null
-    // The row and the list it is in, in this item's coordinates, when the menu opened
+    // The row and its list in this item's coordinates, captured when the menu opened
     property rect rowRect
     property rect listRect
 
     signal infoChosen(var book)
-    // field "author" or "series", values the names to look for, title for the page
+    // field is "author" or "series", values the names to match, title the page title
     signal booksOfChosen(string field, var values, string title)
     signal deleteChosen(var book)
-    // target as openWithTarget has it, app one of its apps
+    // target as in openWithTarget, app one of its apps
     signal openWithChosen(var target, var app)
 
     visible: false
@@ -70,7 +71,7 @@ Item {
         visible = true
     }
 
-    // The book's own record and any other versions of it (an audiobook kept apart)
+    // The book's own record plus any separately stored version (e.g. an audiobook)
     readonly property var bookIds: {
         const ids = book.id === undefined ? [] : [book.id]
         for (const variant of book.variants || []) {
@@ -83,9 +84,9 @@ Item {
     readonly property var authors: book.authors || []
     readonly property string series: book.seriesName || ""
 
-    // What Open with opens, and in what: the book's file of a format the system has apps
-    // for, {bookId, format, apps}, plus option (as DownloadDialog takes it) for a file
-    // that has to download first; null if there's none. A file on the device comes first.
+    // What Open with opens: {bookId, format, apps} for a file in a format the system has
+    // apps for, plus option (as DownloadDialog takes it) if it needs downloading first.
+    // Prefers a file already on the device. null if none.
     readonly property var openWithTarget: {
         if (book.id === undefined || downloads.revision < 0)
             return null
@@ -96,7 +97,7 @@ Item {
                     return { bookId: id, format: format, apps: apps }
             }
         }
-        // The files a download would fetch, as openBook() offers them
+        // Files a download would fetch, as openBook() offers them
         let options = book.variants || []
         if (options.length === 0) {
             const file = downloads.fileToDownload(book)
@@ -111,7 +112,7 @@ Item {
         }
         return null
     }
-    // Whether Open with is showing its apps
+    // Whether Open with is expanded
     property bool openWithOpen: false
 
     // The faded window
@@ -124,8 +125,8 @@ Item {
         }
     }
 
-    // The row, unfaded, over the fading where it is in the list; cut off where the list
-    // is. Tapping it closes the menu too.
+    // The row, unfaded, drawn over the fade where it sits in the list and clipped to the
+    // list. Tapping it also closes the menu.
     Item {
         x: bookMenu.listRect.x
         y: bookMenu.listRect.y
@@ -133,7 +134,7 @@ Item {
         height: bookMenu.listRect.height
         clip: true
 
-        // Only while open: a row needs a book
+        // Only while open, since a row needs a book
         Loader {
             x: bookMenu.rowRect.x - parent.x
             y: bookMenu.rowRect.y - parent.y
@@ -148,7 +149,7 @@ Item {
 
     PopupMenu {
         id: menu
-        // 596px wide and 48px from the screen's right edge, its top level with the row's
+        // Top level with the row
         width: Units.dp(274)
         x: parent.width - Units.dp(22) - width
         y: Math.max(bookMenu.listRect.y,
@@ -222,8 +223,8 @@ Item {
         }
     }
 
-    // The arrow: the theme's pointer laid over the menu's left border, its tip 16px out,
-    // level with the middle of the row, but never past the menu's rounded corners
+    // The arrow: the theme's pointer laid over the menu's left border, level with the row's
+    // middle but never past the rounded corners
     Image {
         id: pointer
         source: "image://theme/context_menu_pointer"

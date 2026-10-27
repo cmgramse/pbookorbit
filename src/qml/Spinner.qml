@@ -1,8 +1,8 @@
 import QtQuick
 
-// The system's loading spinner (theme icons loading_icon_1 to 9), centred where a list's
-// rows would be: below its header (the sub-toolbar), down to its bottom. Goes beside the
-// list, in the same parent. It turns only while visible.
+// The system loading spinner (theme icons loading_icon_1 to 9), centred in the list's row
+// area, from below its header (the sub-toolbar) to its bottom. Place beside the list in the
+// same parent. Only turns while visible.
 Item {
     id: spinner
     property ListView list

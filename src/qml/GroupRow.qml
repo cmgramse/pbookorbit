@@ -2,33 +2,29 @@ import QtQuick
 import "units.js" as Units
 import "night.js" as Night
 
-// One group of books, a collection or a series, in the Collections or Series list, laid
-// out like a book row (BookRow): where the cover goes, a stack of two of its books' covers,
-// the second smaller and behind, with a collection's icon in a white disc over the middle;
-// then its name in the title's place,
-// and its books' authors, in order of surname and cut short with an ellipsis, with their
-// formats in small capitals at the right; then how many books it has, in italics where a
-// book's status goes. The first row of a section (a letter, when sorted by name) carries
-// the letter in a floating square at its left edge, as a book row does. A black line runs
-// under each row. Tapping the row sends clicked().
-// An author's row (in the Authors list) has their photo where the cover goes, or their
-// initials without one (AuthorPortrait), their name in the title's place, just their books'
-// formats on the line below, and how many books they have and how many series those are in,
-// "6 books | 2 series".
+// One collection or series row in the Collections or Series list, laid out like BookRow: a
+// stack of two covers (the second smaller and behind, with a collection's icon in a white
+// disc over the middle), then the name, then the authors by surname (elided) with their
+// formats in small capitals at the right, then the book count in italics. A section's first
+// row has its letter in a floating square at the left edge, as in BookRow. A black line
+// runs under each row. Tapping sends clicked().
+//
+// An author row (Authors list) shows their photo, or initials if there's none
+// (AuthorPortrait), their name, their books' formats, and book and series counts, e.g. "6
+// books | 2 series".
 Item {
     id: row
-    // A row of bookOrbit.collections, seriesList or authorsList
+    // A row from bookOrbit.collections, seriesList or authorsList
     property var group
     signal clicked()
 
-    // As in BookRow, measured in device pixels on the Era Color (2.175px per dp)
-    readonly property int rowHeight: Units.dp(83)              // 180px
-    readonly property int lineLeft: Units.dp(26)               // 57px
-    readonly property int contentLeft: Units.dp(33)            // 71px
+    readonly property int rowHeight: Units.dp(83)
+    readonly property int lineLeft: Units.dp(26)
+    readonly property int contentLeft: Units.dp(33)
     readonly property int contentRight: width - contentLeft
-    readonly property int coverWidth: Units.dp(43)             // 94x142px, 2:3
+    readonly property int coverWidth: Units.dp(43)             // 2:3
     readonly property int coverHeight: Units.dp(65)
-    // The front cover, and the one behind it: smaller, so both fit where one cover goes
+    // Front cover and the smaller one behind it, so both fit in one cover's space
     readonly property int frontWidth: Math.round(coverWidth * 0.86)
     readonly property int frontHeight: Math.round(coverHeight * 0.86)
     readonly property int backWidth: Math.round(coverWidth * 0.74)
@@ -44,16 +40,16 @@ Item {
         onClicked: row.clicked()
     }
 
-    // A cover shrunk to fit width x height, set in its corner of the stack; the system's
-    // blank book while it downloads
+    // A cover scaled to fit width x height, in its corner of the stack. Shows the system's
+    // blank book while downloading.
     component StackCover: Item {
         id: stackCover
         property var book
         property int boxWidth
         property int boxHeight
-        // Which corner it sits in: the front cover bottom left, the one behind top right
+        // Corner: front cover bottom left, back cover top right
         property bool front: true
-        // The cover's own size, once it has loaded
+        // The cover's natural size, once loaded
         readonly property real coverWidth: image.status === Image.Ready ? image.implicitWidth : boxWidth
         readonly property real coverHeight: image.status === Image.Ready ? image.implicitHeight : boxHeight
 
@@ -62,8 +58,8 @@ Item {
         width: coverWidth
         height: coverHeight
 
-        // Bumped when a download arrives, to ask again; a binding rather than setting url,
-        // so a row that changes to another group (when the list is sorted) follows it
+        // Bumped when a download arrives so the URL is re-fetched. A binding rather than
+        // setting url, so the row follows a re-sorted list.
         property int revision: 0
         property string url: revision >= 0 && book.id !== undefined
                              ? covers.source(book.id, book.coverVersion, boxWidth, boxHeight) : ""
@@ -74,14 +70,14 @@ Item {
                     stackCover.revision++
             }
         }
-        // A white edge round the front cover parts it from the one behind
+        // A white edge separates the front cover from the one behind
         Rectangle {
             visible: stackCover.front
             anchors.fill: parent
             anchors.margins: -2
             color: "white"
         }
-        // Opaque, so it hides the cover behind
+        // Opaque, to hide the cover behind
         CoverPlaceholder {
             visible: image.status !== Image.Ready
         }
@@ -112,7 +108,7 @@ Item {
             boxWidth: row.frontWidth
             boxHeight: row.frontHeight
         }
-        // No covers (yet): an outline where they go
+        // No covers (yet): an outline in their place
         Rectangle {
             anchors.fill: parent
             visible: row.stackBooks.length === 0 && !row.isAuthor
@@ -120,7 +116,7 @@ Item {
             border.color: "#cccccc"
         }
 
-        // An author's photo, or their initials, 3:4 and as wide as a cover, centred
+        // Author photo or initials, 3:4, as wide as a cover, centred
         AuthorPortrait {
             visible: row.isAuthor
             anchors.centerIn: parent
@@ -130,11 +126,10 @@ Item {
         }
     }
 
-    // Name, authors and book count, on the same baselines as a book's title, author and
-    // status (52, 107 and 159px below the row's top)
+    // Name, authors and count on the same baselines as a book's title, author and status
     Item {
         id: texts
-        x: stack.x + stack.width + Units.dp(12)                 // 26px after the stack
+        x: stack.x + stack.width + Units.dp(12)
         width: row.contentRight - x - Units.dp(4)
         height: row.height
 
@@ -149,20 +144,20 @@ Item {
         Text {
             id: authors
             y: Units.dp(49) - baselineOffset
-            // Leave room for the formats at the right
+            // Leave room for the formats on the right
             width: parent.width - (formats.width > 0 ? formats.width + Units.dp(12) : 0)
             text: (row.group.authors || []).join(", ")
             font.pointSize: 7.25
             elide: Text.ElideRight
         }
-        // How many books, and for an author how many series, split as a book row's status
-        // and series are, by an upright grey bar
+        // Book count, and series count for authors, split by an upright grey bar like a
+        // book row's status and series
         Row {
             id: counts
             width: parent.width
             spacing: Units.dp(13)
             readonly property int books: row.group.bookCount || 0
-            // An author's series, once their books are in
+            // An author's series, once their books have loaded
             readonly property int series: row.isAuthor && row.group.seriesCount !== undefined ? row.group.seriesCount : 0
 
             Text {
@@ -190,7 +185,7 @@ Item {
                 elide: Text.ElideRight
             }
         }
-        // The formats, centred on the author line: "EPUB  AZW3  M4B"
+        // Formats, centred on the author line: "EPUB  AZW3  M4B"
         Row {
             id: formats
             anchors.right: parent.right
@@ -210,13 +205,13 @@ Item {
         }
     }
 
-    // Section letter: a floating square at the top left, over the stack's corner
+    // Section letter: a floating square at top left, over the stack's corner
     Rectangle {
         z: 1
         visible: row.group.sectionStart === true
         x: 0
         y: 0
-        width: Units.dp(35)                                     // 76px
+        width: Units.dp(35)
         height: width
         border.width: 1
         border.color: "black"
@@ -229,7 +224,7 @@ Item {
         }
     }
 
-    // Line under the row, 1px black, as under a book row
+    // 1px black line under the row, as under a book row
     Rectangle {
         anchors.bottom: parent.bottom
         x: row.lineLeft

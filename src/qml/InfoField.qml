@@ -1,11 +1,11 @@
 import QtQuick
 import "units.js" as Units
 
-// One field of an info page (BookInfoPage, AuthorInfoPage): a bold label over its value
-// and a grey line under them; nothing when there is no value. A tappable field has a
-// chevron at its right, is inverted while pressed, as InfoCells' cells are, and sends
-// clicked(). A link field (a web address) underlines its value instead, and only the
-// value's text is tapped, inverted while pressed; it sends linkClicked().
+// One field on an info page (BookInfoPage, AuthorInfoPage): bold label over value with a
+// grey line below; nothing if there's no value. A tappable field has a chevron on the
+// right, inverts while pressed like InfoCells' cells, and sends clicked(). A link field
+// (web address) underlines its value instead; only the text is tappable, inverting while
+// pressed, and it sends linkClicked().
 Item {
     id: field
     property string label
@@ -19,8 +19,7 @@ Item {
     visible: value !== ""
     implicitHeight: column.height
 
-    // Pressed: black from the line above (the previous field's, halfway down its gap) to
-    // its own
+    // Pressed fill: black from the line above (halfway down the gap) to its own
     Rectangle {
         visible: mouse.pressed
         y: -Units.dp(9) + 1
@@ -29,7 +28,7 @@ Item {
         color: "black"
     }
 
-    // A link's text, black behind it while pressed
+    // Link text, with a black background while pressed
     Rectangle {
         visible: linkMouse.pressed
         x: valueText.x
@@ -59,12 +58,11 @@ Item {
             text: field.value
             color: mouse.pressed || linkMouse.pressed ? "white" : "black"
             font.underline: field.link
-            // Descriptions come as HTML
+            // Descriptions are HTML
             textFormat: field.richText ? Text.RichText : Text.PlainText
             font.pointSize: 8
             wrapMode: Text.Wrap
         }
-        // 21px under the value, then 61px to the next label's baseline
         Item {
             width: parent.width
             height: Units.dp(18)

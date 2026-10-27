@@ -1,29 +1,28 @@
 import QtQuick
 import "units.js" as Units
 
-// The Collections or Series view: groups of books (bookOrbit.collections or seriesList),
-// one GroupRow each, under a sub-toolbar with just the sort button, with a jump rail when
-// sorted by name. Goes between the header and the footer; main.qml owns the sort menu, as
-// it does the library's.
+// The Collections or Series view: one GroupRow per group (bookOrbit.collections or
+// seriesList) under a sort-only sub-toolbar, with a jump rail when sorted by name. Sits
+// between the header and footer; main.qml owns the sort menu, as for the library.
 Item {
     id: page
-    // For the device's page-turn keys, which main.qml sends to the page in front
+    // For the page-turn keys, which main.qml forwards to the front page
     readonly property alias pageButtons: pageButtons
     property string sortText
     property bool sortReversed: false
     property bool sortOpen: false
-    // The authors also have the library's filter
+    // Authors also have the library's filter
     property bool hasFilter: false
     property string filterText
     property bool filterOpen: false
     property int tabOverhang: Units.dp(4)
-    // Z to A when the sort is turned round
+    // Z to A when the sort is reversed
     property bool descending: false
-    // Where the jump rail's first entry goes, in the page's coordinates, and its spacing
+    // Y of the jump rail's first entry (page coordinates) and its spacing
     property real jumpRailTop: NaN
     property real jumpRailPitch: NaN
-    // The groups' model and letters to jump to, whether they have been listed, and what to
-    // say when there are none
+    // The model and jump sections, whether they've loaded, and the text to show when there
+    // are none
     property var model
     property var jumpSections: []
     property bool loaded: false
@@ -42,10 +41,11 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         model: page.model
 
-        // The rows are all there at once: nothing to load. The jump rail calls this.
+        // All rows are present at once, so there's nothing to load. Called by the jump
+        // rail.
         function loadVisibleBooks() {}
 
-        // The sort bar and any status line scroll away with the rows, as in the library
+        // The sort bar and any status line scroll with the rows, as in the library
         header: Column {
             width: ListView.view.width
             bottomPadding: status.visible ? Units.dp(8) : 0
@@ -75,7 +75,7 @@ Item {
             }
         }
 
-        // Fast black-and-white updates while it scrolls, as in the library list
+        // Fast black-and-white updates while scrolling, as in the library list
         onMovementStarted: {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)

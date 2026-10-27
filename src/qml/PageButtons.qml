@@ -1,27 +1,26 @@
 import QtQuick
 import "units.js" as Units
 
-// Page buttons over the bottom corners of a list, or of an info page's Flickable, as in the
-// system library (screenshot 9): up on the left, down on the right, each scrolling it by a
-// screenful. Paging suits
-// e-ink better than flicking: one clean redraw per page. The buttons are half-white, fading
-// the rows behind them (black shows as 128 grey in the screenshot), with a 1px line along
-// the top and the inner side, rounded where they meet. Goes in the list's parent with its
-// bottom on the list's bottom; between the buttons taps reach the list.
+// Page buttons over the bottom corners of a list or an info page's Flickable, as in the
+// system library (screenshot 9): up on the left, down on the right, each scrolling a
+// screenful. Paging suits e-ink better than flicking, with one clean redraw per page. The
+// buttons are half-white, fading the rows behind (black shows as 128 grey), with a 1px line
+// along the top and inner side, rounded where they meet. Place in the list's parent with
+// its bottom on the list's bottom; taps between the buttons reach the list.
 Item {
     id: buttons
     property Flickable list
 
-    // Each page keeps this much of the last one, the strip the buttons sat over
+    // Each page overlaps the previous by this much, the strip under the buttons
     readonly property int overlap: height
 
     visible: list.visible && list.contentHeight > list.height
     width: parent.width
-    height: Units.dp(57)   // 124px
+    height: Units.dp(57)
 
-    // A ListView's origin moves as it lays out rows it hadn't measured, so a page reaching
-    // either end goes to that end the ListView's own way rather than to a computed position.
-    // An info page's Flickable has fixed ends, so it goes straight to them.
+    // A ListView's origin shifts as it lays out unmeasured rows, so paging into either end
+    // uses the ListView's own positioning instead of a computed one. An info page's
+    // Flickable has fixed ends, so it goes straight there.
     function page(direction) {
         const top = list.originY
         const bottom = list.originY + list.contentHeight - list.height
@@ -44,14 +43,14 @@ Item {
 
     component PageButton: Item {
         id: button
-        // The inner side, which has the line and the rounded corner
+        // Inner side, with the line and rounded corner
         property bool innerLeft
         property alias icon: image.source
         signal clicked()
 
-        width: Units.dp(84)   // 182px
+        width: Units.dp(84)
         height: parent.height
-        // The outer side and the bottom have no line
+        // No line on the outer side or bottom
         clip: true
 
         Rectangle {
@@ -59,7 +58,7 @@ Item {
             x: button.innerLeft ? 0 : -hidden
             width: button.width + hidden
             height: button.height + hidden
-            radius: Units.dp(6)   // 12px
+            radius: Units.dp(6)
             color: Qt.rgba(1, 1, 1, 0.5)
             border.width: 1
             border.color: "black"

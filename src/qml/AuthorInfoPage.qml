@@ -1,20 +1,19 @@
 import QtQuick
 import "units.js" as Units
 
-// An author's details, opened from their row in the Authors list, laid out like the book
-// info page (BookInfoPage): their photo (or initials) where the cover goes, with their
-// name, born, died, genres and website (which opens in the browser) beside it, then a row
-// of BOOKS, SERIES and FORMAT, whose BOOKS and SERIES open their books and their series,
-// and then what BookOrbit says about them. The details beyond the list's row are fetched when the page opens; offline
-// they just don't appear. The whole page scrolls when the description is long, with page
-// buttons as the lists have.
+// An author's details, opened from the Authors list and laid out like BookInfoPage: photo
+// (or initials) in the cover's place, with name, born, died, genres and website (opens in
+// the browser) beside it, then BOOKS, SERIES and FORMAT (BOOKS and SERIES link to them),
+// then BookOrbit's description. Details beyond the list row are fetched on open and simply
+// missing offline. The page scrolls when the description is long, with page buttons like
+// the lists.
 Rectangle {
     id: page
     color: "white"
 
-    // The author's row of the Authors list, as loaded (bookOrbit.authorRow)
+    // The author's unfiltered Authors list row (bookOrbit.authorRow)
     property var author: ({})
-    // GET /authors/:id, once it arrives
+    // GET /authors/:id, once loaded
     property var details: ({})
 
     readonly property alias pageButtons: pageButtons
@@ -36,14 +35,14 @@ Rectangle {
             if (authorId === page.author.id)
                 page.details = newDetails
         }
-        // Their books' formats and series come in after the list
+        // Formats and series arrive after the list
         function onAuthorsChanged() {
             if (page.visible && page.author.id !== undefined)
                 page.author = bookOrbit.authorRow(page.author.id)
         }
     }
 
-    // How many series their books are in, -1 until they have been looked up, and which
+    // Number of series their books are in (-1 until looked up), and which ones
     readonly property int seriesCount: author.seriesCount === undefined ? -1 : author.seriesCount
     readonly property var seriesNames: {
         const names = []
@@ -75,10 +74,10 @@ Rectangle {
         width: parent.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        // Room at the end to scroll the last of it clear of the page buttons
+        // Room at the end to scroll the last line clear of the page buttons
         contentHeight: column.height + Units.dp(26) + pageButtons.height
 
-        // Fast black-and-white updates while it scrolls, as in the book lists
+        // Fast black-and-white updates while scrolling, as in the book lists
         onMovementStarted: {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
@@ -88,18 +87,17 @@ Rectangle {
 
         Column {
             id: column
-            // As the book info page: 57px margins, the photo 44px below the toolbar
+            // Same margins and photo position as the book info page
             x: Units.dp(26)
             y: Units.dp(20)
             width: parent.width - 2 * x
 
-            // Photo and the main fields beside it
+            // Photo with the main fields beside it
             Item {
                 width: parent.width
                 height: Math.max(photoBox.height, fields.height)
 
-                // Where a book's cover goes, as wide, but 3:4, which crops less of most
-                // photos than a cover's 2:3
+                // Cover width but 3:4, which crops most photos less than a cover's 2:3
                 AuthorPortrait {
                     id: photoBox
                     width: Units.dp(197)
@@ -107,7 +105,6 @@ Rectangle {
                     author: page.author
                 }
 
-                // 32px after the photo
                 Column {
                     id: fields
                     x: photoBox.width + Units.dp(15)
@@ -126,7 +123,7 @@ Rectangle {
                             width: fields.width
                             label: modelData[0]
                             value: modelData[1]
-                            // The website opens in the system's browser
+                            // Opens in the system browser
                             link: modelData[0] === "Website" && browser.available
                             onLinkClicked: browser.open(value)
                         }
@@ -134,12 +131,12 @@ Rectangle {
                 }
             }
 
-            Item { width: 1; height: Units.dp(17) }   // 36px below the photo
+            Item { width: 1; height: Units.dp(17) }   // space below the photo
 
-            // BOOKS, SERIES, FORMAT, of all their books whatever the list's filter: an ebook
-            // and its audiobook count once, as in their book list, once looked up. BOOKS and
-            // SERIES go to them, as the book menu's "All books of" items do; SERIES only if
-            // they have any.
+            // BOOKS, SERIES and FORMAT across all their books, ignoring the list filter. An
+            // ebook and its audiobook count once, as in their book list. BOOKS and SERIES
+            // link through, like the book menu's "All books of" items; SERIES only if there
+            // are any.
             InfoCells {
                 width: parent.width
                 cells: [
@@ -149,15 +146,16 @@ Rectangle {
                 ]
                 onCellClicked: (index) => index === 0 ? page.booksClicked() : page.seriesClicked()
             }
-            // A little more room under the cells than between fields, as on the book info page
+            // A little more space under the cells than between fields, as on the book info
+            // page
             Item { width: 1; height: Units.dp(16) }
 
             InfoField {
                 width: parent.width
                 label: "Description"
                 value: page.details.description || ""
-                // HTML from some sources, plain text from others (whose line breaks would
-                // be lost as HTML)
+                // HTML from some sources, plain text from others (whose line breaks HTML
+                // would drop)
                 richText: /<[a-z][^>]*>/i.test(value)
                 showLine: false
             }

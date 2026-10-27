@@ -1,10 +1,10 @@
 import QtQuick
 
-// One view's sort and filter, as its sub-toolbar and menus choose them: the library's,
-// the collections', a collection's books'. applied() follows each change, once a new sort
-// and its direction have both settled.
+// One view's sort and filter, as chosen in its sub-toolbar menus (library, collections, a
+// collection's books). Emits applied() after each change, once the sort and its direction
+// have both settled.
 QtObject {
-    // The sorts' names, their BookOrbit sort fields, and each one's usual direction
+    // Sort names, their BookOrbit sort fields, and each one's default direction
     property var sortOptions: []
     property var sortFields: []
     property var sortDescendingByDefault: []
@@ -14,19 +14,19 @@ QtObject {
     property int sortIndex: 0
     property bool sortReversed: false
     property int filterIndex: 0
-    // Only the books on the device, along with the content type
+    // Only books on the device, combined with the content type
     property bool downloadedOnly: false
 
     readonly property bool sortDescending: sortDescendingByDefault[sortIndex] !== sortReversed
 
     signal applied()
 
-    // Worked out here rather than read from sortDescending: when the sort and sortReversed
-    // change together, that binding may not have caught up yet
+    // Computed here rather than read from sortDescending, which may lag when the sort and
+    // sortReversed change together
     function descending() {
         return sortDescendingByDefault[sortIndex] !== sortReversed
     }
-    // Another sort starts the usual way round
+    // A different sort starts in its default direction
     function chooseSort(index) {
         if (index === sortIndex)
             return

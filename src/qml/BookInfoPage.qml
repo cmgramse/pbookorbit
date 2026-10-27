@@ -3,27 +3,27 @@ import "units.js" as Units
 import "night.js" as Night
 
 // A book's details, laid out like the system library's Book info page (screenshot 11):
-// the cover at the left with title, author, series and the file on the device beside it,
-// then a row of ADDED, SIZE and FORMAT. Author and series go to all their books, as the
-// book menu's "All books of" items do. Below those come what BookOrbit knows besides
-// (published, pages or an audiobook's length, language, description), fetched when the
-// page opens; offline they just don't appear. The whole page scrolls when the
-// description is long, with page buttons as the lists have.
+// cover on the left with title, author, series and file path beside it, then ADDED, SIZE
+// and FORMAT. Author and series link to all their books, like the book menu's "All books
+// of" items. Below that come the extra details from BookOrbit (published, pages or length,
+// language, description), fetched on open and simply missing offline. The page scrolls when
+// the description is long, with page buttons like the lists.
 //
 // The system's page also has a favourite heart and a CHOOSE ACTION button.
 Rectangle {
     id: page
     color: "white"
 
-    // The book as the list has it
+    // The book's list entry
     property var book: ({})
-    // GET /books/:id, once it arrives
+    // GET /books/:id, once loaded
     property var details: ({})
 
     readonly property alias pageButtons: pageButtons
 
     signal back()
-    // As BookMenu's: "author" or "series", the names to match and the page's title
+    // Same as BookMenu's: field "author" or "series", the names to match, and the page
+    // title
     signal booksOfChosen(string field, var values, string title)
 
     function show(newBook) {
@@ -48,7 +48,7 @@ Rectangle {
              : Math.max(1, Math.round(bytes / 1024)) + " KB"
     }
 
-    // "13 h 56 min", "45 min"; "" without one
+    // "13 h 56 min", "45 min", or "" if unknown
     function durationText(seconds) {
         if (!seconds)
             return ""
@@ -57,7 +57,7 @@ Rectangle {
         return hours > 0 ? hours + " h " + (minutes % 60) + " min" : minutes + " min"
     }
 
-    // Its records: its own, and any other version of it (an audiobook kept apart)
+    // Its own record plus any separately stored version (e.g. an audiobook)
     readonly property var records: {
         const records = book.id === undefined ? [] : [book]
         for (const variant of book.variants || []) {
@@ -66,7 +66,7 @@ Rectangle {
         }
         return records
     }
-    // Their book files, one for each format, as the row lists them: [{format, sizeBytes}]
+    // One file per format, in the row's order: [{format, sizeBytes}]
     readonly property var files: {
         const files = []
         for (const record of records) {
@@ -79,7 +79,8 @@ Rectangle {
         }
         return files
     }
-    // Its files on the device, as the system shows them: "Internal memory/Books/Dune.epub"
+    // Files on the device, shown as the system shows them: "Internal
+    // memory/Books/Dune.epub"
     readonly property var devicePaths: {
         if (downloads.revision < 0)
             return []
@@ -103,10 +104,10 @@ Rectangle {
         width: parent.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        // Room at the end to scroll the last of it clear of the page buttons
+        // Room at the end to scroll the last line clear of the page buttons
         contentHeight: column.height + Units.dp(26) + pageButtons.height
 
-        // Fast black-and-white updates while it scrolls, as in the book lists
+        // Fast black-and-white updates while scrolling, as in the book lists
         onMovementStarted: {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
@@ -116,25 +117,25 @@ Rectangle {
 
         Column {
             id: column
-            // 57px margins, the cover 44px below the toolbar
+            // Margins and cover position as on the system's Book info page
             x: Units.dp(26)
             y: Units.dp(20)
             width: parent.width - 2 * x
 
-            // Cover and the main fields beside it
+            // Cover with the main fields beside it
             Item {
                 width: parent.width
                 height: Math.max(cover.height, fields.height)
 
-                // 429x645px, the cover shrunk to fit; the system's blank book while it
-                // downloads or if there isn't one
+                // Scaled to fit. Shows the system's blank book while downloading or if
+                // there's none.
                 Item {
                     id: cover
                     width: Units.dp(197)
                     height: Units.dp(297)
 
-                    // Bumped when the download arrives, to ask again; a binding rather than
-                    // setting url, so the page follows the next book it shows
+                    // Bumped when the download arrives so the URL is re-fetched. A binding
+                    // rather than setting url, so it follows the next book shown.
                     property int revision: 0
                     property string url: revision >= 0 && page.book.hasCover
                                          ? covers.source(page.book.id, page.book.coverVersion, width, height) : ""
@@ -160,13 +161,12 @@ Rectangle {
                     }
                 }
 
-                // 32px after the cover
                 Column {
                     id: fields
                     x: cover.width + Units.dp(15)
                     width: parent.width - x
 
-                    // Label, value, and for a link the field and names to go to
+                    // Label and value, plus the field and names for links
                     Repeater {
                         model: [
                             ["Title", page.book.title || ""],
@@ -188,19 +188,19 @@ Rectangle {
                 }
             }
 
-            Item { width: 1; height: Units.dp(17) }   // 36px below the cover
+            Item { width: 1; height: Units.dp(17) }   // space below the cover
 
             // ADDED, SIZE, FORMAT
             InfoCells {
                 width: parent.width
                 cells: [
                     ["Added", page.book.addedAt ? Qt.formatDateTime(new Date(page.book.addedAt), "dd/MM/yy hh:mm") : ""],
-                    // Each format's size, in the same order
+                    // Size per format, in the same order
                     ["Size", page.files.map(f => page.sizeText(f.sizeBytes)).join(", ")],
                     ["Format", page.files.map(f => f.format.toUpperCase()).join(", ")],
                 ]
             }
-            // From the book's details, once they arrive
+            // From the book's details, once loaded
             InfoCells {
                 width: parent.width
                 showTopLine: false
@@ -208,15 +208,15 @@ Rectangle {
                     ["Published", page.details.publishedDate
                                   ? Qt.formatDate(new Date(page.details.publishedDate), "dd/MM/yyyy")
                                   : (page.details.publishedYear || "").toString()],
-                    // An audiobook has no pages, but a length
+                    // Audiobooks have a length instead of pages
                     page.details.pageCount || !page.details.audioMetadata
                         ? ["Pages", (page.details.pageCount || "").toString()]
                         : ["Length", page.durationText(page.details.audioMetadata.durationSeconds)],
                     ["Language", page.details.language || ""],
                 ]
             }
-            // A little more room under the cells than between fields, to set the fields
-            // below apart from them
+            // A little more space under the cells than between fields, to separate the
+            // sections
             Item { width: 1; height: Units.dp(16) }
 
             InfoField {

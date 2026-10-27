@@ -1,11 +1,10 @@
 import QtQuick
 import "units.js" as Units
 
-// Top toolbar: home button, title, optional search and menu buttons, and a 1px line
-// underneath. As in the system apps, home leaves the app for the dashboard; the title
-// can be tapped too. Tapping it six times in quick succession is secretTapped().
-// Follows AppHeader.qml in the SDK's qml_test example: theme icons at their own size,
-// dp(15) from the edges. Taller than dp(56) if the theme's icons are.
+// Top toolbar: home button, title, optional search and menu buttons, and a 1px line below.
+// As in the system apps, home goes to the dashboard. The title is tappable too; six quick
+// taps emit secretTapped(). Follows AppHeader.qml from the SDK's qml_test: theme icons at
+// natural size, dp(15) from the edges. Taller than dp(56) if the theme's icons are.
 Rectangle {
     id: header
     property alias title: titleText.text
@@ -38,22 +37,22 @@ Rectangle {
         id: titleText
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -separator.height / 2
-        // Centred on the header, so leave the wider of the two sides' buttons free on both
+        // Centred, so reserve the wider side's button width on both sides
         width: parent.width - 2 * (header.margin + Math.max(homeButton.width, rightButtons.width))
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        // So part of the title can be coloured: <font color="...">
+        // Lets part of the title be coloured with <font color="...">
         textFormat: Text.StyledText
         font.pointSize: 8
         font.capitalization: Font.AllUppercase
 
-        // The toolbar's full height, across the title's width
+        // Full toolbar height, across the title's width
         MouseArea {
             width: parent.width
             height: header.height - separator.height
             anchors.centerIn: parent
-            // Counts presses: Qt can take the second of two quick taps as a double click
-            // and not report it as a click
+            // Counts presses, since Qt may report the second of two quick taps as a double
+            // click rather than a click
             onPressed: {
                 tapTimer.taps++
                 tapTimer.restart()
@@ -64,7 +63,7 @@ Rectangle {
             }
             onClicked: header.titleClicked()
         }
-        // The taps start counting again after a pause
+        // Reset the count after a pause
         Timer {
             id: tapTimer
             property int taps: 0
@@ -90,7 +89,8 @@ Rectangle {
         IconButton {
             id: menuButton
             visible: header.showMenu
-            // bw_menu_close_b is the inverted look: shown while pressed and while the menu is open
+            // bw_menu_close_b is the inverted look, shown while pressed or while the menu
+            // is open
             icon: header.menuOpen ? "bw_menu_close_b" : "bw_menu_open_b"
             pressedIcon: "bw_menu_close_b"
             fallbackText: "Menu"

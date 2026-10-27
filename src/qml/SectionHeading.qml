@@ -1,7 +1,7 @@
 import QtQuick
 
-// Heading for a section of a page. PocketBook's own apps put headings and calls to action
-// (buttons) in capitals; menu items, links and content stay as written.
+// Section heading on a page. PocketBook's apps capitalise headings and calls to action
+// (buttons); menu items, links and content keep their case.
 Text {
     font.pointSize: 10
     font.bold: true

@@ -1,9 +1,9 @@
 import QtQuick
 import "units.js" as Units
 
-// Toolbar of a page opened over the book list, after the system library's Book info page
-// (screenshot 11): a back chevron at the left, the title centred in capitals, e.g.
-// "BOOK INFO / 99 BOTTLES OF OOP", and a 1px line underneath.
+// Toolbar for pages opened over the book list, modelled on the system library's Book info
+// page (screenshot 11): back chevron on the left, centred capitalised title (e.g. "BOOK
+// INFO / 99 BOTTLES OF OOP"), and a 1px line below.
 Rectangle {
     id: header
     property alias title: titleText.text
@@ -14,7 +14,7 @@ Rectangle {
 
     IconButton {
         id: backButton
-        // Where the search page has it
+        // Same position as on the search page
         x: Units.dp(7)
         anchors.verticalCenter: parent.verticalCenter
         icon: "back"
@@ -26,7 +26,7 @@ Rectangle {
     Text {
         id: titleText
         anchors.centerIn: parent
-        // Centred on the header, so leave the back button's width free on both sides
+        // Centred, so reserve the back button's width on both sides
         width: parent.width - 2 * (backButton.x + backButton.width)
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight

@@ -1,18 +1,17 @@
 import QtQuick
 import "units.js" as Units
 
-// Three cells side by side on an info page (BookInfoPage, AuthorInfoPage), a grey capital
-// label over each value, split by grey lines; cells without a value are left blank, and
-// the row goes if all of them are. A cell given a third entry, true, can be tapped: it
-// has a chevron at its right, is inverted while pressed, as buttons are, and sends
-// cellClicked(index).
+// Three cells side by side on an info page (BookInfoPage, AuthorInfoPage): grey capital
+// labels over values, separated by grey lines. Empty cells are blank, and the row is hidden
+// if all are. A cell with a third entry, true, is tappable: it has a chevron on the right,
+// inverts while pressed like buttons, and sends cellClicked(index).
 Item {
     id: cellRow
     property var cells: []
     property bool showTopLine: true
     signal cellClicked(int index)
     visible: cells.some(cell => cell[1] !== "")
-    height: visible ? Units.dp(82) : 0     // 969 to 1148px
+    height: visible ? Units.dp(82) : 0
 
     Rectangle {
         visible: cellRow.showTopLine
@@ -32,7 +31,7 @@ Item {
                 width: cellRow.width / 3
                 height: cellRow.height
 
-                // Pressed: black, between the lines
+                // Pressed: black between the lines
                 Rectangle {
                     visible: mouse.pressed
                     x: index > 0 ? 1 : 0
@@ -42,7 +41,8 @@ Item {
                     color: "black"
                 }
 
-                // Line before every cell but the first, short of the row's top and bottom
+                // Divider before every cell but the first, short of the row's top and
+                // bottom
                 Rectangle {
                     visible: index > 0
                     y: Units.dp(13)
@@ -72,9 +72,9 @@ Item {
                         elide: Text.ElideRight
                     }
                 }
-                // The toolbar's back chevron, turned to point right: the theme has no
-                // forward one that size. Its own padding keeps it off the cell's edge; its
-                // back_inv is a disc, so pressed it is the plain one inverted.
+                // The toolbar's back chevron turned to point right, since the theme has no
+                // forward one this size. Its padding keeps it off the edge. Its back_inv is
+                // a disc, so the pressed state just inverts the plain one.
                 Image {
                     id: chevron
                     visible: cell.tappable

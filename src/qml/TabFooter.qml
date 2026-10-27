@@ -1,9 +1,9 @@
 import QtQuick
 import "units.js" as Units
 
-// Footer for switching between views, after the Libby app on an Era Color: a full-width
-// line, then equal tabs (inset 33px from the sides), each a theme icon over its label.
-// The current tab's label sits in a black pill.
+// Footer for switching views, modelled on Libby on an Era Color: a full-width line, then
+// equal tabs (inset from the sides), each a theme icon over a label. The current tab's
+// label sits in a black pill.
 Rectangle {
     id: footer
     // [{ label: "Library", icon: "overdrive_library" }, ...]
@@ -46,7 +46,6 @@ Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         source: "image://theme/" + tab.modelData.icon
                     }
-                    // 143x47px pill for "Library"
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: label.implicitWidth + 2 * Units.dp(12)

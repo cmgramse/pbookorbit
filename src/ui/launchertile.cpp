@@ -17,20 +17,20 @@
 namespace {
 
 const QString TITLE = "PBookOrbit";
-// The app's key in view.json's "applications" and in its groups' "apps" lists. The
-// firmware's comment in the file: user apps' keys must start with "U_".
+// The app's key in view.json's "applications" and its groups' "apps" lists. The firmware's
+// comment in the file says user apps' keys must start with "U_".
 const QString ENTRY = "U_pbookorbit";
 
 const QString VIEW_FILE = CONFIGPATH "/desktop/view.json";
-// view.json as it was before the app first changed it, kept for putting things back
+// The original view.json, kept so it can be restored
 const QString VIEW_BACKUP = CONFIGPATH "/desktop/view.json.before-pbookorbit";
-// Where the user can find them to change them
+// Somewhere the user can find and replace them
 const QString ICON_DIR = FLASHDIR "/applications/icons";
 const QString ICON_FILE = ICON_DIR + "/pbookorbit.bmp";
 const QString FOCUSED_ICON_FILE = ICON_DIR + "/pbookorbit_f.bmp";
 
-// Saved whole or not at all: the launcher shows no picture for a broken icon, and might
-// not start with a broken view.json
+// Written atomically: the launcher shows nothing for a broken icon, and might not start
+// with a broken view.json
 bool save(const QString &path, const QByteArray &bytes)
 {
     QSaveFile file(path);
@@ -40,7 +40,7 @@ bool save(const QString &path, const QByteArray &bytes)
     return false;
 }
 
-// Only when it isn't there: the user may have drawn their own
+// Only if missing, since the user may have replaced it
 bool saveIfMissing(const QString &path, const QString &resource)
 {
     if (QFile::exists(path))
@@ -49,11 +49,11 @@ bool saveIfMissing(const QString &path, const QString &resource)
     return source.open(QIODevice::ReadOnly) && save(path, source.readAll());
 }
 
-// Paths in view.json: the app's absolute, the icons as "object paths", relative to the
-// storage's root (the firmware's comment in the file explains both)
+// view.json paths: the app's is absolute, the icons are "object paths" relative to the
+// storage root (the firmware's comment in the file explains both)
 QJsonObject launcherEntry()
 {
-    // Absolute first: the emulator's paths are relative to where it runs
+    // Make absolute first, since the emulator's paths are relative to its working directory
     const QDir storage(QDir(FLASHDIR).absolutePath());
     const auto fromStorage = [&](const QString &file) {
         return QJsonObject{{"path", storage.relativeFilePath(QDir(file).absolutePath())}};
@@ -66,7 +66,7 @@ QJsonObject launcherEntry()
     };
 }
 
-// True if this added the tile, rather than finding it there or only updating it
+// True if this added the tile, as opposed to finding or updating it
 bool addToView()
 {
     QFile file(VIEW_FILE);
@@ -85,7 +85,7 @@ bool addToView()
     QJsonObject view = document.object();
     QJsonObject apps = view.value("applications").toObject();
     const bool added = !apps.contains(ENTRY);
-    // Our keys over whatever else the entry has, which the launcher may have added
+    // Our keys override the entry's, keeping anything else the launcher added
     const QJsonObject before = apps.value(ENTRY).toObject();
     QJsonObject entry = before;
     const QJsonObject wanted = launcherEntry();
@@ -96,8 +96,8 @@ bool addToView()
     apps.insert(ENTRY, entry);
     view.insert("applications", apps);
 
-    // A new entry goes at the end of the first group of tiles. Later starts leave the
-    // groups alone, so a tile the user moved or took off stays where they put it.
+    // New entries go at the end of the first group. Later starts leave the groups alone, so
+    // a tile the user moved or removed stays that way.
     if (added) {
         QJsonObject layout = view.value("view").toObject();
         QJsonArray groups = layout.value("groups").toArray();
@@ -122,15 +122,15 @@ bool addToView()
     return added;
 }
 
-// The tile's icon as the task manager draws it: 8-bit grey, like the theme's icons.
-// InkView's LoadBitmap gives 24-bit for a BMP with a palette, which the task manager draws
-// as three squashed copies side by side. Null if the icon can't be read.
+// The tile icon as an 8-bit grey bitmap, the format the task manager expects. InkView's
+// LoadBitmap returns 24-bit for a palette BMP, which the task manager draws as three
+// squashed copies. Null if the icon can't be read.
 const ibitmap *taskIcon()
 {
     const QImage image = QImage(ICON_FILE).convertToFormat(QImage::Format_Grayscale8);
     if (image.isNull())
         return nullptr;
-    // Never freed: the task manager may draw it from here for as long as the app runs
+    // Never freed, since the task manager may draw from it while the app runs
     ibitmap *icon = NewBitmap8(image.width(), image.height());
     if (!icon)
         return nullptr;
@@ -139,20 +139,20 @@ const ibitmap *taskIcon()
     return icon;
 }
 
-// The task manager names a task after its program, pbookorbit, unless a language file has
-// a better name for it (the firmware's has none for user apps), and gives it an icon only
-// if the theme has one for it. The task can set both itself.
+// The task manager names a task after its program (pbookorbit) unless a language file
+// translates it (the firmware has none for user apps), and only shows an icon if the theme
+// has one. A task can set both itself.
 void nameTask()
 {
     const int task = GetCurrentTask();
-    // Kept as it is: OpenTask and FindTaskByAppName find the app by it
+    // Left unchanged, since OpenTask and FindTaskByAppName look the app up by it
     const taskinfo *info = GetTaskInfo(task);
     const char *appname = info ? info->appname : nullptr;
     const ibitmap *icon = taskIcon();
     const QByteArray title = TITLE.toUtf8();
     const int parameters = SetTaskParameters(task, appname, title.constData(), const_cast<ibitmap *>(icon),
                                              TASK_DONTCHANGE);
-    // KOReader names its subtask, the open book, the same way
+    // KOReader names its subtask (the open book) the same way
     const int subtask = SetSubtaskInfo(task, 0, title.constData(), "");
     diagnostics::log(QString("task %1 (%2): named %3, icon %4; SetTaskParameters %5, SetSubtaskInfo %6")
                          .arg(task).arg(QString::fromUtf8(appname ? appname : "no appname"), TITLE,
@@ -178,7 +178,7 @@ void LauncherTile::restartDevice()
 #ifdef EMULATOR
     diagnostics::trace("would restart the device");
 #else
-    // As KOReader does on PocketBook. Written out first: the restart may not wait for it.
+    // Same as KOReader on PocketBook. Sync first, as the restart may not wait.
     diagnostics::trace("restarting the device");
     sync();
     iv_ipc_request(MSG_REBOOT, 1, nullptr, 0, 0);

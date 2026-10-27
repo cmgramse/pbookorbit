@@ -2,11 +2,11 @@ import QtQuick
 import "units.js" as Units
 
 // Bar under the toolbar with a filter button on the left and a sort button on the right,
-// after the Libby app on an Era Color. A button whose menu is open becomes a black tab
-// that runs down over the menu's top border, so the two read as one shape. The down arrow
-// after each label marks it as a menu. As in the system library, the sort button's icon is a
-// round button of its own that turns the sort round, and changes to show which way it
-// runs; it isn't part of the tab, so it stays as it is while the menu is open.
+// modelled on Libby on an Era Color. While its menu is open, a button becomes a black tab
+// running down over the menu's top border so they read as one shape. The down arrow after
+// each label marks a menu. As in the system library, the sort icon is a separate round
+// button that reverses the sort and shows its direction; it isn't part of the tab, so it
+// doesn't change while the menu is open.
 Item {
     id: bar
     property string filterText
@@ -14,24 +14,24 @@ Item {
     property bool filterOpen: false
     property bool sortOpen: false
     property bool sortReversed: false
-    // Pages that only sort leave the filter button out
+    // Sort-only pages leave out the filter button
     property bool showFilter: true
-    // How far an open tab reaches below the bar: the menu's border width
+    // How far an open tab reaches below the bar: the menu border width
     property int tabOverhang: Units.dp(4)
-    // For a copy drawn over the faded page while a menu is open: just the open tab
+    // For a copy drawn over the faded page while a menu is open, showing just the open tab
     property bool onlyOpenTab: false
     signal filterClicked()
     signal sortClicked()
     signal sortIconClicked()
 
-    // Where the menus go, in this item's coordinates
+    // Where menus go, in this item's coordinates
     readonly property real filterMenuX: filterButton.x
     readonly property real sortMenuRight: sortButton.x + sortButton.width
     readonly property real menuY: height - 1
 
-    height: Units.dp(55)   // 120px
+    height: Units.dp(55)
 
-    // One of the two buttons: icon, label and an arrow
+    // A button: icon, label and arrow
     component DropdownButton: Item {
         id: button
         property string icon
@@ -39,8 +39,8 @@ Item {
         property bool capitals: false
         property bool open: false
         property int spacing: Units.dp(2)
-        // Whether the icon is a button of its own, outside the tab: its taps are sent as
-        // iconClicked rather than clicked, and it shows `pressedIcon` while pressed
+        // Whether the icon is a separate button outside the tab. Its taps send iconClicked
+        // instead of clicked, and it shows pressedIcon while pressed.
         property bool iconIsButton: false
         property string pressedIcon
         signal clicked()
@@ -49,7 +49,7 @@ Item {
         width: content.width + Units.dp(8)
         height: bar.height
 
-        // The tab, which leaves out an icon that is a button of its own
+        // The tab, without a separate icon button
         Rectangle {
             x: button.iconIsButton ? content.x + label.x - Units.dp(4) : 0
             width: parent.width - x
@@ -64,7 +64,7 @@ Item {
             Image {
                 id: iconImage
                 anchors.verticalCenter: parent.verticalCenter
-                // The open-tab copy leaves it out, so the faded one beneath shows
+                // Left out of the open-tab copy so the faded one beneath shows
                 opacity: button.iconIsButton && bar.onlyOpenTab ? 0 : 1
                 source: "image://theme/" + (!button.iconIsButton ? button.icon + (button.open ? "@inverted" : "")
                                             : iconMouse.pressed ? button.pressedIcon : button.icon)
@@ -82,8 +82,8 @@ Item {
             anchors.fill: parent
             onClicked: button.clicked()
         }
-        // The icon's taps: the full height, from the button's left edge to halfway into
-        // the gap before the label
+        // Icon tap area: full height, from the button's left edge to halfway into the gap
+        // before the label
         MouseArea {
             id: iconMouse
             visible: button.iconIsButton && !bar.onlyOpenTab
@@ -93,7 +93,7 @@ Item {
         }
     }
 
-    // 1px line, inset 56px from both sides
+    // 1px line, inset from both sides
     Rectangle {
         visible: !bar.onlyOpenTab
         anchors.bottom: parent.bottom

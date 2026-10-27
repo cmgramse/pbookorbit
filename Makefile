@@ -1,5 +1,5 @@
-# Builds PBookOrbit with pocketbook-kit: the kit/ submodule if there is one, else the pb
-# command on your PATH. PB_KIT=/path/to/pocketbook-kit picks another checkout.
+# Builds PBookOrbit with pocketbook-kit: the kit/ submodule if present, otherwise pb from
+# your PATH. PB_KIT=/path/to/pocketbook-kit uses another checkout.
 PB_KIT ?= kit
 PB := $(if $(wildcard $(PB_KIT)/pb.sh),$(PB_KIT)/pb.sh,pb)
 
@@ -18,19 +18,19 @@ run:
 pc:
 	$(PB) pc .
 
-# Build for the device: copy build/pbookorbit/<sdk>/arm/pbookorbit.app to its applications/ folder
+# Build for the device; copy build/pbookorbit/<sdk>/arm/pbookorbit.app to its applications/
+# folder
 arm:
 	$(PB) arm .
 
-# A device build with a server filled in on the sign-in page, to hand to someone who uses
-# it: make release SERVER=books.example.com
+# Device build with the sign-in server prefilled, for users of that server: make release
+# SERVER=books.example.com
 release:
 	$(if $(SERVER),,$(error set SERVER, e.g. make release SERVER=books.example.com))
 	PB_QMAKE_ARGS="SUGGESTED_SERVER=$(SERVER)" $(PB) arm .
 
-# Render the app's icons (src/icons/*.bmp, built into the app) from their line art
-# (src/icons/*.svg): 110x110 8-bit grey BMPs, the size of the Era Color's theme icons.
-# Needs rsvg-convert and ImageMagick.
+# Render the icons built into the app (src/icons/*.bmp) from their SVG sources as 110x110
+# 8-bit grey BMPs, the Era Color's theme icon size. Needs rsvg-convert and ImageMagick.
 icons:
 	for svg in src/icons/*.svg; do \
 		rsvg-convert "$$svg" | magick - -colorspace Gray -type Palette -depth 8 -compress None "BMP3:$${svg%.svg}.bmp" || exit 1; \

@@ -12,7 +12,7 @@ void adjustForEink(QImage &image)
 
 QColor einkColor(const QColor &color)
 {
-    // Big enough for the dither pattern to average out
+    // Large enough for the dither pattern to average out
     QImage patch(16, 16, QImage::Format_RGB32);
     patch.fill(color);
     adjustForEink(patch);

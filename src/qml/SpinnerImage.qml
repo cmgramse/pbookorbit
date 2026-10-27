@@ -1,7 +1,7 @@
 import QtQuick
 
-// One of the system's spinners, turning while visible: theme icons <frames>1 to 9, e.g.
-// loading_icon_ (big, for a page) or progress_indicator_ (small, for a button)
+// A system spinner that turns while visible: theme icons <frames>1 to 9, e.g. loading_icon_
+// (large, for pages) or progress_indicator_ (small, for buttons)
 Image {
     id: spinner
     property string frames: "loading_icon_"

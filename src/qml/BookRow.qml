@@ -2,23 +2,24 @@ import QtQuick
 import "units.js" as Units
 import "night.js" as Night
 
-// One book in the list, after the system library on an Era Color (screenshots 9 and 10):
-// cover, then title, author, and a line with the reading status and series. A section's
-// first row carries a floating box at its left edge: a short label (a letter, a number in
-// a series) in a square, or the date written upwards in a narrow box. A black line runs under each row. The book's formats
-// show in small capitals at the right of the author line, all of them where its ebook and
-// audiobook share the row: grey, or in a solid pill of the user's BookOrbit accent colour
-// with a small e-reader mark for a format on the device (where the system shows its cloud icon). A row standing in for
-// another (the audiobook record of a book whose ebook row shows both) is hidden: no
-// height at all.
-// Tapping the row sends clicked(); holding it for two seconds sends held(), for the book
-// menu, which sets focused to frame it in a thick black border first, as the search box
-// is while it has focus.
+// One book in the list, modelled on the Era Color system library (screenshots 9 and 10):
+// cover, then title, author, and a line with reading status and series. A section's first
+// row has a floating box at its left edge: a short label (letter or series number) in a
+// square, or the date written upwards in a narrow box. A black line runs under each row.
+//
+// Formats show in small capitals at the right of the author line (all of them when an ebook
+// and audiobook share the row): grey, or in an accent-coloured pill with a small e-reader
+// mark if on the device (where the system shows its cloud icon). A row that another row
+// stands in for (an audiobook record whose ebook row shows both) is hidden with zero
+// height.
+//
+// Tapping sends clicked(). Holding for two seconds sends held() for the book menu, which
+// first sets focused to draw a thick black frame, like the focused search box.
 Item {
     id: row
     property var book
-    // Formats of its versions downloaded by this app and still there, e.g. ["epub"];
-    // revision re-checks when a download arrives
+    // Formats of this book's downloads still on the device, e.g. ["epub"]. revision
+    // re-checks when a download arrives.
     readonly property var formatsOnDevice: {
         if (book.loaded !== true || downloads.revision < 0)
             return []
@@ -29,19 +30,18 @@ Item {
         }
         return formats
     }
-    // Framed while it is about to open the book menu
+    // Framed while about to open the book menu
     property bool focused: false
     signal clicked()
     signal held()
     readonly property bool sectionStart: book.sectionStart
     readonly property bool squareSection: book.sectionLabel.length <= 4
 
-    // Measured in device pixels on the Era Color (2.175px per dp)
-    readonly property int rowHeight: Units.dp(83)              // 180px
-    readonly property int lineLeft: Units.dp(26)               // 57px: after the date box
-    readonly property int contentLeft: Units.dp(33)            // 71px: the cover
+    readonly property int rowHeight: Units.dp(83)
+    readonly property int lineLeft: Units.dp(26)               // after the date box
+    readonly property int contentLeft: Units.dp(33)            // the cover
     readonly property int contentRight: width - contentLeft    // rows end as far from the right
-    readonly property int coverWidth: Units.dp(43)             // 94x142px, 2:3
+    readonly property int coverWidth: Units.dp(43)             // 2:3
     readonly property int coverHeight: Units.dp(65)
 
     width: ListView.view ? ListView.view.width : 0
@@ -53,11 +53,12 @@ Item {
         enabled: row.book.loaded === true
         pressAndHoldInterval: 1500
         onClicked: row.clicked()
-        // A row held this long doesn't send clicked() when it is let go
+        // After a hold this long, releasing doesn't send clicked()
         onPressAndHold: row.held()
     }
 
-    // Cover, shrunk to fit; the system's blank book while it downloads or if there isn't one
+    // Cover, scaled to fit. Shows the system's blank book while downloading or if there's
+    // none.
     Item {
         id: cover
         x: row.contentLeft
@@ -65,8 +66,8 @@ Item {
         width: row.coverWidth
         height: row.coverHeight
 
-        // Bumped when the download arrives, to ask again; a binding rather than setting url,
-        // so a row that changes to another book (when the list is sorted) follows it
+        // Bumped when the download arrives so the URL is re-fetched. A binding rather than
+        // setting url, so the row follows a re-sorted list.
         property int revision: 0
         property string url: revision >= 0 && row.book.hasCover
                              ? covers.source(row.book.id, row.book.coverVersion, row.coverWidth, row.coverHeight) : ""
@@ -88,11 +89,11 @@ Item {
         }
     }
 
-    // Title, author, then status and series, each on a fixed baseline (52, 107 and 159px
-    // below the row's top) so rows with fewer lines line up
+    // Title, author, then status and series, each on a fixed baseline so rows with fewer
+    // lines align
     Item {
         id: texts
-        x: cover.x + cover.width + Units.dp(12)                 // 26px after the cover
+        x: cover.x + cover.width + Units.dp(12)
         width: row.contentRight - x - Units.dp(4)
         height: row.height
 
@@ -107,14 +108,14 @@ Item {
         Text {
             id: author
             y: Units.dp(49) - baselineOffset
-            // Leave room for the formats at the right
+            // Leave room for the formats on the right
             width: parent.width - (formats.width > 0 ? formats.width + Units.dp(12) : 0)
             text: row.book.authors.join(", ")
             font.pointSize: 7.25
             elide: Text.ElideRight
         }
-        // The formats, centred on the author line: "EPUB  AZW3  M4B", those on the device
-        // in pills
+        // Formats, centred on the author line: "EPUB  AZW3  M4B", with downloaded ones in
+        // pills
         Row {
             id: formats
             anchors.right: parent.right
@@ -136,7 +137,7 @@ Item {
                         id: pill
                         visible: format.onDevice
                         width: pillContent.width + 2 * Units.dp(7)
-                        height: Units.dp(16)                    // 35px
+                        height: Units.dp(16)
                         radius: height / 2
                         color: Night.color(bookOrbit.accentColor)
                     }
@@ -146,11 +147,11 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: Units.dp(3)
 
-                        // A small e-reader: screen outline and a button below it
+                        // A small e-reader: screen outline with a button below
                         Rectangle {
                             visible: format.onDevice
                             anchors.verticalCenter: parent.verticalCenter
-                            width: Units.dp(5)                  // 11x17px
+                            width: Units.dp(5)
                             height: Units.dp(8)
                             radius: 2
                             color: "transparent"
@@ -176,7 +177,7 @@ Item {
                 }
             }
         }
-        // Status and series in italics, split by an upright grey bar about 32px either side
+        // Status and series in italics, split by an upright grey bar
         Row {
             id: details
             width: parent.width
@@ -212,7 +213,7 @@ Item {
         }
     }
 
-    // Line under the row, 1px black, from after the date box to the end of the row
+    // 1px black line under the row, from after the date box to the row's end
     Rectangle {
         anchors.bottom: parent.bottom
         x: row.lineLeft
@@ -221,13 +222,13 @@ Item {
         color: "black"
     }
 
-    // Section letter or number: a floating square at the top left, over the cover's corner
+    // Section letter or number: a floating square at top left, over the cover's corner
     Rectangle {
-        z: 1    // over the focus frame too
+        z: 1    // above the focus frame too
         visible: row.sectionStart && row.squareSection && row.book.sectionLabel !== ""
         x: 0
         y: 0
-        width: Units.dp(35)                                     // 76px
+        width: Units.dp(35)
         height: width
         border.width: 1
         border.color: "black"
@@ -239,19 +240,19 @@ Item {
             text: row.book.sectionLabel
             font.pointSize: 9
             font.bold: true
-            // Smaller for a longer number, such as 10.5
+            // Smaller for longer numbers such as 10.5
             fontSizeMode: Text.HorizontalFit
             minimumPointSize: 6
         }
     }
 
-    // Section date: a narrow box down the left edge, the date written upwards
+    // Section date: a narrow box down the left edge, written upwards
     Rectangle {
         z: 1
         visible: row.sectionStart && !row.squareSection
         x: 0
         y: 1
-        width: row.lineLeft                                     // 57px
+        width: row.lineLeft
         height: row.height - 4                                  // a 3px gap before the next box
         border.width: 1
         border.color: "black"
@@ -264,8 +265,8 @@ Item {
         }
     }
 
-    // Focus frame round the row, 4px, a pixel under the search box's: its sides the same
-    // distance from the screen's edges, 23px, a little nearer them than the line's start
+    // Focus frame, a pixel thinner than the search box's, slightly nearer the screen edges
+    // than the line's start
     Rectangle {
         x: Math.round(row.lineLeft * 2 / 5)
         width: row.width - 2 * x

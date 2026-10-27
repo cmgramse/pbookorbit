@@ -38,9 +38,9 @@ HEADERS += \
     src/ui/themeimageprovider.h
 RESOURCES += src/qml.qrc
 
-# qmake SUGGESTED_SERVER=books.example.com: the server field starts filled in with it, for
-# a build to hand to someone who uses that server. It goes in a generated header, written
-# only when it changes, so a build with another (or none) recompiles what uses it.
+# qmake SUGGESTED_SERVER=books.example.com prefills the server field, for builds handed to
+# users of that server. It's written to a generated header only when it changes, so
+# switching servers recompiles what uses it.
 SERVER_HEADER = $$OUT_PWD/suggestedserver.h
 SERVER_DEFINE = "$${LITERAL_HASH}define SUGGESTED_SERVER \"$$SUGGESTED_SERVER\""
 !equals(SERVER_DEFINE, $$cat($$SERVER_HEADER, blob)): write_file($$SERVER_HEADER, SERVER_DEFINE)

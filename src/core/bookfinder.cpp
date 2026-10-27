@@ -19,21 +19,21 @@
 #include <algorithm>
 #include <cctype>
 
-// Library books fetched per request
+// Library books per request
 static const int LIBRARY_PAGE_SIZE = 100;
-// Candidates looked up for each file
+// Candidates looked up per file
 static const int MAX_CANDIDATES = 3;
 
-// Where to look: the folders the app downloads to, and the browser's downloads
+// Folders to search: the app's download folders and the browser's downloads
 static const char *SEARCH_DIRS[] = {FLASHDIR "/Books", AUDIOBOOKS_DEFAULT_PATH, DOWNLOADFOLDER};
 static const char *KOREADER_SETTINGS_DIR = FLASHDIR "/applications/koreader/settings";
 
-// The fraction of the progress bar for loading the library; looking files up takes the rest
+// Share of the progress bar for loading the library; file lookups take the rest
 static const int LIBRARY_PERCENT = 30;
 
-// Lower case letters and digits, each run of anything else a single space, accents
-// dropped: "The Emperor’s Legion: Book 1" -> "the emperor s legion book 1". File names
-// lose characters a title can have (a ':' saved as '_'), and this evens that out.
+// Lower case, digits, and single spaces for anything else, with accents dropped: "The
+// Emperor’s Legion: Book 1" -> "the emperor s legion book 1". Evens out characters file
+// names can't hold (':' saved as '_').
 static QString normalise(const QString &text)
 {
     const QString decomposed = text.normalized(QString::NormalizationForm_KD);
@@ -47,14 +47,14 @@ static QString normalise(const QString &text)
     return out.simplified();
 }
 
-// Whether words appears in text as whole words; both normalised
+// Whether words occurs in text as whole words (both normalised)
 static bool containsWords(const QString &text, const QString &words)
 {
     return !words.isEmpty() && (' ' + text + ' ').contains(' ' + words + ' ');
 }
 
-// KOReader's partial MD5 (util.partialMD5), which BookOrbit stores as each file's hash:
-// 1 KB at 0, then at 1 KB, 4 KB, 16 KB and so on up to 1 GB
+// KOReader's partial MD5 (util.partialMD5), which BookOrbit stores as each file's hash: 1
+// KB at offset 0, then at 1 KB, 4 KB, 16 KB and so on up to 1 GB
 static QString partialMd5(const QString &path)
 {
     QFile file(path);
@@ -72,9 +72,9 @@ static QString partialMd5(const QString &path)
     return QString::fromLatin1(hash.result().toHex());
 }
 
-// Reads the Lua data KOReader saves its settings as (LuaSettings): "return { ... }" with
-// tables, strings, numbers and booleans. Tables come back as maps keyed by their keys as
-// text; anything it doesn't follow comes back as an invalid QVariant.
+// Parses KOReader's LuaSettings files: "return { ... }" with tables, strings, numbers and
+// booleans. Tables become maps with text keys; anything unrecognised becomes an invalid
+// QVariant.
 class LuaData
 {
 public:
@@ -242,7 +242,7 @@ QList<BookFinder::LocalFile> BookFinder::unrecordedFiles() const
     QList<LocalFile> files;
     for (const char *dir : SEARCH_DIRS) {
         const QString root = QString::fromUtf8(dir);
-        // Not hidden files, nor what's in hidden folders or KOReader's .sdr folders
+        // Skip hidden files, hidden folders and KOReader's .sdr folders
         QDirIterator it(root, QDir::Files, QDirIterator::Subdirectories);
         while (it.hasNext()) {
             const QString path = it.next();
@@ -281,12 +281,12 @@ void BookFinder::markOffered()
 
 QHash<QString, BookFinder::KoreaderMatch> BookFinder::koreaderMatches() const
 {
-    // One state file per KOReader account: bookorbit_sync_state.lua, and
-    // bookorbit_sync_state_<md5>.lua for any other. Not the .old backups.
+    // One state file per KOReader account: bookorbit_sync_state.lua, plus
+    // bookorbit_sync_state_<md5>.lua for others. Skip the .old backups.
     static const QRegularExpression stateName(R"(^bookorbit_sync_state(_[0-9a-f]{32})?\.lua$)");
-    // KOReader's account identity: "<server>/api/v1|<KOReader user>". That user is the
-    // KOReader sync login, which needn't be the BookOrbit one, so only the server counts;
-    // the books still have to be in this user's library.
+    // KOReader's account id is "<server>/api/v1|<KOReader user>". That user is the KOReader
+    // sync login, not necessarily the BookOrbit one, so only the server is compared;
+    // matched books must still be in this user's library.
     const QString server = m_client->serverUrl() + "/api/v1|";
     QHash<QString, KoreaderMatch> matches;
     const QDir dir(QString::fromUtf8(KOREADER_SETTINGS_DIR));
@@ -302,8 +302,8 @@ QHash<QString, BookFinder::KoreaderMatch> BookFinder::koreaderMatches() const
             diagnostics::trace(QString("find books: %1 is for %2, skipped").arg(name, account));
             continue;
         }
-        // books: {<partial MD5>: {bookId, fileId, file, ...}}, file being the path on the
-        // device (/mnt/ext1/...; FLASHDIR in the emulator)
+        // books: {<partial MD5>: {bookId, fileId, file, ...}}, where file is the device
+        // path (/mnt/ext1/...; FLASHDIR in the emulator)
         const QVariantMap books = state.value("books").toMap();
         for (auto it = books.cbegin(); it != books.cend(); ++it) {
             const QVariantMap book = it.value().toMap();
@@ -398,15 +398,15 @@ void BookFinder::matchFiles(int generation)
 {
     diagnostics::trace(QString("find books: library has %1 books").arg(m_library.size()));
     for (LocalFile &file : m_files) {
-        // 1. KOReader's plugin knows it, the file is unchanged and the book is in the library
+        // 1. Known to KOReader's plugin, file unchanged, and the book is in the library
         const auto koreader = m_koreader.constFind(file.path);
         if (koreader != m_koreader.cend() && koreader->md5 == file.md5
                 && m_libraryIndex.contains(koreader->bookId)) {
             m_found.append({koreader->bookId, file.path, m_library.at(m_libraryIndex.value(koreader->bookId))});
             continue;
         }
-        // Otherwise the books with their title in the file's name, in its format; those
-        // with the author there too first, then longer titles (Dune Messiah over Dune)
+        // Otherwise, books in the file's format whose title is in its name. Those with the
+        // author in the name come first, then longer titles (Dune Messiah before Dune).
         QList<QPair<int, int>> scored;   // score, index
         for (int i = 0; i < m_library.size(); i++) {
             if (!containsWords(file.nameKey, m_titleKeys.at(i)))
@@ -439,7 +439,7 @@ void BookFinder::checkCandidate(int index, int candidate, int generation)
     setPercent(LIBRARY_PERCENT + (100 - LIBRARY_PERCENT) * index / int(m_pending.size()));
     const LocalFile &file = m_pending.at(index);
     if (candidate >= file.candidates.size()) {
-        // 4. No file of theirs is this one. The best candidate is a guess if the name has
+        // 4. None of their files is this one. The best candidate is a guess if the name has
         // its author as well as its title.
         const int best = file.candidates.first();
         if (containsWords(file.nameKey, m_authorKeys.at(best)))
@@ -451,7 +451,7 @@ void BookFinder::checkCandidate(int index, int candidate, int generation)
     }
     const QVariantMap book = m_library.at(file.candidates.at(candidate));
     const int bookId = book.value("id").toInt();
-    // The book's details: files [{id, format, filename, fileHash, ...}]
+    // Book details: files [{id, format, filename, fileHash, ...}]
     m_client->request("GET", QString("/books/%1").arg(bookId), QJsonDocument(),
         [this, index, candidate, generation, book, bookId](const QByteArray &data) {
             if (generation != m_generation)
@@ -459,7 +459,7 @@ void BookFinder::checkCandidate(int index, int candidate, int generation)
             const LocalFile &file = m_pending.at(index);
             for (const QJsonValue &value : QJsonDocument::fromJson(data).object().value("files").toArray()) {
                 const QJsonObject serverFile = value.toObject();
-                // 2. The same bytes, as far as KOReader's hash goes; 3. the same name
+                // 2. Same bytes, as far as KOReader's hash can tell; 3. same name
                 if (serverFile.value("fileHash").toString() == file.md5
                         || serverFile.value("filename").toString().compare(file.fileName, Qt::CaseInsensitive) == 0) {
                     m_found.append({bookId, file.path, book});
@@ -472,7 +472,8 @@ void BookFinder::checkCandidate(int index, int candidate, int generation)
         [this, index, candidate, generation](int status, const QString &message) {
             if (generation != m_generation)
                 return;
-            // A book gone since the list loaded is just not this one; anything else stops
+            // A book deleted since the list loaded just isn't a match; any other error
+            // stops the search
             if (status == 404 || status == 403)
                 checkCandidate(index, candidate + 1, generation);
             else

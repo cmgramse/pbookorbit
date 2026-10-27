@@ -1,33 +1,32 @@
 import QtQuick
 import "units.js" as Units
 
-// All the books of an author or series, from the book menu, or of a collection: the
-// library's rows under a toolbar with a back button, e.g. "SERIES / A SONG OF ICE AND
-// FIRE". An author's or collection's books go in A-Z sections, as in the library; a series' in its order, each under its number in
-// the series. Either has a jump rail when there are more than fit on the screen, and for a
-// series at least 16 books. Above them, the library's sub-toolbar, to filter and sort them
-// (a series also in its own order, the one these sections and the number rail go with),
-// whose menus main.qml shows.
-// Loads as it scrolls, like the library list. bookOrbit.showBooksOf() fills it.
+// All books of an author or series (from the book menu) or of a collection: library rows
+// under a toolbar with a back button, e.g. "SERIES / A SONG OF ICE AND FIRE". Author and
+// collection books are in A-Z sections like the library; a series is in series order, each
+// book under its number. There's a jump rail when the list is longer than a screen (and,
+// for a series, has at least 16 books). The library's sub-toolbar sits above for filtering
+// and sorting (plus series order for a series), with menus shown by main.qml. Loads on
+// scroll like the library list; bookOrbit.showBooksOf() fills it.
 Rectangle {
     id: page
-    // For the device's page-turn keys, which main.qml sends to the page in front
+    // For the page-turn keys, which main.qml forwards to the front page
     readonly property alias pageButtons: booksPages
     color: "white"
 
     // "Author", "Series" or "Collection", and the name
     property string kind
     property string name
-    // Where the jump rail's first entry goes, in the page's coordinates
+    // Y of the jump rail's first entry, in page coordinates
     property real jumpRailTop: NaN
-    // And the spacing of its entries
+    // And its entry spacing
     property real jumpRailPitch: NaN
-    // For the sub-toolbar, as SubToolbar takes them
+    // For the sub-toolbar, in SubToolbar's terms
     property string filterText
     property string sortText
     property bool sortReversed: false
     property bool sortDescending: false
-    // Sorted in the series' order: each book under its number, with a number rail
+    // In series order: each book under its number, with a number rail
     property bool seriesOrder: false
     property bool downloadedOnly: false
     property bool filterOpen: false
@@ -58,7 +57,7 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         model: bookOrbit.booksOf
 
-        // The sub-toolbar scrolls away with the books, as the library's does
+        // The sub-toolbar scrolls away with the books, like the library's
         header: SubToolbar {
             width: ListView.view ? ListView.view.width : 0
             filterText: page.filterText
@@ -92,7 +91,7 @@ Rectangle {
         onContentYChanged: loadTimer.restart()
         onCountChanged: loadTimer.restart()
 
-        // Another author or series starts at the top
+        // A different author or series starts at the top
         Connections {
             target: bookOrbit
             function onBooksOfChanged() {
@@ -101,7 +100,7 @@ Rectangle {
             }
         }
 
-        // Fast black-and-white updates while it scrolls, as in the library list
+        // Fast black-and-white updates while scrolling, as in the library list
         onMovementStarted: {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
@@ -128,7 +127,7 @@ Rectangle {
         alignPitch: page.jumpRailPitch
         alphabetical: !page.seriesOrder
         descending: page.sortDescending
-        // A series of fewer books is quick enough to scroll
+        // Short series are quick enough to scroll without one
         minSections: page.seriesOrder ? 16 : 1
         bottomInset: booksPages.height
     }
@@ -143,7 +142,7 @@ Rectangle {
         list: books
         visible: books.count === 0 && bookOrbit.booksOfTotal !== 0 && bookOrbit.error === ""
     }
-    // If there are no books, or loading them failed
+    // If there are no books, or they failed to load
     Text {
         visible: books.count === 0 && !spinner.visible
         anchors.top: header.bottom

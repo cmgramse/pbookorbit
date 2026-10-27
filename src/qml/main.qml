@@ -10,17 +10,16 @@ Window {
     height: windowHeight
     color: "white"
 
-    // Quicker e-ink updates while typing. Applied with callLater because moving focus
-    // from one field to the other briefly leaves neither focused.
+    // Faster e-ink updates while typing. callLater because moving focus between fields
+    // briefly leaves neither focused.
     readonly property bool typing: (loginPage.visible && loginPage.typing)
                                    || (searchPage.visible && searchPage.typing)
     onTypingChanged: Qt.callLater(() => eink.setDynamicUpdates(root.typing))
 
-    // Search page open over everything else
+    // Search page, over everything else
     property bool searching: false
-    // Pages opened from the book menu, a collection or an author, over the search page:
-    // an author's info and over that their series, then the books of an author, series or
-    // collection, and over that a book's info
+    // Pages opened from the book menu, a collection or an author, stacked over the search
+    // page: author info, then their series, then a books-of list, then book info
     property bool showingAuthor: false
     property bool showingAuthorSeries: false
     property bool showingBooksOf: false
@@ -41,9 +40,9 @@ Window {
         searchPage.open()
     }
 
-    // A book on the device opens in its reader (the ebook, if both versions are there);
-    // otherwise the dialog offers to download it first, asking which version if it has an
-    // ebook and an audiobook
+    // Opens a downloaded book in its reader (the ebook if both versions are there).
+    // Otherwise offers to download it, asking which version if there's an ebook and an
+    // audiobook.
     function openBook(book) {
         const variants = book.variants || []
         for (const variant of variants) {
@@ -58,18 +57,18 @@ Window {
             downloadDialog.show(book, variants)
     }
 
-    // The title goes back to the top of the current view's list
+    // Tapping the title scrolls the current list back to the top
     function backToTop() {
         menu.visible = false
         closeDropdowns()
         activeList.positionViewAtBeginning()
     }
 
-    // The footer's views: Library, Collections, Series or Authors
+    // Footer views: Library, Collections, Series or Authors
     readonly property bool showingCollections: footer.currentIndex === 1
     readonly property bool showingSeries: footer.currentIndex === 2
     readonly property bool showingAuthors: footer.currentIndex === 3
-    // The list under the sub-toolbar whose menus are in use
+    // The list whose sub-toolbar menus are in use
     readonly property ListView activeList: showingBooksOf ? booksOfPage.list
                                            : showingAuthorSeries ? authorSeriesPage.list
                                            : showingCollections ? collectionsPage.list
@@ -85,7 +84,7 @@ Window {
         title: "PocketBook × Book<font color=\"" + Night.color(bookOrbit.accentColor) + "\">Orbit</font>"
         menuOpen: menu.visible
         showSearch: bookOrbit.signedIn
-        // Its only item is signing out
+        // Only has Sign out
         showMenu: bookOrbit.signedIn
         onHomeClicked: Qt.quit()
         onTitleClicked: root.backToTop()
@@ -107,32 +106,31 @@ Window {
         anchors.right: parent.right
     }
 
-    // Signed in: the home page. Sub-toolbar with filter and sort, the book list, and a
-    // footer for BookOrbit's views, after the Libby app.
+    // Signed in: sub-toolbar with filter and sort, the book list, and a footer for the
+    // views, modelled on Libby
     readonly property var filterOptions: ["All titles", "Ebooks", "Audiobooks"]
-    // File formats for each filter option (BookOrbit's EBOOK_FORMAT_LIST, AUDIO_FORMAT_LIST)
+    // File formats per filter option (BookOrbit's EBOOK_FORMAT_LIST and AUDIO_FORMAT_LIST)
     readonly property var filterFormats: [
         [],
         ["epub", "kepub", "mobi", "azw3", "azw", "fb2", "pdf", "djvu"],
         ["m4b", "mp3", "m4a", "opus", "ogg", "flac"]
     ]
 
-    // The library's sort and filter. Each sort's usual order: newest first for the dates,
-    // A to Z otherwise.
+    // Library sort and filter. Dates default to newest first, everything else to A-Z.
     ListQuery {
         id: libraryQuery
         sortOptions: ["Date added", "Title", "Author", "Recently read"]
         sortFields: ["addedAt", "title", "author", "lastReadAt"]
         sortDescendingByDefault: [true, false, false, true]
-        sortIndex: 1   // Title, as bookOrbit starts out
+        sortIndex: 1   // Title, matching bookOrbit's default
         onApplied: {
             bookOrbit.setBookQuery(sortFields[sortIndex], descending(), root.filterFormats[filterIndex],
                                    downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
             bookList.positionViewAtBeginning()
         }
     }
-    // The collections' sorts, from BookOrbit's collections page (less its "Custom order",
-    // which isn't clear here): A to Z, and the most books first
+    // Collection sorts from BookOrbit's collections page, minus "Custom order": A-Z, and
+    // most books first
     ListQuery {
         id: collectionsQuery
         sortOptions: ["Name", "Book count"]
@@ -144,8 +142,8 @@ Window {
             collectionsPage.list.positionViewAtBeginning()
         }
     }
-    // The series' sorts, from BookOrbit's series page: A to Z, and the most books, the
-    // latest added and the most read first
+    // Series sorts from BookOrbit's series page: A-Z, then most books, latest added and
+    // most read first
     ListQuery {
         id: seriesQuery
         sortOptions: ["Name", "Book count", "Recently added", "Read progress"]
@@ -157,9 +155,8 @@ Window {
             seriesPage.list.positionViewAtBeginning()
         }
     }
-    // The authors' sorts, from BookOrbit's authors page: A to Z by name or by sort name
-    // (surname first), the most books and the latest added first. Filtered as the library
-    // is, by their books.
+    // Author sorts from BookOrbit's authors page: A-Z by name or surname, most books and
+    // latest added first. Filtered by their books, like the library.
     ListQuery {
         id: authorsQuery
         sortOptions: ["Name", "Sort name", "Book count", "Recently added"]
@@ -171,7 +168,7 @@ Window {
             authorsPage.list.positionViewAtBeginning()
         }
     }
-    // An author's series: the Series view's sorts, kept from one author to the next
+    // An author's series: the Series view's sorts, kept between authors
     ListQuery {
         id: authorSeriesQuery
         sortOptions: seriesQuery.sortOptions
@@ -189,8 +186,8 @@ Window {
         authorSeriesPage.list.positionViewAtBeginning()
         showingAuthorSeries = true
     }
-    // The books of an author, series or collection, as bookOrbit.showBooksOf() takes them,
-    // each kind with its own sort and filter, kept from one to the next as the library's are
+    // Books of an author, series or collection (see bookOrbit.showBooksOf()). Each kind
+    // keeps its own sort and filter between uses, like the library.
     property string booksOfField
     property var booksOfValues: []
     readonly property ListQuery booksOfQuery: booksOfField === "series" ? seriesBooksQuery
@@ -204,8 +201,8 @@ Window {
         applyBooksOf(booksOfQuery)
         showingBooksOf = true
     }
-    // For the book menu's "All books of" items and the book info page's links: "author" or
-    // "series", the names to match and the page's title
+    // Used by the book menu's "All books of" items and the book info page's links. field is
+    // "author" or "series".
     function openBooksOfChosen(field, values, title) {
         openBooksOf(field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author", title, field, values)
     }
@@ -215,7 +212,7 @@ Window {
                               query.downloadedOnly ? downloads.downloadedBooks() : [])
         booksOfPage.list.positionViewAtBeginning()
     }
-    // An author's books: the library's sorts
+    // An author's books use the library's sorts
     ListQuery {
         id: authorBooksQuery
         sortOptions: libraryQuery.sortOptions
@@ -224,7 +221,7 @@ Window {
         sortIndex: 1
         onApplied: root.applyBooksOf(authorBooksQuery)
     }
-    // A series' books: in its order first, then the library's sorts
+    // A series' books: series order first, then the library's sorts
     ListQuery {
         id: seriesBooksQuery
         sortOptions: ["Series order"].concat(libraryQuery.sortOptions)
@@ -232,7 +229,7 @@ Window {
         sortDescendingByDefault: [false].concat(libraryQuery.sortDescendingByDefault)
         onApplied: root.applyBooksOf(seriesBooksQuery)
     }
-    // A collection's books: the library's sorts, but Date added is when each book was added
+    // A collection's books: the library's sorts, with Date added meaning when it was added
     // to the collection
     ListQuery {
         id: collectionBooksQuery
@@ -242,8 +239,7 @@ Window {
         sortIndex: 1
         onApplied: root.applyBooksOf(collectionBooksQuery)
     }
-    // Books arriving on the device (or their details being looked up) change the
-    // downloaded books
+    // Downloads (and details lookups) change the downloaded book list
     readonly property int downloadsRevision: downloads.revision
     onDownloadsRevisionChanged: {
         if (libraryQuery.downloadedOnly)
@@ -254,7 +250,7 @@ Window {
             authorsQuery.applied()
     }
 
-    // The sort and filter that the menus show and change: those of the page in front
+    // The sort and filter shown by the menus, for whichever page is in front
     readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
                                              : showingAuthorSeries ? authorSeriesQuery
                                              : showingCollections ? collectionsQuery
@@ -262,10 +258,9 @@ Window {
                                              : showingAuthors ? authorsQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
-    // The device's page-turn keys page the list or info page in front, as its on-screen
-    // page buttons do. The platform plugin sends them as Page Up and Page Down. The sign-in
-    // page has none; nor does anything while a menu or dialog is over the page, since a tap
-    // there would only close it.
+    // The page-turn keys (sent as Page Up/Page Down) page the front list or info page, like
+    // its page buttons. Not on the sign-in page, and not while a menu or dialog is open,
+    // since a tap would only close it.
     readonly property PageButtons frontPageButtons: showingInfo ? bookInfoPage.pageButtons
                                                     : showingBooksOf ? booksOfPage.pageButtons
                                                     : showingAuthorSeries ? authorSeriesPage.pageButtons
@@ -303,11 +298,11 @@ Window {
         const open = !dropdown.visible
         closeDropdowns()
         if (open) {
-            // If the bar is partly scrolled off, bring it fully into view first
+            // Bring a partly scrolled-off bar fully into view first
             if (activeList.headerItem.mapToItem(root.contentItem, 0, 0).y < activeList.y)
                 activeList.positionViewAtBeginning()
-            // Line the menu and the copy of the tab up with the sub-toolbar where it has
-            // scrolled to. The list can't move while a menu is open: the fading takes taps.
+            // Align the menu and the tab copy with where the sub-toolbar has scrolled to.
+            // The list can't move while a menu is open, since the fade takes taps.
             openTab.y = activeList.headerItem.mapToItem(root.contentItem, 0, 0).y
             dropdown.visible = true
         }
@@ -321,12 +316,12 @@ Window {
         anchors.left: parent.left
         anchors.right: parent.right
         clip: true
-        // No bounce at the ends: on e-ink it is only extra redraws
+        // No bounce at the ends; on e-ink that's just extra redraws
         boundsBehavior: Flickable.StopAtBounds
         model: bookOrbit.books
 
-        // Load the books on screen, and a screenful either side, once scrolling pauses:
-        // a fast flick doesn't fetch every page it passes
+        // Load the visible books plus a screen either side once scrolling pauses, so a fast
+        // flick doesn't fetch every page it passes
         function loadVisibleBooks() {
             if (count === 0)
                 return
@@ -347,8 +342,8 @@ Window {
         onContentYChanged: loadTimer.restart()
         onCountChanged: loadTimer.restart()
 
-        // Filter and sort bar, and any status line, scroll away with the books. The first
-        // row sits right under the bar, as in the system library.
+        // The filter/sort bar and any status line scroll with the books. The first row sits
+        // right under the bar, as in the system library.
         header: Column {
             width: ListView.view.width
             bottomPadding: status.visible ? Units.dp(8) : 0
@@ -369,7 +364,7 @@ Window {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                // While the first books load, the spinner shows instead
+                // The spinner shows while the first books load
                 visible: bookOrbit.error !== "" || (bookList.count === 0 && !bookOrbit.busy && libraryQuery.downloadedOnly)
                 topPadding: Units.dp(8)
                 text: bookOrbit.error !== "" ? bookOrbit.error
@@ -379,13 +374,13 @@ Window {
             }
         }
 
-        // Fast black-and-white updates for just the list while it scrolls. A2 takes
-        // screen coordinates, hence mapToGlobal (as in the SDK's qml_test example).
+        // Fast black-and-white (A2) updates for the list while it scrolls. A2 takes screen
+        // coordinates, hence mapToGlobal (as in the SDK's qml_test).
         onMovementStarted: {
             const pos = mapToGlobal(0, 0)
             eink.enterA2ForFlick(pos.x, pos.y, width, height)
         }
-        // Sent once the momentum has stopped, not when the finger lifts
+        // Fires when momentum stops, not when the finger lifts
         onMovementEnded: eink.leaveA2Soon()
         onVisibleChanged: if (!visible) eink.leaveA2()
         delegate: BookRow {
@@ -400,14 +395,14 @@ Window {
         list: bookList
         bottomInset: pageButtons.height
     }
-    // Only until the first books arrive: later pages load as the list scrolls
+    // Only until the first books arrive; later pages load on scroll
     Spinner {
         list: bookList
         visible: bookList.visible && bookOrbit.error === "" && bookList.count === 0 && bookOrbit.busy
     }
 
-    // For the A-Z sorts. Starts below the sub-toolbar, clear of the sort button, and stays
-    // put when the sub-toolbar scrolls away.
+    // For A-Z sorts. Starts below the sub-toolbar, clear of the sort button, and stays put
+    // when the sub-toolbar scrolls away.
     JumpRail {
         id: libraryRail
         list: bookList
@@ -438,14 +433,14 @@ Window {
         sortText: "By " + collectionsQuery.sortOptions[collectionsQuery.sortIndex]
         sortReversed: collectionsQuery.sortReversed
         descending: collectionsQuery.sortDescending
-        // Its jump rail level with the library's, spaced the same
+        // Jump rail aligned and spaced like the library's
         jumpRailTop: libraryRail.entriesY - y
         jumpRailPitch: libraryRail.pitch
         sortOpen: sortMenu.visible
         tabOverhang: sortMenu.border.width - 1
         onSortClicked: root.toggleDropdown(sortMenu)
         onSortIconClicked: collectionsQuery.reverseSort()
-        // Listed afresh each time the view opens
+        // Reloaded every time the view opens
         onVisibleChanged: if (visible) bookOrbit.loadCollections()
         onGroupClicked: (collection) => root.openBooksOf("Collection", collection.name, "collection",
                                                         [String(collection.id)])
@@ -465,15 +460,15 @@ Window {
         sortText: "By " + seriesQuery.sortOptions[seriesQuery.sortIndex]
         sortReversed: seriesQuery.sortReversed
         descending: seriesQuery.sortDescending
-        // Its jump rail level with the library's, spaced the same
+        // Jump rail aligned and spaced like the library's
         jumpRailTop: libraryRail.entriesY - y
         jumpRailPitch: libraryRail.pitch
         sortOpen: sortMenu.visible
         tabOverhang: sortMenu.border.width - 1
         onSortClicked: root.toggleDropdown(sortMenu)
         onSortIconClicked: seriesQuery.reverseSort()
-        // Listed the first time the view opens: a large library has many series, and
-        // their formats take a request for every few
+        // Loaded the first time the view opens: large libraries have many series, and their
+        // formats take a request per few series
         onVisibleChanged: if (visible && !bookOrbit.seriesLoaded) bookOrbit.loadSeries()
         onGroupClicked: (series) => root.openBooksOf("Series", series.name, "series", [series.name])
     }
@@ -483,7 +478,7 @@ Window {
         visible: bookOrbit.signedIn && root.showingAuthors
         model: bookOrbit.authorsList
         jumpSections: bookOrbit.authorJumpSections
-        // Under a filter, the authors show once their books have been looked up
+        // With a filter on, authors appear once their books have been looked up
         loaded: bookOrbit.authorsLoaded && (bookOrbit.authorBooksLoaded
                                             || (authorsQuery.filterIndex === 0 && !authorsQuery.downloadedOnly))
         emptyText: authorsQuery.downloadedOnly ? "No authors with downloaded books"
@@ -499,7 +494,7 @@ Window {
         sortText: "By " + authorsQuery.sortOptions[authorsQuery.sortIndex]
         sortReversed: authorsQuery.sortReversed
         descending: authorsQuery.sortDescending
-        // Its jump rail level with the library's, spaced the same
+        // Jump rail aligned and spaced like the library's
         jumpRailTop: libraryRail.entriesY - y
         jumpRailPitch: libraryRail.pitch
         sortOpen: sortMenu.visible
@@ -507,7 +502,7 @@ Window {
         onFilterClicked: root.toggleDropdown(filterMenu)
         onSortClicked: root.toggleDropdown(sortMenu)
         onSortIconClicked: authorsQuery.reverseSort()
-        // Listed the first time the view opens, as the series are
+        // Loaded the first time the view opens, like the series
         onVisibleChanged: if (visible && !bookOrbit.authorsLoaded) bookOrbit.loadAuthors()
         onGroupClicked: (author) => {
             authorInfoPage.show(author.id)
@@ -529,7 +524,7 @@ Window {
             { label: "Authors", icon: "e3_filter_author" }
         ]
         onTabClicked: (index) => {
-            // Tapping the current view's tab again goes back to the top of its list
+            // Tapping the current tab again scrolls its list to the top
             if (index === currentIndex) {
                 root.activeList.positionViewAtBeginning()
             } else {
@@ -539,8 +534,8 @@ Window {
         }
     }
 
-    // While a filter or sort menu is open the whole window fades, as in Libby; a tap
-    // anywhere else closes it
+    // While a filter or sort menu is open the window fades, as in Libby. Tapping elsewhere
+    // closes it.
     Rectangle {
         anchors.fill: parent
         z: 1
@@ -551,7 +546,7 @@ Window {
             onClicked: root.closeDropdowns()
         }
     }
-    // The open tab, drawn over the fading at the sub-toolbar's position in the list
+    // The open tab, drawn over the fade at the sub-toolbar's position
     SubToolbar {
         id: openTab
         visible: root.dropdownOpen
@@ -592,7 +587,7 @@ Window {
                 }
             }
         }
-        // Goes with the content type, so the menu stays open to choose that too
+        // Tied to the content type, so the menu stays open for that choice too
         SwitchMenuItem {
             text: "Downloaded only"
             checked: root.activeQuery.downloadedOnly
@@ -625,8 +620,8 @@ Window {
         }
     }
 
-    // Header menu: drops down from the menu button. As in the system apps, the page
-    // below the header fades while it is open; a tap there closes it.
+    // Header menu, dropping from the menu button. As in the system apps, the page below the
+    // header fades and tapping it closes the menu.
     Rectangle {
         anchors.top: header.bottom
         anchors.bottom: parent.bottom
@@ -645,7 +640,7 @@ Window {
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(1)
         anchors.right: parent.right
-        anchors.rightMargin: Units.dp(9)   // 20px from the screen edge
+        anchors.rightMargin: Units.dp(9)
 
         PopupMenuItem {
             visible: bookOrbit.signedIn
@@ -686,7 +681,7 @@ Window {
             const name = authorInfoPage.author.name
             root.openBooksOf("Author", name, "author", [name])
         }
-        // Straight to the one series, if that's all there is
+        // Go straight to the series if there's only one
         onSeriesClicked: {
             const names = authorInfoPage.seriesNames
             if (authorInfoPage.seriesCount === 1 && names.length === 1)
@@ -696,8 +691,8 @@ Window {
         }
     }
 
-    // An author's series, from their info page: the Series view's rows under a toolbar
-    // with a back button, e.g. "SERIES / ADRIAN TCHAIKOVSKY"
+    // An author's series, opened from their info page: Series rows under a toolbar with a
+    // back button, e.g. "SERIES / ADRIAN TCHAIKOVSKY"
     Rectangle {
         id: authorSeriesView
         property string name
@@ -727,7 +722,7 @@ Window {
             sortText: "By " + authorSeriesQuery.sortOptions[authorSeriesQuery.sortIndex]
             sortReversed: authorSeriesQuery.sortReversed
             descending: authorSeriesQuery.sortDescending
-            // Its jump rail level with the library's, spaced the same
+            // Jump rail aligned and spaced like the library's
             jumpRailTop: libraryRail.entriesY - y
             jumpRailPitch: libraryRail.pitch
             sortOpen: sortMenu.visible
@@ -740,10 +735,10 @@ Window {
 
     BooksOfPage {
         id: booksOfPage
-        // Its jump rail starts level with the library's, spaced the same
+        // Jump rail aligned and spaced like the library's
         jumpRailTop: libraryRail.entriesY
         jumpRailPitch: libraryRail.pitch
-        // Its sub-toolbar, with the shared menus
+        // Sub-toolbar, using the shared menus
         filterText: root.filterOptions[root.booksOfQuery.filterIndex]
         sortText: "By " + root.booksOfQuery.sortOptions[root.booksOfQuery.sortIndex]
         sortReversed: root.booksOfQuery.sortReversed
@@ -771,14 +766,14 @@ Window {
         anchors.fill: parent
         visible: root.showingInfo
         onBack: root.showingInfo = false
-        // The books-of page is under this one, so this one closes
+        // Close this page, since the books-of page is underneath
         onBooksOfChosen: (field, values, title) => {
             root.showingInfo = false
             root.openBooksOfChosen(field, values, title)
         }
     }
 
-    // Over the pages, from any of their book lists
+    // Over the pages, opened from any of their book lists
     BookMenu {
         id: bookMenu
         anchors.fill: parent
@@ -796,8 +791,8 @@ Window {
         }
     }
 
-    // Asks before deleting a book from the device, as the system library does (screenshot
-    // 13). Deletes every version of it there, ebook and audiobook.
+    // Confirms deleting a book from the device, as the system library does (screenshot 13).
+    // Deletes every version on the device.
     SystemDialog {
         id: deleteDialog
         anchors.fill: parent
@@ -841,7 +836,7 @@ Window {
         }
     }
 
-    // Over everything, the search page too
+    // Above everything, including the search page
     DownloadDialog {
         id: downloadDialog
         anchors.fill: parent
@@ -851,7 +846,7 @@ Window {
         id: findBooksDialog
         anchors.fill: parent
     }
-    // Says diagnostics logging has been turned on or off, by tapping the title six times
+    // Shown when tapping the title six times turns diagnostics logging on or off
     SystemDialog {
         id: diagnosticsDialog
         anchors.fill: parent
@@ -875,12 +870,12 @@ Window {
             wrapMode: Text.Wrap
         }
     }
-    // The first start adds the app's tile to the applications, which shows only after a
-    // restart
+    // On first run, the app adds its tile to the applications screen. It only appears after
+    // a restart.
     SystemDialog {
         id: launcherTileDialog
         anchors.fill: parent
-        // The device takes a while to start restarting, so the dialog stays to say so
+        // The device is slow to begin restarting, so the dialog stays up to say so
         property bool restarting: false
         visible: launcherTile.added
         icon: "icon_information"
@@ -893,7 +888,7 @@ Window {
                 visible = false
         }
 
-        // Gives the screen time to show the dialog's restarting message first
+        // Give the screen time to show the restarting message first
         Timer {
             id: restartTimer
             interval: 500
@@ -917,8 +912,8 @@ Window {
             wrapMode: Text.Wrap
         }
     }
-    // Signing in for the first time offers to find the books already on the device, if
-    // there are any. Only the once: after that it's in the menu.
+    // After the first sign-in, offer to find books already on the device, if there are any.
+    // Only once; after that it's in the menu.
     Connections {
         target: bookOrbit
         function onSignedInChanged() {

@@ -21,7 +21,7 @@
 
 int main(int argc, char *argv[])
 {
-    // Connect to the PocketBook system (on PC this opens the emulator window)
+    // Connect to the PocketBook system (opens the emulator window on PC)
     InitInkview(ACTIVETASK);
 
     // Render Qt through the PocketBook e-ink platform plugin
@@ -30,16 +30,15 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     diagnostics::captureQtMessages();
     app.setFont(QFont(QString::fromUtf8(iv_get_default_font(FONT_FAMILY))));
-    // A blinking cursor redraws the screen twice a second for as long as a text field has
-    // focus, and every redraw is a slow e-ink update. Keep the cursor solid instead.
+    // A blinking cursor redraws the screen twice a second while a text field has focus, and
+    // every redraw is a slow e-ink update. Keep it solid.
     app.styleHints()->setCursorFlashTime(0);
     LauncherTile launcherTile;
 
-    // /mnt/ext1/system/config on the device, ./system/config in the emulator.
-    // PBOOKORBIT_DB points automated tests at their own database, so they don't touch the
-    // saved login.
+    // /mnt/ext1/system/config on the device, ./system/config in the emulator. PBOOKORBIT_DB
+    // lets tests use their own database and leave the saved login alone.
     Database database(qEnvironmentVariable("PBOOKORBIT_DB", QString::fromUtf8(CONFIGPATH "/pbookorbit.db")));
-    // Before anything else logs: whether diagnostics logging is on is one of the settings
+    // First, before anything logs: the diagnostics setting lives in the database
     diagnostics::Log diagnosticsLog(&database);
     BookOrbitClient client(&database);
 
@@ -53,7 +52,7 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("screenWidth", ScreenWidth());
-    // Pixels per dp, for units.js: the SDK's qml_test example scales sizes the same way
+    // Pixels per dp for units.js, scaled the same way as the SDK's qml_test example
     engine.rootContext()->setContextProperty("dpScale", get_screen_dpi() * get_screen_scale_factor() / 160.0);
     // Leave room for the system status bar, as the SDK's browser-minimal example does
     engine.rootContext()->setContextProperty("windowHeight", ScreenHeight() - PanelHeight());
@@ -67,7 +66,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("launcherTile", &launcherTile);
     // Icons from the system theme: image://theme/<name>
     engine.addImageProvider("theme", new ThemeImageProvider);
-    // Pictures drawn inverted for night mode: image://inverted/<file or qrc URL>
+    // Images drawn inverted for night mode: image://inverted/<file or qrc URL>
     engine.addImageProvider("inverted", new InvertedImageProvider);
     engine.load(QUrl("qrc:/qml/main.qml"));
     if (engine.rootObjects().isEmpty())

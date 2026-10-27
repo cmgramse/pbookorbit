@@ -3,15 +3,15 @@ import QtQuick.Controls
 import "units.js" as Units
 import "night.js" as Night
 
-// Sign-in form, centred on the page: server, username and password fields, status line,
-// button. Uses the same username and password as the BookOrbit website. The server is a
-// field until a sign-in has worked, then a pill whose cross forgets it.
+// Sign-in form, centred: server, username and password fields, status line and button. Uses
+// the BookOrbit website's username and password. The server is a field until a sign-in
+// succeeds, then a pill whose cross clears it.
 Item {
     id: page
-    // The form can move up under the header while the keyboard is open
+    // The form can slide up under the header while the keyboard is open
     clip: true
 
-    // True while either field has focus, for the quicker e-ink update mode
+    // True while either field has focus, for faster e-ink updates
     readonly property bool typing: serverField.activeFocus || usernameField.activeFocus
                                    || passwordField.activeFocus
     readonly property string server: bookOrbit.serverUrl !== "" ? bookOrbit.serverUrl : serverField.text.trim()
@@ -21,16 +21,16 @@ Item {
     function signIn() {
         if (!canSignIn)
             return
-        // The button doesn't take focus, so the field would keep it and the system keyboard
-        // would stay up: move focus off the fields and close the keyboard first
+        // The button doesn't take focus, so the field would keep it and the keyboard would
+        // stay up. Clear focus and close the keyboard first.
         page.forceActiveFocus()
         Qt.inputMethod.hide()
         bookOrbit.signIn(page.server, usernameField.text, passwordField.text)
         passwordField.text = ""
     }
 
-    // How far the form is moved up so the focused field sits above the on-screen keyboard.
-    // Set in one step (no animation: on e-ink that is only extra redraws).
+    // How far the form shifts up so the focused field clears the on-screen keyboard. Set in
+    // one step, since animation on e-ink is just extra redraws.
     property real keyboardShift: 0
 
     function updateKeyboardShift() {
@@ -42,20 +42,20 @@ Item {
             keyboardShift = 0
             return
         }
-        // Where the field's bottom would be with the form unshifted, plus a gap
+        // The field's bottom with the form unshifted, plus a gap
         const fieldBottom = field.mapToItem(null, 0, field.height).y + keyboardShift + Units.dp(16)
         keyboardShift = Math.max(0, fieldBottom - keyboard.y)
         diagnostics.trace("keyboard at y " + keyboard.y + ", form moved up " + keyboardShift)
     }
 
-    // The keyboard rectangle arrives a moment after the keyboard is reported visible
+    // The keyboard's rectangle arrives shortly after it's reported visible
     Connections {
         target: Qt.inputMethod
         function onVisibleChanged() { Qt.callLater(page.updateKeyboardShift) }
         function onKeyboardRectangleChanged() { Qt.callLater(page.updateKeyboardShift) }
     }
 
-    // A field's name, tucked under its underline, left aligned
+    // Field label, under its underline, left aligned
     component FieldLabel: Text {
         width: parent.width
         topPadding: Units.dp(3)
@@ -63,7 +63,7 @@ Item {
         font.capitalization: Font.AllUppercase
     }
 
-    // On a faint grey fill, with just an underline, thicker while typing in it
+    // Faint grey fill with an underline that thickens while typing
     component FormField: TextField {
         id: field
         width: parent.width
@@ -91,8 +91,8 @@ Item {
         width: Math.min(parent.width - 2 * Units.dp(20), Units.dp(360))
         spacing: Units.dp(18)
 
-        // As high with the pill as with the field and its label, so the form below stays put
-        // when the server is forgotten. The label's space sets the pill apart from the form.
+        // Same height with the pill as with the field and label, so the form doesn't move
+        // when the server is cleared. The label's space separates the pill from the form.
         Column {
             width: parent.width
             height: serverField.implicitHeight + serverLabel.implicitHeight
@@ -104,7 +104,7 @@ Item {
                 onAccepted: usernameField.forceActiveFocus()
                 onActiveFocusChanged: Qt.callLater(page.updateKeyboardShift)
             }
-            // The saved server, in the user's accent colour, as high as a field
+            // The saved server, in the accent colour, at field height
             Rectangle {
                 id: serverPill
                 visible: bookOrbit.serverUrl !== ""
@@ -119,7 +119,7 @@ Item {
                     anchors.leftMargin: Units.dp(16)
                     anchors.right: forget.left
                     anchors.verticalCenter: parent.verticalCenter
-                    // https:// is assumed, so only http:// is worth showing
+                    // https:// is assumed, so only http:// is shown
                     text: bookOrbit.serverUrl.replace(/^https:\/\//, "")
                     color: serverPill.textColor
                     font.pointSize: 8
@@ -132,7 +132,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.height
                     height: parent.height
-                    // The theme's cross is black: turned white for the darker accents
+                    // The theme's cross is black; inverted to white on darker accents
                     icon: serverPill.textColor.hslLightness > 0.5 ? "close@inverted" : "close"
                     iconSize: Units.dp(20)
                     fallbackText: "×"
@@ -173,7 +173,7 @@ Item {
             FieldLabel { text: "Password" }
         }
 
-        // The last error; keeps its space so the button doesn't jump
+        // The last error. Keeps its space so the button doesn't jump.
         Text {
             width: parent.width
             height: Math.max(implicitHeight, Units.dp(40))

@@ -11,20 +11,18 @@
 class BookOrbitClient;
 class Database;
 
-// Finds books that were on the device before the app, such as ones downloaded through
-// KOReader, and records the ones in the BookOrbit library as downloaded.
+// Finds books that were already on the device (e.g. downloaded through KOReader) and
+// records the ones in the BookOrbit library as downloaded.
 //
-// Looks through the Books, Audio Books and Downloads folders for book files the app
-// hasn't recorded. A file is the library's book when, in order:
-//   1. KOReader's BookOrbit plugin says so: its state file (bookorbit_sync_state*.lua)
-//      lists the book and file ids of every file it downloaded or matched. Only for this
-//      server, and only if the file is still the one it saw (same partial MD5).
-//   2. Its partial MD5, the hash KOReader identifies books by, is a library file's.
-//   3. Its name is a library file's name.
-// For 2 and 3 the candidates are the library books whose title is in the file's name, as
-// whole words, with the same format; the best three are looked up. A file whose name has
-// a book's title and author but matched neither way is only a guess: those are kept as
-// unsure, for the user to add or not.
+// Scans Books, Audio Books and Downloads for files the app hasn't recorded. A file matches
+// a library book if, in order:
+//   1. KOReader's BookOrbit plugin lists it in its state file (bookorbit_sync_state*.lua)
+//      for this server, and the file is unchanged (same partial MD5).
+//   2. Its partial MD5, KOReader's book hash, matches a library file.
+//   3. Its name matches a library file's name.
+// Candidates for 2 and 3 are library books in the same format whose title appears in the
+// file name as whole words; the best three are looked up. A name containing a book's title
+// and author that matches neither way is kept as an unsure guess for the user to confirm.
 class BookFinder : public QObject
 {
     Q_OBJECT
@@ -32,8 +30,8 @@ class BookFinder : public QObject
     Q_PROPERTY(QString state READ state NOTIFY changed)
     // How far the search is, 0-100
     Q_PROPERTY(int percent READ percent NOTIFY changed)
-    // Once done: the books found and recorded, the guesses (each {fileName, title}), and
-    // how many files are in neither
+    // When done: books found and recorded, guesses ({fileName, title} each), and how many
+    // files matched neither
     Q_PROPERTY(int foundCount READ foundCount NOTIFY changed)
     Q_PROPERTY(QVariantList unsure READ unsure NOTIFY changed)
     Q_PROPERTY(int notFoundCount READ notFoundCount NOTIFY changed)
@@ -51,14 +49,14 @@ public:
     int notFoundCount() const { return m_notFoundCount; }
     QString error() const { return m_error; }
 
-    // Book files on the device that the app hasn't recorded
+    // Book files on the device the app hasn't recorded
     Q_INVOKABLE int unrecordedCount() const;
     // Whether to offer a search: once, after the first sign-in, if there's anything to find
     Q_INVOKABLE bool shouldOffer() const;
     Q_INVOKABLE void markOffered();
     Q_INVOKABLE void start();
     Q_INVOKABLE void cancel();
-    // Records the unsure books too
+    // Also records the unsure matches
     Q_INVOKABLE void addUnsure();
 
 signals:
@@ -79,12 +77,12 @@ private:
     };
 
     QList<LocalFile> unrecordedFiles() const;
-    // From the KOReader plugin's state files for this server: local path -> its match
+    // Matches from the KOReader plugin's state files for this server: local path -> match
     QHash<QString, KoreaderMatch> koreaderMatches() const;
     void loadLibraryPage(int libraryId, int page, int generation);
-    // With the whole library in, sorts the files into found and to look up
+    // Once the library has loaded, splits files into found and still to look up
     void matchFiles(int generation);
-    // Looks up the next candidate of the file at m_pending[index]
+    // Looks up the next candidate for m_pending[index]
     void checkCandidate(int index, int candidate, int generation);
     void finish(int generation);
     void fail(const QString &error);
@@ -98,14 +96,14 @@ private:
     int m_foundCount = 0;
     int m_notFoundCount = 0;
     QString m_error;
-    // Bumped by each search, so replies to a cancelled one are ignored
+    // Bumped per search, so replies to a cancelled one are ignored
     int m_generation = 0;
 
-    // The search under way
+    // The current search
     QList<LocalFile> m_files;
     QHash<QString, KoreaderMatch> m_koreader;
     QList<QVariantMap> m_library;   // list entries
-    QList<QString> m_titleKeys;     // normalised titles, as m_library
+    QList<QString> m_titleKeys;     // normalised titles, parallel to m_library
     QList<QString> m_authorKeys;    // normalised last name of the first author
     QHash<int, int> m_libraryIndex; // book id -> index in m_library
     int m_libraryTotal = 0;

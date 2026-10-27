@@ -2,34 +2,33 @@ import QtQuick
 import QtQuick.Controls
 import "units.js" as Units
 
-// Full-window search page, after the library app's search on an Era Color: the toolbar
-// becomes a back button and a search box, with recent searches below. From three
-// characters on, the books matching the search replace the recent searches.
+// Full-window search page, modelled on the Era Color library's search: the toolbar turns
+// into a back button and search box, with recent searches below. From three characters,
+// matching books replace the recent searches.
 //
-// A search is kept in the recent searches once the keyboard goes away for it: Enter,
-// scrolling the results or tapping a book (or the keyboard's own close key). Going back
-// doesn't keep it.
+// A search is saved to recent searches when the keyboard closes for it (Enter, scrolling
+// the results, tapping a book, or the keyboard's close key). Going back doesn't save it.
 Rectangle {
     id: page
-    // For the device's page-turn keys, which main.qml sends to the page in front
+    // For the page-turn keys, which main.qml forwards to the front page
     readonly property alias pageButtons: resultsPages
     color: "white"
 
-    // Same height as the main toolbar, so the page below doesn't jump when switching
+    // Same height as the main toolbar, so the page below doesn't jump
     property int headerHeight: Units.dp(56)
-    // True while the search box has focus, for the quicker e-ink update mode
+    // True while the search box has focus, for faster e-ink updates
     readonly property bool typing: searchField.activeFocus
-    // Enough typed to search (bookOrbit.search() ignores anything shorter)
+    // Long enough to search (bookOrbit.search() ignores shorter text)
     readonly property bool showResults: searchField.text.trim().length >= 3
 
     signal back()
     signal bookClicked(var book)
     signal bookHeld(BookRow row)
 
-    // Set while going back, so the search box losing focus doesn't keep the search
+    // Set while going back, so losing focus doesn't save the search
     property bool closing: false
 
-    // Focus the search box, which brings up the on-screen keyboard
+    // Focusing the search box opens the on-screen keyboard
     function open() {
         searchField.forceActiveFocus()
     }
@@ -42,14 +41,14 @@ Rectangle {
         page.back()
     }
 
-    // Ends the typing: the search box loses focus, which keeps the search
+    // Finishes typing: the box loses focus, which saves the search
     function hideKeyboard() {
         page.forceActiveFocus()
         Qt.inputMethod.hide()
     }
 
-    // Closing the on-screen keyboard ends the editing: the box loses focus and its thick
-    // border. Tapping the box focuses it again.
+    // Closing the on-screen keyboard ends editing: the box loses focus and its thick
+    // border. Tapping it focuses it again.
     Connections {
         target: Qt.inputMethod
         enabled: page.visible
@@ -67,7 +66,7 @@ Rectangle {
         IconButton {
             id: backButton
             // Chevron with a little space either side; the search box starts after it
-            x: Units.dp(7)   // 15px
+            x: Units.dp(7)
             anchors.verticalCenter: parent.verticalCenter
             icon: "back"
             pressedIcon: "back_inv"
@@ -75,12 +74,12 @@ Rectangle {
             onClicked: page.close()
         }
 
-        // Fills the toolbar right of the back button. While the field has focus it gets a
-        // thick black border (covering the toolbar's bottom line); otherwise just a 1px line
-        // on its left, like the rest of the toolbar.
+        // Fills the toolbar right of the back button. With focus it gets a thick black
+        // border (covering the toolbar's bottom line), otherwise a 1px line on its left
+        // like the rest of the toolbar.
         Rectangle {
             id: searchBox
-            readonly property int thickBorder: Units.dp(2)   // 5px
+            readonly property int thickBorder: Units.dp(2)
             x: backButton.x + backButton.width + Units.dp(7)
             width: parent.width - x
             height: parent.height
@@ -103,18 +102,18 @@ Rectangle {
                 // Not every theme has the transparent version
                 onStatusChanged: if (status === Image.Error) source = "image://theme/search"
             }
-            // Clears the box, once there is something in it. Under three characters the
-            // results give way to the recent searches, so clearing goes back to them.
+            // Clears the box once it has text. Under three characters the recent searches
+            // come back, so clearing returns to them.
             IconButton {
                 id: clearButton
                 visible: searchField.text !== ""
                 anchors.right: parent.right
                 anchors.rightMargin: searchBox.thickBorder
                 anchors.verticalCenter: parent.verticalCenter
-                // The icon at 2/3 its own size (110px), the tap target still the full size
-                width: Units.dp(51)        // 111px
+                // Icon at 2/3 of its natural size, tap target full size
+                width: Units.dp(51)
                 height: Units.dp(51)
-                iconSize: Units.dp(34)     // 74px
+                iconSize: Units.dp(34)
                 icon: "remove"
                 pressedIcon: "remove_inv"
                 fallbackText: "×"
@@ -131,10 +130,10 @@ Rectangle {
                 placeholderText: "Search…"
                 placeholderTextColor: "#949494"
                 background: null
-                // Search once typing pauses, rather than for every letter; clearing the
-                // results (under three characters) needn't wait
+                // Search when typing pauses, not on every letter. Clearing (under three
+                // characters) needn't wait.
                 onTextChanged: {
-                    // The text itself: showResults may not have caught up with it yet
+                    // Use the text itself; showResults may not have caught up yet
                     if (text.trim().length >= 3)
                         searchTimer.restart()
                     else {
@@ -147,10 +146,10 @@ Rectangle {
                         return
                     searchTimer.stop()
                     bookOrbit.search(text)
-                    // Done typing: put the keyboard away to show the results
+                    // Done typing: hide the keyboard to show the results
                     page.hideKeyboard()
                 }
-                // However the typing ends, bar going back, the search is kept
+                // Save the search however typing ends, except going back
                 onActiveFocusChanged: {
                     if (!activeFocus && page.visible && !page.closing)
                         bookOrbit.addRecentSearch(text)
@@ -163,7 +162,7 @@ Rectangle {
             }
         }
 
-        // Toolbar line along the bottom, under the back button too
+        // Toolbar bottom line, under the back button too
         Rectangle {
             anchors.bottom: parent.bottom
             width: parent.width
@@ -178,7 +177,7 @@ Rectangle {
         visible: !page.showResults
         anchors.top: header.bottom
         width: parent.width
-        height: Units.dp(56)   // 122px
+        height: Units.dp(56)
 
         Text {
             anchors.centerIn: parent
@@ -215,7 +214,7 @@ Rectangle {
             }
             Text {
                 anchors.left: parent.left
-                anchors.leftMargin: Units.dp(42)   // 92px
+                anchors.leftMargin: Units.dp(42)
                 anchors.right: parent.right
                 anchors.rightMargin: Units.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
@@ -229,7 +228,7 @@ Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: Units.dp(26)   // 57px
+                anchors.leftMargin: Units.dp(26)
                 anchors.rightMargin: Units.dp(26)
                 height: 1
                 color: "#7f7f7f"
@@ -238,8 +237,8 @@ Rectangle {
                 id: rowMouse
                 anchors.fill: parent
                 onClicked: {
-                    // Searched again, so it moves to the top. The list changes under the
-                    // tap, so take the text first.
+                    // Searched again, so it moves to the top. Grab the text first, since
+                    // the list changes under the tap.
                     const search = modelData
                     searchField.text = search
                     bookOrbit.addRecentSearch(search)
@@ -248,8 +247,8 @@ Rectangle {
         }
     }
 
-    // Matching books, in the library's rows without its sections. Loads as it scrolls,
-    // like the library list.
+    // Matching books, as library rows without sections. Loads on scroll like the library
+    // list.
     ListView {
         id: results
         visible: page.showResults
@@ -289,8 +288,8 @@ Rectangle {
             }
         }
 
-        // Fast black-and-white updates while it scrolls, as in the library list. Scrolling
-        // the results ends the typing.
+        // Fast black-and-white updates while scrolling, as in the library list. Scrolling
+        // also ends typing.
         onMovementStarted: {
             page.hideKeyboard()
             const pos = mapToGlobal(0, 0)
@@ -302,7 +301,7 @@ Rectangle {
         delegate: BookRow {
             id: bookRow
             required book
-            // Ends the typing too, which keeps the search
+            // Also ends typing, which saves the search
             onClicked: {
                 page.hideKeyboard()
                 page.bookClicked(book)

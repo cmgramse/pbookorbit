@@ -1,11 +1,10 @@
 import QtQuick
 import "units.js" as Units
 
-// Button in the style of PocketBook's own apps, measured from the OverDrive sign-in
-// screen on an Era Color: pill-shaped, 121px tall, 1px pure black border, about 77px
-// between border and content, label in capitals, optional theme icon on the left.
-// Inverted while pressed. While busy, a spinner turns at its right end and it can't be
-// pressed.
+// Button in PocketBook's native style, measured from the OverDrive sign-in screen on an Era
+// Color: pill-shaped with a 1px pure black border, capitalised label, optional theme icon
+// on the left. Inverted while pressed. While busy, a spinner turns at its right end and it
+// can't be pressed.
 Rectangle {
     id: button
     property alias text: label.text
@@ -19,7 +18,7 @@ Rectangle {
     implicitWidth: Math.max(Units.dp(200), content.implicitWidth + 2 * padding)
     implicitHeight: Units.dp(56)
     radius: height / 2
-    // One device pixel, like the native buttons, so not scaled with dp()
+    // One device pixel like the native buttons, so not dp-scaled
     border.width: 1
     border.color: "black"
     color: mouse.pressed ? "black" : "white"
