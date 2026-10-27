@@ -89,6 +89,10 @@ Window {
         showMenu: bookOrbit.signedIn
         onHomeClicked: Qt.quit()
         onTitleClicked: root.backToTop()
+        onSecretTapped: {
+            diagnostics.toggle()
+            diagnosticsDialog.visible = true
+        }
         onSearchClicked: root.openSearch()
         onMenuClicked: menu.visible = !menu.visible
     }
@@ -846,6 +850,30 @@ Window {
     FindBooksDialog {
         id: findBooksDialog
         anchors.fill: parent
+    }
+    // Says diagnostics logging has been turned on or off, by tapping the title six times
+    SystemDialog {
+        id: diagnosticsDialog
+        anchors.fill: parent
+        icon: "icon_information"
+        buttons: [["Close", "close"]]
+        onPressed: visible = false
+
+        Text {
+            width: parent.width
+            text: diagnostics.enabled ? "Diagnostics logging is on" : "Diagnostics logging is off"
+            font.pointSize: 7.25
+            font.bold: true
+            wrapMode: Text.Wrap
+        }
+        Text {
+            width: parent.width
+            text: diagnostics.enabled
+                  ? "Details for bug reports are written to pbookorbit.log on your device's storage."
+                  : "Only startup details and errors are written to pbookorbit.log."
+            font.pointSize: 7.25
+            wrapMode: Text.Wrap
+        }
     }
     // The first start adds the app's tile to the applications, which shows only after a
     // restart

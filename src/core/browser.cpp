@@ -37,11 +37,11 @@ bool Browser::open(const QString &address)
     }
     const QByteArray encoded = url.toEncoded();
 #ifdef EMULATOR
-    diagnostics::log("would open " + QString::fromUtf8(encoded) + " in the browser");
+    diagnostics::trace("would open " + QString::fromUtf8(encoded) + " in the browser");
     return true;
 #else
     const int rc = OpenBook(m_app.toUtf8().constData(), encoded.constData(), 0);
-    diagnostics::log(QString("OpenBook %1 %2 -> %3").arg(m_app, QString::fromUtf8(encoded)).arg(rc));
+    (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenBook %1 %2 -> %3").arg(m_app, QString::fromUtf8(encoded)).arg(rc));
     return rc >= 0;
 #endif
 }

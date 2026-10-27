@@ -1669,7 +1669,7 @@ void BookOrbitClient::ensureNetwork()
         QElapsedTimer netTimer;
         netTimer.start();
         const int rc = NetConnect2(nullptr, 1);
-        diagnostics::log(QString("NetConnect2 -> %1 after %2 ms").arg(rc).arg(netTimer.elapsed()));
+        (rc != 0 ? diagnostics::log : diagnostics::trace)(QString("NetConnect2 -> %1 after %2 ms").arg(rc).arg(netTimer.elapsed()));
     }
 #endif
 }
@@ -1692,7 +1692,7 @@ void BookOrbitClient::startStream(const QString &path, std::function<void(QNetwo
         request.setRawHeader("Authorization", "Bearer " + m_accessToken.toUtf8());
         // A book can take a while: only give up if nothing arrives for a minute
         request.setTransferTimeout(60000);
-        diagnostics::log("GET " + path + " (streamed)");
+        diagnostics::trace("GET " + path + " (streamed)");
         onStarted(m_nam.get(request));
     });
 }
@@ -1731,7 +1731,8 @@ void BookOrbitClient::send(const QByteArray &method, const QString &path, const 
 
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const QByteArray data = reply->readAll();
-        diagnostics::log(QString("%1 %2 -> %3 (%4 bytes) in %5 ms")
+        (reply->error() != QNetworkReply::NoError ? diagnostics::log : diagnostics::trace)(
+                QString("%1 %2 -> %3 (%4 bytes) in %5 ms")
                              .arg(QString::fromLatin1(method), path)
                              .arg(status ? QString::number(status) : reply->errorString())
                              .arg(data.size()).arg(timer.elapsed()));

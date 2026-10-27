@@ -3,7 +3,7 @@ import "units.js" as Units
 
 // Top toolbar: home button, title, optional search and menu buttons, and a 1px line
 // underneath. As in the system apps, home leaves the app for the dashboard; the title
-// can be tapped too.
+// can be tapped too. Tapping it six times in quick succession is secretTapped().
 // Follows AppHeader.qml in the SDK's qml_test example: theme icons at their own size,
 // dp(15) from the edges. Taller than dp(56) if the theme's icons are.
 Rectangle {
@@ -14,6 +14,7 @@ Rectangle {
     property bool showMenu: true
     signal homeClicked()
     signal titleClicked()
+    signal secretTapped()
     signal searchClicked()
     signal menuClicked()
 
@@ -51,7 +52,24 @@ Rectangle {
             width: parent.width
             height: header.height - separator.height
             anchors.centerIn: parent
+            // Counts presses: Qt can take the second of two quick taps as a double click
+            // and not report it as a click
+            onPressed: {
+                tapTimer.taps++
+                tapTimer.restart()
+                if (tapTimer.taps === 6) {
+                    tapTimer.taps = 0
+                    header.secretTapped()
+                }
+            }
             onClicked: header.titleClicked()
+        }
+        // The taps start counting again after a pause
+        Timer {
+            id: tapTimer
+            property int taps: 0
+            interval: 800
+            onTriggered: taps = 0
         }
     }
 

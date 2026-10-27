@@ -32,7 +32,7 @@ void Eink::followNightMode()
             if (nightMode == m_nightMode)
                 return;
             m_nightMode = nightMode;
-            diagnostics::log(m_nightMode ? "night mode on" : "night mode off");
+            diagnostics::trace(m_nightMode ? "night mode on" : "night mode off");
             emit nightModeChanged();
             // Most of the window is unchanged, so only a full update redraws it all
             if (auto *platform = einkPlatform())
@@ -56,7 +56,7 @@ void Eink::enterA2ForFlick(int x, int y, int width, int height)
         // auto_exit would leave A2 as soon as the finger lifts, while the list is still
         // coasting; leaveA2() ends it when the movement has really stopped
         platform->a2ForFlick({x, y, width, height, 0}, false);
-        diagnostics::log(QString("A2 on for %1,%2 %3x%4").arg(x).arg(y).arg(width).arg(height));
+        diagnostics::trace(QString("A2 on for %1,%2 %3x%4").arg(x).arg(y).arg(width).arg(height));
     }
 }
 
@@ -64,7 +64,7 @@ void Eink::leaveA2Soon()
 {
     if (auto *platform = einkPlatform(); platform && platform->isInA2()) {
         platform->timedLeaveA2(a2SettleMs);
-        diagnostics::log(QString("A2 off in %1 ms").arg(a2SettleMs));
+        diagnostics::trace(QString("A2 off in %1 ms").arg(a2SettleMs));
     }
 }
 
@@ -73,7 +73,7 @@ void Eink::leaveA2()
     if (auto *platform = einkPlatform(); platform && platform->isInA2()) {
         platform->cancelLeaveA2Timer();
         platform->leaveA2();
-        diagnostics::log("A2 off");
+        diagnostics::trace("A2 off");
     }
 }
 
@@ -88,7 +88,7 @@ void Eink::setDynamicUpdates(bool enabled)
     // text and 1px lines, and the text fields have both
     using Mode = pocketbook::utilities::EinkPlatformInterface::DynamicUpdateMode;
     platform->setDynamicUpdateMode(enabled ? Mode::Enabled : Mode::Disabled);
-    diagnostics::log(enabled ? "dynamic updates on" : "dynamic updates off");
+    diagnostics::trace(enabled ? "dynamic updates on" : "dynamic updates off");
 
     // Redraw at normal quality, clearing any artifacts left from typing
     if (!enabled) {

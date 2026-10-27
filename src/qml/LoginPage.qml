@@ -45,7 +45,7 @@ Item {
         // Where the field's bottom would be with the form unshifted, plus a gap
         const fieldBottom = field.mapToItem(null, 0, field.height).y + keyboardShift + Units.dp(16)
         keyboardShift = Math.max(0, fieldBottom - keyboard.y)
-        diagnostics.log("keyboard at y " + keyboard.y + ", form moved up " + keyboardShift)
+        diagnostics.trace("keyboard at y " + keyboard.y + ", form moved up " + keyboardShift)
     }
 
     // The keyboard rectangle arrives a moment after the keyboard is reported visible

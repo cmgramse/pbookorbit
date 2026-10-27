@@ -1,5 +1,6 @@
 #include "core/diagnostics.h"
 
+#include "core/database.h"
 #include <inkview.h>
 #include <QDateTime>
 #include <QFile>
@@ -11,6 +12,12 @@
 #include <cstring>
 
 namespace diagnostics {
+
+static const char *const SETTING = "diagnosticsLogging";
+
+static bool tracing = false;
+// The frame and memory counter, run while tracing
+static QTimer *statsTimer = nullptr;
 
 static QFile *logFile()
 {
@@ -36,6 +43,12 @@ void log(const QString &message)
     }
 }
 
+void trace(const QString &message)
+{
+    if (tracing)
+        log(message);
+}
+
 void captureQtMessages()
 {
     qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &message) {
@@ -58,6 +71,15 @@ static QString processStats()
     return parts.join(' ');
 }
 
+static void setTracing(bool on)
+{
+    tracing = on;
+    if (statsTimer && on)
+        statsTimer->start();
+    else if (statsTimer)
+        statsTimer->stop();
+}
+
 void start(QQuickWindow *window)
 {
     // afterRendering is emitted on the render thread
@@ -65,18 +87,38 @@ void start(QQuickWindow *window)
     QObject::connect(window, &QQuickWindow::afterRendering, window, [] { frames++; },
                      Qt::DirectConnection);
 
-    auto *timer = new QTimer(window);
-    QObject::connect(timer, &QTimer::timeout, [] {
+    statsTimer = new QTimer(window);
+    statsTimer->setInterval(10000);
+    QObject::connect(statsTimer, &QTimer::timeout, [] {
         log(QString("frames=%1 %2").arg(frames.exchange(0)).arg(processStats()));
     });
-    timer->start(10000);
-    log("started, " + processStats());
+    setTracing(tracing);
+    log("started, " + processStats() + (tracing ? ", diagnostics logging on" : ""));
     // The QML is compiled at build time for exactly this Qt; on any other the engine
     // ignores it and compiles every file from source on each launch.
     log(QString("Qt %1, QML compiled for %2%3")
             .arg(qVersion(), QT_VERSION_STR,
                  strcmp(qVersion(), QT_VERSION_STR) ? " - mismatch, compiling QML at startup"
                                                     : ""));
+}
+
+Log::Log(Database *database, QObject *parent)
+    : QObject(parent), m_database(database)
+{
+    setTracing(m_database->flag(SETTING));
+}
+
+bool Log::enabled() const
+{
+    return tracing;
+}
+
+void Log::toggle()
+{
+    setTracing(!tracing);
+    m_database->setFlag(SETTING, tracing);
+    log(tracing ? "diagnostics logging on" : "diagnostics logging off");
+    emit enabledChanged();
 }
 
 }

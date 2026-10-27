@@ -64,7 +64,7 @@ Downloads::Downloads(BookOrbitClient *client, Database *database, QObject *paren
     if (auto *platform = pocketbook::utilities::einkPlatform()) {
         platform->addHandlerForInkvewEvents([](int type, int, int) {
             if (type == EVT_SCANSTOPPED)
-                diagnostics::log("library scan finished");
+                diagnostics::trace("library scan finished");
         });
     }
 }
@@ -119,7 +119,7 @@ bool Downloads::remove(int bookId)
                 diagnostics::log(QString("book %1: can't delete %2").arg(bookId).arg(path));
                 deleted = false;
             } else {
-                diagnostics::log(QString("book %1 deleted from %2").arg(bookId).arg(path));
+                diagnostics::trace(QString("book %1 deleted from %2").arg(bookId).arg(path));
                 m_database->removeBookFile(path);
             }
         }
@@ -242,7 +242,7 @@ void Downloads::download(const QVariantMap &book, int fileId)
                 if (generation != m_generation)
                     return;   // cancelled
                 const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-                diagnostics::log(QString("book %1 download -> %2, %3 bytes")
+                diagnostics::trace(QString("book %1 download -> %2, %3 bytes")
                                      .arg(bookId)
                                      .arg(status ? QString::number(status) : reply->errorString())
                                      .arg(m_part.size()));
@@ -269,7 +269,7 @@ void Downloads::download(const QVariantMap &book, int fileId)
                     m_database->saveBook(bookId, m_entry);
                     m_database->addBookFile(bookId, path);
                 });
-                diagnostics::log(QString("book %1 saved as %2").arg(bookId).arg(path));
+                diagnostics::trace(QString("book %1 saved as %2").arg(bookId).arg(path));
                 requestLibraryScan();
                 m_reply = nullptr;
                 m_bookId = -1;
@@ -292,7 +292,7 @@ void Downloads::requestLibraryScan()
     // scanner service to scan for new books, as pbweb does and says the firmware does
     // (PBScanClient::startDeviceScan). It answers with EVT_SCANSTOPPED. See NOTES.md.
     const int rc = SendEventTo(OTHERTASKS, EVT_STARTSCAN, 0, 0);
-    diagnostics::log(QString("library scan requested -> %1").arg(rc));
+    (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("library scan requested -> %1").arg(rc));
 }
 
 void Downloads::cancel()
@@ -343,7 +343,7 @@ void Downloads::addExisting(const QList<Existing> &books)
         for (const Existing &book : books) {
             m_database->saveBook(book.bookId, book.entry);
             m_database->addBookFile(book.bookId, book.path);
-            diagnostics::log(QString("book %1 found at %2").arg(book.bookId).arg(book.path));
+            diagnostics::trace(QString("book %1 found at %2").arg(book.bookId).arg(book.path));
         }
     });
     m_revision++;
@@ -394,7 +394,7 @@ bool Downloads::openWith(int bookId, const QString &format, const QString &app)
     const QByteArray file = path.toUtf8();
     SetFileHandler(file.constData(), app.toUtf8().constData());
     const int rc = OpenBook(file.constData(), "", OB_ADDTOLAST | OB_WITHRETURN);
-    diagnostics::log(QString("OpenBook %1 with %2 -> %3").arg(path, app).arg(rc));
+    (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenBook %1 with %2 -> %3").arg(path, app).arg(rc));
     return true;
 }
 
@@ -416,11 +416,11 @@ bool Downloads::open(int bookId)
         const QByteArray file = path.toUtf8();
         const char *args[] = {"--bookPlay", file.constData()};
         const int rc = OpenTask(AUDIOBOOKS_APP, 2, args, TASK_MAKEACTIVE);
-        diagnostics::log(QString("OpenTask %1 --bookPlay %2 -> %3").arg(AUDIOBOOKS_APP, path).arg(rc));
+        (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenTask %1 --bookPlay %2 -> %3").arg(AUDIOBOOKS_APP, path).arg(rc));
         return rc >= 0;
     }
     // Adds it to the system's recent books, and comes back here when the reader closes
     const int rc = OpenBook(path.toUtf8().constData(), "", OB_ADDTOLAST | OB_WITHRETURN);
-    diagnostics::log(QString("OpenBook %1 -> %2").arg(path).arg(rc));
+    (rc < 0 ? diagnostics::log : diagnostics::trace)(QString("OpenBook %1 -> %2").arg(path).arg(rc));
     return true;
 }

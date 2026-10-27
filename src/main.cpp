@@ -39,6 +39,8 @@ int main(int argc, char *argv[])
     // PBOOKORBIT_DB points automated tests at their own database, so they don't touch the
     // saved login.
     Database database(qEnvironmentVariable("PBOOKORBIT_DB", QString::fromUtf8(CONFIGPATH "/pbookorbit.db")));
+    // Before anything else logs: whether diagnostics logging is on is one of the settings
+    diagnostics::Log diagnosticsLog(&database);
     BookOrbitClient client(&database);
 
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
@@ -48,7 +50,6 @@ int main(int argc, char *argv[])
     Browser browser;
     Eink eink;
     eink.followNightMode();
-    diagnostics::Log diagnosticsLog;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("screenWidth", ScreenWidth());

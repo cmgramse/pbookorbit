@@ -134,10 +134,10 @@ LauncherTile::LauncherTile(QObject *parent)
 void LauncherTile::restartDevice()
 {
 #ifdef EMULATOR
-    diagnostics::log("would restart the device");
+    diagnostics::trace("would restart the device");
 #else
     // As KOReader does on PocketBook. Written out first: the restart may not wait for it.
-    diagnostics::log("restarting the device");
+    diagnostics::trace("restarting the device");
     sync();
     iv_ipc_request(MSG_REBOOT, 1, nullptr, 0, 0);
 #endif

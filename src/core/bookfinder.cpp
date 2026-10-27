@@ -299,7 +299,7 @@ QHash<QString, BookFinder::KoreaderMatch> BookFinder::koreaderMatches() const
         const QVariantMap state = LuaData(file.readAll()).read().toMap();
         const QString account = state.value("account_identity").toString();
         if (!account.startsWith(server, Qt::CaseInsensitive)) {
-            diagnostics::log(QString("find books: %1 is for %2, skipped").arg(name, account));
+            diagnostics::trace(QString("find books: %1 is for %2, skipped").arg(name, account));
             continue;
         }
         // books: {<partial MD5>: {bookId, fileId, file, ...}}, file being the path on the
@@ -313,7 +313,7 @@ QHash<QString, BookFinder::KoreaderMatch> BookFinder::koreaderMatches() const
             if (!path.isEmpty() && book.contains("bookId"))
                 matches.insert(path, KoreaderMatch{book.value("bookId").toInt(), it.key()});
         }
-        diagnostics::log(QString("find books: %1 lists %2 books").arg(name).arg(books.size()));
+        diagnostics::trace(QString("find books: %1 lists %2 books").arg(name).arg(books.size()));
     }
     return matches;
 }
@@ -342,7 +342,7 @@ void BookFinder::start()
     for (LocalFile &file : m_files)
         file.md5 = partialMd5(file.path);
     m_koreader = koreaderMatches();
-    diagnostics::log(QString("find books: %1 unrecorded files").arg(m_files.size()));
+    diagnostics::trace(QString("find books: %1 unrecorded files").arg(m_files.size()));
     if (m_files.isEmpty()) {
         finish(generation);
         return;
@@ -396,7 +396,7 @@ void BookFinder::loadLibraryPage(int libraryId, int page, int generation)
 
 void BookFinder::matchFiles(int generation)
 {
-    diagnostics::log(QString("find books: library has %1 books").arg(m_library.size()));
+    diagnostics::trace(QString("find books: library has %1 books").arg(m_library.size()));
     for (LocalFile &file : m_files) {
         // 1. KOReader's plugin knows it, the file is unchanged and the book is in the library
         const auto koreader = m_koreader.constFind(file.path);
@@ -486,10 +486,10 @@ void BookFinder::finish(int generation)
         return;
     m_downloads->addExisting(m_found);
     m_foundCount = int(m_found.size());
-    diagnostics::log(QString("find books: %1 found, %2 unsure, %3 not found")
+    diagnostics::trace(QString("find books: %1 found, %2 unsure, %3 not found")
                          .arg(m_foundCount).arg(m_unsure.size()).arg(m_notFoundCount));
     for (const Downloads::Existing &book : m_unsure)
-        diagnostics::log(QString("find books: unsure: %1 -> book %2").arg(book.path).arg(book.bookId));
+        diagnostics::trace(QString("find books: unsure: %1 -> book %2").arg(book.path).arg(book.bookId));
     m_files.clear();
     m_pending.clear();
     m_library.clear();
