@@ -370,7 +370,8 @@ QVariantList Downloads::appsFor(const QString &format) const
     QVariantList result;
     for (const QString &app : apps) {
         // The names are language strings named after the app: "@eink-reader_with_blink" is
-        // "PB Reader (EPUB 3)", and KOReader adds "@koreader" to the user's language file
+        // "PB Reader (EPUB 3)". Other apps have none unless the user adds one, as
+        // "@koreader=KOReader", to the language file on their storage
         QString base = app;
         if (base.endsWith(".app"))
             base.chop(4);

@@ -139,9 +139,9 @@ const ibitmap *taskIcon()
     return icon;
 }
 
-// The task manager names a task after its program, pbookorbit, unless the firmware's
-// language file has a better name for it (it has @koreader=KOReader, but nothing for us),
-// and gives it an icon only if the theme has one for it. The task can set both itself.
+// The task manager names a task after its program, pbookorbit, unless a language file has
+// a better name for it (the firmware's has none for user apps), and gives it an icon only
+// if the theme has one for it. The task can set both itself.
 void nameTask()
 {
     const int task = GetCurrentTask();

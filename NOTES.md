@@ -69,7 +69,9 @@ eink-reader_with_blink.app,eink-reader_with_epub2.app:ICON_EPUB` (KOReader's lin
 InkView's `GetSupportedFileTypes()` returns these lines with `program` as that
 comma-separated list; the emulator reads its one `extensions.cfg` twice, so lines repeat.
 The names are language strings named after the app, `@eink-reader_with_blink` and so on;
-KOReader adds `@koreader=KOReader` to `/mnt/ext1/system/language/en.txt`. The SDK's
+KOReader has none in the firmware's: the Era Color's user language file,
+`/mnt/ext1/system/language/en.txt`, has `@koreader=KOReader` only because the user added
+it by hand, and without it the app is listed as `koreader`. The SDK's
 emulator language file predates the blink and epub2 readers, so the emulator shows the
 apps' file names. Choosing an app records it for that file in `handlers.cfg`
 (`SetFileHandler`), so `OpenBook` and the system library open it there from then on.
@@ -122,8 +124,10 @@ the format in `_comment` arrays inside the file itself (read on the Era Color, 6
 
 The task manager names a task with `TaskNameToHumanName(appname)`: the program's name
 without its folder and extension (`pbookorbit`), looked up as `@pbookorbit` in the
-firmware's language file, or left as it is. KOReader shows as KOReader only because the
-firmware's `en.txt` has `@koreader=KOReader`. The built-in apps' icons there are theme
+language files, or left as it is. KOReader shows as KOReader on the Era Color only because
+the user added `@koreader=KOReader` to the language file on its storage
+(`/mnt/ext1/system/language/en.txt`); the firmware's `en.txt` has no such entry. The
+built-in apps' icons there are theme
 icons, `ctrl_panel_<app>` (110x110, e.g. `ctrl_panel_sudoku`), and any other app gets
 `ctrl_panel_app_unknown`.
 
