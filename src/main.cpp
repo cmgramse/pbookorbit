@@ -9,6 +9,7 @@
 
 #include "core/bookfinder.h"
 #include "core/bookorbitclient.h"
+#include "core/browser.h"
 #include "core/database.h"
 #include "core/diagnostics.h"
 #include "ui/covers.h"
@@ -42,6 +43,7 @@ int main(int argc, char *argv[])
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
     Downloads downloads(&client, &database);
     BookFinder bookFinder(&client, &downloads, &database);
+    Browser browser;
     Eink eink;
     eink.followNightMode();
     diagnostics::Log diagnosticsLog;
@@ -56,6 +58,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("covers", &covers);
     engine.rootContext()->setContextProperty("downloads", &downloads);
     engine.rootContext()->setContextProperty("bookFinder", &bookFinder);
+    engine.rootContext()->setContextProperty("browser", &browser);
     engine.rootContext()->setContextProperty("eink", &eink);
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
     // Icons from the system theme: image://theme/<name>

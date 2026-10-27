@@ -4,7 +4,8 @@ import "units.js" as Units
 // One field of an info page (BookInfoPage, AuthorInfoPage): a bold label over its value
 // and a grey line under them; nothing when there is no value. A tappable field has a
 // chevron at its right, is inverted while pressed, as InfoCells' cells are, and sends
-// clicked().
+// clicked(). A link field (a web address) underlines its value instead, and only the
+// value's text is tapped, inverted while pressed; it sends linkClicked().
 Item {
     id: field
     property string label
@@ -12,7 +13,9 @@ Item {
     property bool richText: false
     property bool showLine: true
     property bool tappable: false
+    property bool link: false
     signal clicked()
+    signal linkClicked()
     visible: value !== ""
     implicitHeight: column.height
 
@@ -23,6 +26,16 @@ Item {
         y: -Units.dp(9) + 1
         width: parent.width
         height: column.height - 1
+        color: "black"
+    }
+
+    // A link's text, black behind it while pressed
+    Rectangle {
+        visible: linkMouse.pressed
+        x: valueText.x
+        y: valueText.y
+        width: valueText.contentWidth
+        height: valueText.contentHeight
         color: "black"
     }
 
@@ -44,7 +57,8 @@ Item {
             id: valueText
             width: parent.width - (field.tappable ? chevron.width + Units.dp(6) : 0)
             text: field.value
-            color: mouse.pressed ? "white" : "black"
+            color: mouse.pressed || linkMouse.pressed ? "white" : "black"
+            font.underline: field.link
             // Descriptions come as HTML
             textFormat: field.richText ? Text.RichText : Text.PlainText
             font.pointSize: 8
@@ -73,6 +87,15 @@ Item {
         y: (valueText.y + valueText.height - height) / 2
         source: !field.tappable ? "" : mouse.pressed ? "image://theme/back@inverted" : "image://theme/back"
         mirror: true
+    }
+    MouseArea {
+        id: linkMouse
+        enabled: field.link
+        x: valueText.x
+        y: valueText.y
+        width: valueText.contentWidth
+        height: valueText.contentHeight
+        onClicked: field.linkClicked()
     }
     MouseArea {
         id: mouse

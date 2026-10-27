@@ -7,6 +7,7 @@ INCLUDEPATH += src
 SOURCES += \
     src/main.cpp \
     src/core/bookfinder.cpp \
+    src/core/browser.cpp \
     src/core/booklistmodel.cpp \
     src/core/bookorbitclient.cpp \
     src/core/database.cpp \
@@ -20,6 +21,7 @@ SOURCES += \
     src/ui/themeimageprovider.cpp
 HEADERS += \
     src/core/bookfinder.h \
+    src/core/browser.h \
     src/core/booklistmodel.h \
     src/core/bookorbitclient.h \
     src/core/database.h \

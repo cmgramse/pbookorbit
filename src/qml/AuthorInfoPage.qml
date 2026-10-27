@@ -3,9 +3,9 @@ import "units.js" as Units
 
 // An author's details, opened from their row in the Authors list, laid out like the book
 // info page (BookInfoPage): their photo (or initials) where the cover goes, with their
-// name, born, died, genres and website beside it, then a row of BOOKS, SERIES and FORMAT,
-// whose BOOKS and SERIES open their books and their series, and then what BookOrbit says
-// about them. The details beyond the list's row are fetched when the page opens; offline
+// name, born, died, genres and website (which opens in the browser) beside it, then a row
+// of BOOKS, SERIES and FORMAT, whose BOOKS and SERIES open their books and their series,
+// and then what BookOrbit says about them. The details beyond the list's row are fetched when the page opens; offline
 // they just don't appear. The whole page scrolls when the description is long, with page
 // buttons as the lists have.
 Rectangle {
@@ -126,6 +126,9 @@ Rectangle {
                             width: fields.width
                             label: modelData[0]
                             value: modelData[1]
+                            // The website opens in the system's browser
+                            link: modelData[0] === "Website" && browser.available
+                            onLinkClicked: browser.open(value)
                         }
                     }
                 }
