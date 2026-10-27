@@ -264,15 +264,15 @@ Item {
         }
     }
 
-    // Focus frame round the row, 5px like the search box's: its sides about halfway
-    // between the ends of the line under the row and the screen's edges
+    // Focus frame round the row, 4px, a pixel under the search box's: its sides the same
+    // distance from the screen's edges, 23px, a little nearer them than the line's start
     Rectangle {
-        x: Math.round(row.lineLeft / 2)
-        width: Math.round((row.contentRight + row.width) / 2) - x
+        x: Math.round(row.lineLeft * 2 / 5)
+        width: row.width - 2 * x
         height: parent.height
         visible: row.focused
         color: "transparent"
-        border.width: Units.dp(2)
+        border.width: Units.dp(2) - 1
         border.color: "black"
     }
 }
