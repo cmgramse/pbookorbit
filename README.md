@@ -1,114 +1,108 @@
 # PBookOrbit
 
-A [BookOrbit](https://github.com/bookorbit/bookorbit) client for PocketBook e-readers.
-Browse your BookOrbit library on the device, download books and audiobooks, and open
-them in the PocketBook's own reader and audiobook player. It is built to look and feel
-like the device's own apps.
+PBookOrbit lets you use your [BookOrbit](https://github.com/bookorbit/bookorbit) library
+from a PocketBook. You can browse it, download books and audiobooks, and read or listen
+to them with the PocketBook's own reader and audiobook player. It's designed to look like
+one of the device's built-in apps rather than a port of something else.
 
 ## Features
 
-- **Sign in with your BookOrbit account:** the same server, username and password as the
-  website. The password isn't kept; the device shows up in your account's sessions as
-  "PocketBook <model>", and signing out ends that session.
-- **Your library, the way the system library shows it:** rows with covers, authors and
-  series, filtered to ebooks or audiobooks, and sorted by date added, title, author or
-  recently read. An A–Z rail jumps through the list, and the page buttons or the device's
-  page keys turn a screenful at a time.
-- **Collections, series and authors** each have their own tab, with their own sorts and
-  filters. An author's page has their photo, details and series. From any book you can
-  go to everything by its author or in its series.
-- **Search as you type**, with your recent searches kept.
-- **Downloads:** ebooks go to `Books` and open in the system reader; audiobooks go to
-  `Audio Books` and play in the system Audiobooks app. A book with both an ebook and an
-  audiobook shows as one book. Show only what's downloaded, open a book with another app,
-  or delete it from the device.
-- **Finds the books already on your device** that came from your BookOrbit library, and
-  marks them as downloaded.
-- **Fits in with the device:** a tile in the applications with its own icon, the right
-  name and icon in the task manager, the system's night mode, and your BookOrbit accent
-  colour.
+- Sign in with the same server, username and password you use on the BookOrbit website.
+  Your password isn't stored, and the device appears in your account's session list as
+  "PocketBook <model>".
+- The library is laid out like the PocketBook's own library app, with covers, authors and
+  series. You can filter to ebooks or audiobooks, sort it a few ways, jump to a letter
+  with the A-Z rail and page through with the page keys.
+- Tabs for collections, series and authors.
+- Pages for each book and author, with links through to everything else by that author
+  or in that series.
+- Search that updates as you type, and remembers recent searches.
+- Ebooks download to `Books` and open in the reader. Audiobooks go to `Audio Books` and
+  play in the Audiobooks app. If a book has both, it's shown once.
+- It can find books you already had on the device (from KOReader's BookOrbit plugin, for
+  example) and mark them as downloaded.
+- Works with night mode, and uses your BookOrbit accent colour.
+- Adds its own tile to the applications screen, and shows up properly in the task
+  manager.
 
 ## Screenshots
 
 | | |
 |:---:|:---:|
-| ![The sign-in page, with a saved server](docs/images/login.png) | ![The library](docs/images/library.png) |
-| Signing in: the server is kept once a sign-in has worked | The library, with its filter and sort bar and the A–Z rail |
-| ![A book's info page](docs/images/book-info.png) | ![The series tab](docs/images/series.png) |
-| A book's info page: its author and series lead to all their books | Series, with their covers, authors and book counts |
-| ![The authors tab](docs/images/authors.png) | ![An author's info page](docs/images/author-info.png) |
-| Authors, with their photos and how many books and series they have | An author's page, with their details, books and series |
+| ![Sign-in page](docs/images/login.png) | ![Library](docs/images/library.png) |
+| Signing in | The library |
+| ![Book info page](docs/images/book-info.png) | ![Series tab](docs/images/series.png) |
+| A book's info page | Series |
+| ![Authors tab](docs/images/authors.png) | ![Author info page](docs/images/author-info.png) |
+| Authors | An author's page |
 
 ## Installation
 
-You need a PocketBook with firmware 6.10, and a BookOrbit account that is allowed to
-download books. PBookOrbit is built with PocketBook's 6.10 SDK and tested on the
-PocketBook Era Color. Firmware 6.10 is the only release it supports so far; 6.11 isn't
-tested yet.
+So far it has only been tested on an Era Color running firmware 6.10, and 6.10 is the
+only firmware it's built for. It may work on other 6.10 devices. Your BookOrbit account
+will need permission to download books.
 
-1. Get `pbookorbit.app`, from a release or by building it (see below).
-2. Connect the PocketBook to your computer with USB and copy `pbookorbit.app` into the
-   `applications` folder on its storage.
-3. Eject the device, open the Applications and start `pbookorbit`.
-4. The first time, the app adds its own tile, named PBookOrbit, to the applications, and
-   offers to restart the device so that the tile appears.
-5. Enter your BookOrbit server's address (e.g. `books.example.com`; https is assumed
-   unless you type `http://`), your username and your password.
+1. Download `pbookorbit.app` from a release, or build it yourself (see below).
+2. Plug the PocketBook into your computer and copy `pbookorbit.app` into its
+   `applications` folder.
+3. Eject it, go to Applications and open `pbookorbit`.
+4. On first run it adds a PBookOrbit tile to the applications screen. The tile won't show
+   up until the device restarts, so it'll offer to do that for you.
+5. Sign in with your server address (`books.example.com`, say), username and password.
+   It uses https unless you type `http://` in front.
 
 To update, copy the new `pbookorbit.app` over the old one.
 
-To remove it, delete `applications/pbookorbit.app` and the icons beside it in
-`applications/icons` (`pbookorbit.bmp` and `pbookorbit_f.bmp`). The app's tile can be
-removed on the device; the app kept a copy of the launcher's settings from before it
-added the tile, `system/config/desktop/view.json.before-pbookorbit`, which can be put back
-as `view.json`. Its own data is `system/config/pbookorbit.db`, and covers it has cached
-are in `system/cache/pbookorbit-covers`.
+To uninstall, delete `applications/pbookorbit.app` and the two icons in
+`applications/icons` (`pbookorbit.bmp` and `pbookorbit_f.bmp`). You can remove the tile
+from the device itself. Before adding the tile the app saved the original launcher config
+as `system/config/desktop/view.json.before-pbookorbit`, so you can also rename that back to
+`view.json`. The app keeps its data in `system/config/pbookorbit.db` and its cached covers
+in `system/cache/pbookorbit-covers`, and both can be deleted.
 
 ## Development
 
-PBookOrbit is a Qt 6 / QML app on top of the PocketBook SDK. It builds with
-[pocketbook-kit](kit), which runs the SDK in a container, so the host needs only `git`,
-`make`, and podman or docker:
+It's a Qt 6/QML app built on the PocketBook SDK. Builds go through
+[pocketbook-kit](kit), which runs the SDK inside a container, so all you need on your
+machine is `git`, `make` and podman or docker.
 
 ```sh
 git clone --recurse-submodules <this repo> pbookorbit
 cd pbookorbit
-make setup    # once: the kit's container image and the SDK
-make run      # build for PC and open the app in the emulator
-make arm      # build for the device: build/pbookorbit/<sdk>/arm/pbookorbit.app
+make setup    # first time only: builds the container image and downloads the SDK
+make run      # build and run in the emulator
+make arm      # build for the device, into build/pbookorbit/<sdk>/arm/pbookorbit.app
 ```
 
-The kit is pinned as a submodule in `kit/`. Its README covers choosing the SDK
-(`kit/pb.sh use B300-6.10` for B300 devices such as the Era Color), making the emulator
-look like your device, and headless tests (`kit/pb.sh test . <script>`). In the emulator,
-`PBOOKORBIT_DB=<file>` runs the app on a database of its own, so tests don't touch your
-saved sign-in.
+The kit lives in `kit/` as a submodule. See its README for picking an SDK (use
+`kit/pb.sh use B300-6.10` for the Era Color and other B300 devices), making the emulator
+match your device, and running headless tests with `kit/pb.sh test . <script>`. Set
+`PBOOKORBIT_DB=<file>` to point the app at a different database, which keeps tests away
+from your own sign-in.
 
-To give the app to people who use a particular server, build it with that server
-filled in on the sign-in page (they can still change it):
+If you're handing the app to people who all use the same server, you can build it with
+the server already filled in. They can still change it.
 
 ```sh
 make release SERVER=books.example.com
 ```
 
-The icons are drawn in `src/icons/*.svg`. After changing them, `make icons` renders the
-BMPs the app is built with (it needs `rsvg-convert` and ImageMagick).
+The icons are SVGs in `src/icons`. Run `make icons` after editing them to regenerate the
+BMPs (you'll need `rsvg-convert` and ImageMagick).
 
-[docs/technical.md](docs/technical.md) explains how the app works: the BookOrbit API
-it uses, the data it keeps on the device, and how it adds its tile. [NOTES.md](NOTES.md)
-has what was found out about the PocketBook firmware and SDK along the way, and
-[TODO.md](TODO.md) what's still to do.
+There's more detail on how it works, including the BookOrbit API calls it makes, in
+[docs/technical.md](docs/technical.md). [NOTES.md](NOTES.md) is a collection of things
+learned about the PocketBook firmware and SDK, and [TODO.md](TODO.md) is the to-do list.
 
 ## Diagnostics
 
-The app writes a log, `pbookorbit.log`, to the root of the device's USB storage. It is
-started afresh each time the app starts, and normally holds only startup details and
-errors.
+The app writes `pbookorbit.log` to the root of the device's storage. It's cleared every
+time the app starts, and normally only has startup information and errors in it.
 
-For more, **tap the title in the app's header six times** to turn diagnostics logging on
-(the same again turns it off; the app says which). It stays on until you turn it off,
-and logs every request with its status and time, Wi-Fi connections, e-ink updates, and
-every 10 seconds the frames drawn, memory use and thread count. Reproduce the problem,
-then connect the device with USB and attach `pbookorbit.log` to your bug report.
+To get a fuller log, tap the title at the top of the screen six times. That turns on
+diagnostics logging, which records requests and timings, Wi-Fi connections, screen
+updates, and memory use every 10 seconds. It stays on until you tap six times again.
+If you're reporting a bug, turn it on, make the problem happen, then plug in the device
+and attach the log.
 
-In the emulator the log is in `build/pbookorbit/<sdk>/pc/system/mnt/ext1`.
+When running in the emulator, the log is in `build/pbookorbit/<sdk>/pc/system/mnt/ext1`.
