@@ -8,7 +8,7 @@ import "night.js" as Night
 // book menu's "All books of" items do. Below those come what BookOrbit knows besides
 // (published, pages or an audiobook's length, language, description), fetched when the
 // page opens; offline they just don't appear. The whole page scrolls when the
-// description is long.
+// description is long, with page buttons as the lists have.
 //
 // The system's page also has a favourite heart and a CHOOSE ACTION button.
 Rectangle {
@@ -19,6 +19,8 @@ Rectangle {
     property var book: ({})
     // GET /books/:id, once it arrives
     property var details: ({})
+
+    readonly property alias pageButtons: pageButtons
 
     signal back()
     // As BookMenu's: "author" or "series", the names to match and the page's title
@@ -101,7 +103,8 @@ Rectangle {
         width: parent.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        contentHeight: column.height + Units.dp(26)
+        // Room at the end to scroll the last of it clear of the page buttons
+        contentHeight: column.height + Units.dp(26) + pageButtons.height
 
         // Fast black-and-white updates while it scrolls, as in the book lists
         onMovementStarted: {
@@ -238,5 +241,11 @@ Rectangle {
 
     ListScrollbar {
         list: content
+        bottomInset: pageButtons.height
+    }
+    PageButtons {
+        id: pageButtons
+        list: content
+        anchors.bottom: content.bottom
     }
 }

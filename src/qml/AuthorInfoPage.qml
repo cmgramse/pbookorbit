@@ -6,7 +6,8 @@ import "units.js" as Units
 // name, born, died, genres and website beside it, then a row of BOOKS, SERIES and FORMAT,
 // whose BOOKS and SERIES open their books and their series, and then what BookOrbit says
 // about them. The details beyond the list's row are fetched when the page opens; offline
-// they just don't appear. The whole page scrolls when the description is long.
+// they just don't appear. The whole page scrolls when the description is long, with page
+// buttons as the lists have.
 Rectangle {
     id: page
     color: "white"
@@ -15,6 +16,8 @@ Rectangle {
     property var author: ({})
     // GET /authors/:id, once it arrives
     property var details: ({})
+
+    readonly property alias pageButtons: pageButtons
 
     signal back()
     signal booksClicked()
@@ -72,7 +75,8 @@ Rectangle {
         width: parent.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        contentHeight: column.height + Units.dp(26)
+        // Room at the end to scroll the last of it clear of the page buttons
+        contentHeight: column.height + Units.dp(26) + pageButtons.height
 
         // Fast black-and-white updates while it scrolls, as in the book lists
         onMovementStarted: {
@@ -159,5 +163,11 @@ Rectangle {
 
     ListScrollbar {
         list: content
+        bottomInset: pageButtons.height
+    }
+    PageButtons {
+        id: pageButtons
+        list: content
+        anchors.bottom: content.bottom
     }
 }

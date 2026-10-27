@@ -258,14 +258,14 @@ Window {
                                              : showingAuthors ? authorsQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
-    // The device's page-turn keys page the list in front, as its on-screen page buttons
-    // do. The platform plugin sends them as Page Up and Page Down. Pages without a list
-    // have none; nor does anything while a menu or dialog is over the page, since a tap
+    // The device's page-turn keys page the list or info page in front, as its on-screen
+    // page buttons do. The platform plugin sends them as Page Up and Page Down. The sign-in
+    // page has none; nor does anything while a menu or dialog is over the page, since a tap
     // there would only close it.
-    readonly property PageButtons frontPageButtons: showingInfo ? null
+    readonly property PageButtons frontPageButtons: showingInfo ? bookInfoPage.pageButtons
                                                     : showingBooksOf ? booksOfPage.pageButtons
                                                     : showingAuthorSeries ? authorSeriesPage.pageButtons
-                                                    : showingAuthor ? null
+                                                    : showingAuthor ? authorInfoPage.pageButtons
                                                     : searching ? searchPage.pageButtons
                                                     : !bookOrbit.signedIn ? null
                                                     : showingCollections ? collectionsPage.pageButtons

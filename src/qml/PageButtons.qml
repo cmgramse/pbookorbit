@@ -1,15 +1,16 @@
 import QtQuick
 import "units.js" as Units
 
-// Page buttons over the bottom corners of a list, as in the system library (screenshot 9):
-// up on the left, down on the right, each scrolling the list by a screenful. Paging suits
+// Page buttons over the bottom corners of a list, or of an info page's Flickable, as in the
+// system library (screenshot 9): up on the left, down on the right, each scrolling it by a
+// screenful. Paging suits
 // e-ink better than flicking: one clean redraw per page. The buttons are half-white, fading
 // the rows behind them (black shows as 128 grey in the screenshot), with a 1px line along
 // the top and the inner side, rounded where they meet. Goes in the list's parent with its
 // bottom on the list's bottom; between the buttons taps reach the list.
 Item {
     id: buttons
-    property ListView list
+    property Flickable list
 
     // Each page keeps this much of the last one, the strip the buttons sat over
     readonly property int overlap: height
@@ -19,17 +20,26 @@ Item {
     height: Units.dp(57)   // 124px
 
     // A ListView's origin moves as it lays out rows it hadn't measured, so a page reaching
-    // either end goes to that end the ListView's own way rather than to a computed position
+    // either end goes to that end the ListView's own way rather than to a computed position.
+    // An info page's Flickable has fixed ends, so it goes straight to them.
     function page(direction) {
         const top = list.originY
         const bottom = list.originY + list.contentHeight - list.height
         const target = list.contentY + direction * (list.height - overlap)
-        if (target <= top)
-            list.positionViewAtBeginning()
-        else if (target >= bottom)
-            list.positionViewAtEnd()
-        else
+        const isListView = typeof list.positionViewAtBeginning === "function"
+        if (target <= top) {
+            if (isListView)
+                list.positionViewAtBeginning()
+            else
+                list.contentY = top
+        } else if (target >= bottom) {
+            if (isListView)
+                list.positionViewAtEnd()
+            else
+                list.contentY = bottom
+        } else {
             list.contentY = target
+        }
     }
 
     component PageButton: Item {
