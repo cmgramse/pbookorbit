@@ -1,138 +1,114 @@
 # PBookOrbit
 
-PocketBook client for a [BookOrbit](https://github.com/bookorbit/bookorbit) server. It signs
-in with a normal BookOrbit account and lists the 20 most recently added books.
+A [BookOrbit](https://github.com/bookorbit/bookorbit) client for PocketBook e-readers.
+Browse your BookOrbit library on the device, download books and audiobooks, and open
+them in the PocketBook's own reader and audiobook player. It is built to look and feel
+like the device's own apps.
 
-It builds with [pocketbook-kit](kit), which runs the PocketBook SDK in a
-container, so the host needs only `git`, `make` and podman or docker:
+## Features
+
+- **Sign in with your BookOrbit account:** the same server, username and password as the
+  website. The password isn't kept; the device shows up in your account's sessions as
+  "PocketBook <model>", and signing out ends that session.
+- **Your library, the way the system library shows it:** rows with covers, authors and
+  series, filtered to ebooks or audiobooks, and sorted by date added, title, author or
+  recently read. An A–Z rail jumps through the list, and the page buttons or the device's
+  page keys turn a screenful at a time.
+- **Collections, series and authors** each have their own tab, with their own sorts and
+  filters. An author's page has their photo, details and series. From any book you can
+  go to everything by its author or in its series.
+- **Search as you type**, with your recent searches kept.
+- **Downloads:** ebooks go to `Books` and open in the system reader; audiobooks go to
+  `Audio Books` and play in the system Audiobooks app. A book with both an ebook and an
+  audiobook shows as one book. Show only what's downloaded, open a book with another app,
+  or delete it from the device.
+- **Finds the books already on your device** that came from your BookOrbit library, and
+  marks them as downloaded.
+- **Fits in with the device:** a tile in the applications with its own icon, the right
+  name and icon in the task manager, the system's night mode, and your BookOrbit accent
+  colour.
+
+## Screenshots
+
+| | |
+|:---:|:---:|
+| ![The sign-in page, with a saved server](docs/images/login.png) | ![The library](docs/images/library.png) |
+| Signing in: the server is kept once a sign-in has worked | The library, with its filter and sort bar and the A–Z rail |
+| ![A book's info page](docs/images/book-info.png) | ![The series tab](docs/images/series.png) |
+| A book's info page: its author and series lead to all their books | Series, with their covers, authors and book counts |
+| ![The authors tab](docs/images/authors.png) | ![An author's info page](docs/images/author-info.png) |
+| Authors, with their photos and how many books and series they have | An author's page, with their details, books and series |
+
+## Installation
+
+You need a PocketBook with firmware 6.10, and a BookOrbit account that is allowed to
+download books. PBookOrbit is built with PocketBook's 6.10 SDK and tested on the
+PocketBook Era Color. Firmware 6.10 is the only release it supports so far; 6.11 isn't
+tested yet.
+
+1. Get `pbookorbit.app`, from a release or by building it (see below).
+2. Connect the PocketBook to your computer with USB and copy `pbookorbit.app` into the
+   `applications` folder on its storage.
+3. Eject the device, open the Applications and start `pbookorbit`.
+4. The first time, the app adds its own tile, named PBookOrbit, to the applications, and
+   offers to restart the device so that the tile appears.
+5. Enter your BookOrbit server's address (e.g. `books.example.com`; https is assumed
+   unless you type `http://`), your username and your password.
+
+To update, copy the new `pbookorbit.app` over the old one.
+
+To remove it, delete `applications/pbookorbit.app` and the icons beside it in
+`applications/icons` (`pbookorbit.bmp` and `pbookorbit_f.bmp`). The app's tile can be
+removed on the device; the app kept a copy of the launcher's settings from before it
+added the tile, `system/config/desktop/view.json.before-pbookorbit`, which can be put back
+as `view.json`. Its own data is `system/config/pbookorbit.db`, and covers it has cached
+are in `system/cache/pbookorbit-covers`.
+
+## Development
+
+PBookOrbit is a Qt 6 / QML app on top of the PocketBook SDK. It builds with
+[pocketbook-kit](kit), which runs the SDK in a container, so the host needs only `git`,
+`make`, and podman or docker:
 
 ```sh
 git clone --recurse-submodules <this repo> pbookorbit
 cd pbookorbit
-make setup    # one-off: the kit's container image and SDK download
-make run      # emulator
-make arm      # device -> build/pbookorbit/<sdk>/arm/pbookorbit.app
+make setup    # once: the kit's container image and the SDK
+make run      # build for PC and open the app in the emulator
+make arm      # build for the device: build/pbookorbit/<sdk>/arm/pbookorbit.app
 ```
 
-The kit is pinned as a submodule in `kit/`. See its README for choosing the SDK (`kit/pb.sh
-use B300-6.10` for B300 devices such as the Era Color), making the emulator look like your
-device, and headless tests (`kit/pb.sh test . <script>`).
+The kit is pinned as a submodule in `kit/`. Its README covers choosing the SDK
+(`kit/pb.sh use B300-6.10` for B300 devices such as the Era Color), making the emulator
+look like your device, and headless tests (`kit/pb.sh test . <script>`). In the emulator,
+`PBOOKORBIT_DB=<file>` runs the app on a database of its own, so tests don't touch your
+saved sign-in.
 
-To hand the app to someone who uses a particular server, build it with that server filled
-in (it can still be deleted or changed):
+To give the app to people who use a particular server, build it with that server
+filled in on the sign-in page (they can still change it):
 
 ```sh
 make release SERVER=books.example.com
 ```
 
-The next build without it is back to an empty field.
+The icons are drawn in `src/icons/*.svg`. After changing them, `make icons` renders the
+BMPs the app is built with (it needs `rsvg-convert` and ImageMagick).
 
-## Signing in
-
-Enter the server's address (`books.example.com`; https is assumed unless `http://` is
-typed) and the same username and password as the BookOrbit website. Once a sign-in has
-worked the server is saved and shown as a pill; its cross forgets it, to sign in to
-another. The app opens a session for the device, shown as "PocketBook <model>" in the
-account's session list. The password is not saved. The session's refresh token is saved
-in the app's database (see below). Signing out revokes the session on the server.
-
-## Local data
-
-The app keeps its data in an SQLite database, `pbookorbit.db`, in the system config folder:
-`/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in the
-emulator. `PBOOKORBIT_DB` points the app at a different file, e.g. for automated tests.
-
-- `settings`: key/value. `serverUrl`, `username`, `refreshToken`, `accent`, `recentSearches` (a JSON
-  array) and `findBooksOffered` (0/1).
-- `books`: a local cache of BookOrbit books by id. `data` is the book's list entry as JSON,
-  so what's kept can grow without changing the table. `title` and `series` are generated
-  columns pulled out of it for querying; add more the same way with
-  `ALTER TABLE books ADD COLUMN ... GENERATED ALWAYS AS (json_extract(data, '$.field'))`.
-- `book_files`: the books' files on the device (`path`, `book_id`), downloaded or found.
-
-Only the downloaded books are cached so far. Deleting a book's files keeps its cache entry.
-With the device on USB, `sqlite3 <mount>/system/config/pbookorbit.db` opens it on a PC.
-
-## Home screen tile
-
-Each time it starts, the app makes sure it has a tile on the home screen, named PBookOrbit
-with its own icon. The icons are built into the app (`src/icons`) and written to
-`applications/icons/pbookorbit.bmp` and `pbookorbit_f.bmp` (the focused one) on the device,
-only if they aren't there: replace them there to change the tile, or delete them to get the
-app's own back at the next start. Keep them 110x110 (on the Era Color) or the tile won't
-line up. The app adds itself to the launcher's `system/config/desktop/view.json`, at the
-end of the first group of tiles, keeping a copy of the file as it was
-(`view.json.before-pbookorbit`). The tile shows after the next restart: the first time,
-the app says so and offers to restart the device. Moving or removing
-it on the device sticks: the app only places it the first time. To take it off completely, put the copy back.
-
-The task manager shows the app with the same name and the normal icon. The icons' line art
-is in `src/icons/*.svg`: after changing it, `make icons` renders the BMPs (it needs
-`rsvg-convert` and ImageMagick).
+[docs/technical.md](docs/technical.md) explains how the app works: the BookOrbit API
+it uses, the data it keeps on the device, and how it adds its tile. [NOTES.md](NOTES.md)
+has what was found out about the PocketBook firmware and SDK along the way, and
+[TODO.md](TODO.md) what's still to do.
 
 ## Diagnostics
 
-The app writes `pbookorbit.log` to the root of the device's USB storage
-(`build/pbookorbit/<sdk>/pc/system/mnt/ext1` in the emulator). The log is cleared each time the app
-starts. Every 10 seconds it records the frames rendered, memory use (`VmRSS`) and thread
-count. It also logs every request with its status and time, every Wi-Fi connect, and each
-time the book list switches A2 on or off while it scrolls (see `src/ui/eink.h`).
+The app writes a log, `pbookorbit.log`, to the root of the device's USB storage. It is
+started afresh each time the app starts, and normally holds only startup details and
+errors.
 
-On e-ink every frame is a slow screen update, so `frames` should be 0 while the app is idle.
-Anything that animates (a blinking cursor, `BusyIndicator`, transitions, Flickable momentum)
-keeps the display busy and makes the whole device feel hung.
+For more, **tap the title in the app's header six times** to turn diagnostics logging on
+(the same again turns it off; the app says which). It stays on until you turn it off,
+and logs every request with its status and time, Wi-Fi connections, e-ink updates, and
+every 10 seconds the frames drawn, memory use and thread count. Reproduce the problem,
+then connect the device with USB and attach `pbookorbit.log` to your bug report.
 
-## The API
-
-BookOrbit doesn't document its API. Everything below comes from its source:
-`server/src/modules/auth/` and `server/src/modules/book/`, with types in `packages/types/src/`.
-
-- Base URL: `<server>/api/v1`
-- Errors use NestJS's format: `{"statusCode": 401, "message": "Invalid credentials"}`.
-  `message` can also be an array.
-
-### Sessions
-
-`POST /auth/login` with `{"username", "password", "clientKind": "native", "deviceLabel"}`
-returns `NativeCredentials` and the user:
-
-```json
-{"accessToken": "...", "accessTokenExpiresAt": "...", "refreshToken": "<64 hex>",
- "refreshTokenExpiresAt": "...", "sessionId": 17, "user": {...}}
-```
-
-`clientKind: "native"` puts the refresh token in the body. Without it, the server sets
-browser cookies instead.
-
-- The access token lasts about 15 minutes. Send it as `Authorization: Bearer <accessToken>`.
-- The refresh token lasts 7 days. `POST /auth/refresh` with `{"refreshToken"}` returns new
-  `NativeCredentials`, including a **new** refresh token. The old one stops working shortly
-  after, so always save the new one, and never run two refreshes at once.
-- `POST /auth/logout` with `{"refreshToken"}` ends the session.
-- Login is rate-limited to 5 attempts a minute.
-
-The client refreshes when a request gets a 401, then retries the request once.
-
-### Books
-
-`POST /books/query` with a `BookQuery` (`packages/types/src/query.ts`):
-
-```json
-{"sort": [{"field": "addedAt", "dir": "desc"}], "pagination": {"page": 1, "size": 20},
- "q": "optional search text", "filter": {"optional": "GroupRule"}}
-```
-
-It returns `{items, total, page, size}`. Each item has `id`, `title`, `authors`, `seriesName`,
-`seriesIndex`, `files: [{id, format, role, sizeBytes}]`, `hasCover`, `readingProgress`,
-`readStatus` and more. The sort fields are listed in `StaticSortField`.
-
-### Authors and series
-
-Found by trying the endpoints against the server:
-
-- `GET /authors/:id` returns one author: `name`, `sortName`, `description` (plain text),
-  `bookCount`, `birthDate`/`birthYear`, `deathDate`/`deathYear`, `website`, `genres`,
-  `imageUrl` and more.
-- `GET /series?libraryId=&author=<text>` lists the series with an author whose name
-  contains the text, ignoring case. `author=Martin` finds every Martin's series, so the
-  client keeps only those whose `authors` include the exact name.
+In the emulator the log is in `build/pbookorbit/<sdk>/pc/system/mnt/ext1`.
