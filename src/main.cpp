@@ -16,6 +16,7 @@
 #include "core/downloads.h"
 #include "ui/eink.h"
 #include "ui/invertedimageprovider.h"
+#include "ui/launchertile.h"
 #include "ui/themeimageprovider.h"
 
 int main(int argc, char *argv[])
@@ -32,6 +33,7 @@ int main(int argc, char *argv[])
     // A blinking cursor redraws the screen twice a second for as long as a text field has
     // focus, and every redraw is a slow e-ink update. Keep the cursor solid instead.
     app.styleHints()->setCursorFlashTime(0);
+    LauncherTile launcherTile;
 
     // /mnt/ext1/system/config on the device, ./system/config in the emulator.
     // PBOOKORBIT_DB points automated tests at their own database, so they don't touch the
@@ -61,6 +63,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("browser", &browser);
     engine.rootContext()->setContextProperty("eink", &eink);
     engine.rootContext()->setContextProperty("diagnostics", &diagnosticsLog);
+    engine.rootContext()->setContextProperty("launcherTile", &launcherTile);
     // Icons from the system theme: image://theme/<name>
     engine.addImageProvider("theme", new ThemeImageProvider);
     // Pictures drawn inverted for night mode: image://inverted/<file or qrc URL>

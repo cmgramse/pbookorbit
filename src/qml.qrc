@@ -37,5 +37,7 @@
         <file>qml/AuthorPortrait.qml</file>
         <file>qml/InfoField.qml</file>
         <file>qml/InfoCells.qml</file>
+        <file>icons/pbookorbit.bmp</file>
+        <file>icons/pbookorbit_f.bmp</file>
     </qresource>
 </RCC>

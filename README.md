@@ -53,6 +53,19 @@ emulator. `PBOOKORBIT_DB` points the app at a different file, e.g. for automated
 Only the downloaded books are cached so far. Deleting a book's files keeps its cache entry.
 With the device on USB, `sqlite3 <mount>/system/config/pbookorbit.db` opens it on a PC.
 
+## Home screen tile
+
+Each time it starts, the app makes sure it has a tile on the home screen, named PBookOrbit
+with its own icon. The icons are built into the app (`src/icons`) and written to
+`applications/icons/pbookorbit.bmp` and `pbookorbit_f.bmp` (the focused one) on the device,
+only if they aren't there: replace them there to change the tile, or delete them to get the
+app's own back at the next start. Keep them 106x110 (on the Era Color) or the tile won't
+line up. The app adds itself to the launcher's `system/config/desktop/view.json`, at the
+end of the first group of tiles, keeping a copy of the file as it was
+(`view.json.before-pbookorbit`). The tile shows after the next restart: the first time,
+the app says so and offers to restart the device. Moving or removing
+it on the device sticks: the app only places it the first time. To take it off completely, put the copy back.
+
 ## Diagnostics
 
 The app writes `pbookorbit.log` to the root of the device's USB storage

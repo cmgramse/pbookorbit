@@ -42,3 +42,5 @@
 - Once the app's UI is settled, delete the device screenshots in the repo root
   (`scr0001.bmp`...) and their entry in `.gitignore`. Code comments refer to them by number,
   e.g. "screenshot 9".
+- Home screen tile: check it in night mode (the icons are black on white). Other devices
+  will want other icon sizes (106x64 on a PB629).

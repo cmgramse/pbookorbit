@@ -87,6 +87,36 @@ command line (`DataManager::parseArguments`, a `QCommandLineParser`) takes:
 front. Both work on the Era Color (25 October 2026): `OpenTask` returns 0 when it started
 the app, 1 when the app was already running and switched to the new book.
 
+## The home screen tile
+
+Apps in `/mnt/ext1/applications` get no tile of their own: the launcher's tiles come from
+`/mnt/ext1/system/config/desktop/view.json`, on the user's storage. The firmware documents
+the format in `_comment` arrays inside the file itself (read on the Era Color, 6.10,
+27 October 2026):
+
+- `applications` maps a key to `{path, title, icon, focused_icon}` (also `param`, the
+  app's arguments, and `visible`). User apps' keys must start with `U_`; the firmware's
+  are `PB_...`. `path` is the `.app` and is required for user apps. An icon is either a
+  theme icon's name or an "object path", `{"path": "<path on user space>"}`.
+- `view.groups[]` are the groups of tiles (`@General`, `@Services`, `@Games`), each with a
+  `title`, an `apps` list of keys and a `sort` (`title` by default, or `fixed`).
+- KOReader's entry, put there by hand, gives absolute paths as plain strings for its icons,
+  which works as well.
+- `hash.txt` beside it has `hash2`, the MD5 of the current view.json (`hash1` is likely
+  the firmware's own). After the app first edited the file, the restart set hash2 to the
+  new file's MD5 and kept the edit, so the hash needs no attention.
+- `apps.json` beside it is the home screen's row of shortcuts (`{"id": ...}` per app,
+  `SYS_Apps` for the applications list). The user picks those: the app leaves it alone.
+- Icons: KOReader's for the Era Color are 106x110, 8-bit uncompressed BMP; its focused
+  one is a 110 px black disc cut to 106 wide, with the drawing in white. The app's
+  (`src/icons`) are the same size, but its focused disc is 106 px so it isn't cut off. pocketbook-statistics found 106x64 on a PB629,
+  and that an icon of the wrong size isn't shown at all (48 px wide) or puts the label
+  out of line with its neighbours' (128 px tall).
+- The launcher reads the file at boot, so a new tile shows after a restart. The app can
+  restart the device as KOReader does (its `frontend/device/pocketbook/device.lua`):
+  `iv_ipc_request(MSG_REBOOT, 1, nullptr, 0, 0)`. Confirmed on the Era Color. Confirmed on
+  the Era Color: the tile appeared and opened the app.
+
 ## InkView dialogs from Qt
 
 InkView's `Dialog`, `DialogSynchro`, `Message` and progress bar don't work in a Qt app,

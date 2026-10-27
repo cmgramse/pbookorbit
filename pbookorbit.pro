@@ -18,6 +18,7 @@ SOURCES += \
     src/ui/eink.cpp \
     src/ui/einkcolors.cpp \
     src/ui/invertedimageprovider.cpp \
+    src/ui/launchertile.cpp \
     src/ui/themeimageprovider.cpp
 HEADERS += \
     src/core/bookfinder.h \
@@ -33,6 +34,7 @@ HEADERS += \
     src/ui/eink.h \
     src/ui/einkcolors.h \
     src/ui/invertedimageprovider.h \
+    src/ui/launchertile.h \
     src/ui/themeimageprovider.h
 RESOURCES += src/qml.qrc
 

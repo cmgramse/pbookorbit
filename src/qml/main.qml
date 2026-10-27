@@ -847,6 +847,35 @@ Window {
         id: findBooksDialog
         anchors.fill: parent
     }
+    // The first start adds the app's tile to the applications, which shows only after a
+    // restart
+    SystemDialog {
+        id: launcherTileDialog
+        anchors.fill: parent
+        visible: launcherTile.added
+        icon: "icon_information"
+        buttons: [["Restart now", "restart"], ["Later", "close"]]
+        onPressed: (action) => {
+            if (action === "restart")
+                launcherTile.restartDevice()
+            visible = false
+        }
+
+        Text {
+            width: parent.width
+            text: "Added to your applications"
+            font.pointSize: 7.25
+            font.bold: true
+            wrapMode: Text.Wrap
+        }
+        Text {
+            width: parent.width
+            text: "PBookOrbit now has its own name and icon in your applications."
+                  + " Restart your device to see them."
+            font.pointSize: 7.25
+            wrapMode: Text.Wrap
+        }
+    }
     // Signing in for the first time offers to find the books already on the device, if
     // there are any. Only the once: after that it's in the menu.
     Connections {
