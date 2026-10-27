@@ -44,3 +44,9 @@
   e.g. "screenshot 9".
 - Home screen tile: check it in night mode (the icons are black on white). Other devices
   will want other icon sizes (106x64 on a PB629).
+- Check the log's "Qt ..., QML compiled for ..." line on the device: if the firmware's Qt
+  isn't 6.8.2 the compiled QML is ignored and compiled on every launch (see NOTES.md,
+  Compiled QML).
+- Compiled QML: most bindings run as bytecode, not C++ (NOTES.md has why). Time how long
+  the first book list takes to fill on the device; if it's slow, start with `BookRow` and
+  `GroupRow` (typed functions, required properties, then typed units and singletons).

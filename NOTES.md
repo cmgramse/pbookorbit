@@ -180,3 +180,41 @@ the app BookOrbit's thumbnail.) Details:
 Before the probe, the transform was fitted from screenshots alone: HSV saturation
 S' = 1 - (1 - S)^5 matched the dark covers but not the bright one; saturating around
 Rec. 709 luma by 3 matched both better, but not as well as the real function.
+
+## Compiled QML
+
+`CONFIG += qtquickcompiler` has qmlcachegen compile every QML and JS file in `qml.qrc` to
+bytecode at build time, linked into the app, so the device doesn't parse or compile QML
+at startup and there's no QML disk cache to manage. Checked in the emulator (October
+2026, headless, empty cache directory): a normal run wrote no `.qmlc`/`.jsc` files, while
+`QML_DISK_CACHE=qmlc-read,qmlc-write` (which ignores the compiled-in units) compiled from
+source and wrote 38.
+
+**The units only work on the exact Qt they were built for**: their header records Qt
+6.8.2 (the SDK sysroot), and the engine rejects them on any other version, silently
+compiling from source on every launch instead. The app uses the firmware's Qt, so the
+log's "Qt 6.8.2, QML compiled for 6.8.2" line (after "started") says whether they match;
+it ends "mismatch, compiling QML at startup" when they don't.
+
+**Few bindings are compiled to C++**: 35 functions in all, about one per file; the rest
+run as bytecode. `qmlcachegen --verbose` (the build's command plus `--verbose`) gives 950
+warnings. The main causes:
+
+| Cause | Count | Example |
+|---|---|---|
+| Calls into `import "units.js" as Units` | ~195 | `Units.dp(15)` almost everywhere |
+| Context properties from `main.cpp`, invisible to the compiler | ~125 | `bookOrbit` (75), `eink` (18), `downloads`, `bookFinder`, `covers` |
+| `property var` data from C++ | 71 | `BookRow.book` (15), `GroupRow.group`, `AuthorInfoPage.author` |
+| Ids from an outer file or component | ~60 | `page` (25), `root`, `bookMenu`, `row` |
+| Functions without type annotations | 31 | `show(authorId)`, `dateText(date, year)` |
+| Delegates' implicit `modelData` / `index` | ~10 | |
+| QtQuick.Controls' `TextField` not resolved | ~25 | `serverField`, `searchField` |
+| `try`/`catch` (not supported) | 11 | |
+
+Fixing them, cheapest first: type annotations on functions; `required property` in
+delegates and `pragma ComponentBehavior: Bound`; typed units (a singleton instead of the
+JS library); C++ singletons (`QML_SINGLETON`) instead of context properties, which needs
+type information for qmlcachegen (`CONFIG += qmltypes` in qmake, or CMake's
+`qt_add_qml_module`); typed book/group/author objects instead of `var`. Most of these
+bindings run once when an item is created (layout maths), so the likely gain is in the
+list delegates (`BookRow`, `GroupRow`), created while scrolling.

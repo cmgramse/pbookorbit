@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 
 namespace diagnostics {
 
@@ -70,6 +71,12 @@ void start(QQuickWindow *window)
     });
     timer->start(10000);
     log("started, " + processStats());
+    // The QML is compiled at build time for exactly this Qt; on any other the engine
+    // ignores it and compiles every file from source on each launch.
+    log(QString("Qt %1, QML compiled for %2%3")
+            .arg(qVersion(), QT_VERSION_STR,
+                 strcmp(qVersion(), QT_VERSION_STR) ? " - mismatch, compiling QML at startup"
+                                                    : ""));
 }
 
 }
