@@ -852,26 +852,39 @@ Window {
     SystemDialog {
         id: launcherTileDialog
         anchors.fill: parent
+        // The device takes a while to start restarting, so the dialog stays to say so
+        property bool restarting: false
         visible: launcherTile.added
         icon: "icon_information"
-        buttons: [["Restart now", "restart"], ["Later", "close"]]
+        buttons: restarting ? [] : [["Restart now", "restart"], ["Later", "close"]]
         onPressed: (action) => {
-            if (action === "restart")
-                launcherTile.restartDevice()
-            visible = false
+            if (action === "restart") {
+                restarting = true
+                restartTimer.start()
+            } else
+                visible = false
+        }
+
+        // Gives the screen time to show the dialog's restarting message first
+        Timer {
+            id: restartTimer
+            interval: 500
+            onTriggered: launcherTile.restartDevice()
         }
 
         Text {
             width: parent.width
-            text: "Added to your applications"
+            text: launcherTileDialog.restarting ? "Restarting…" : "Added to your applications"
             font.pointSize: 7.25
             font.bold: true
             wrapMode: Text.Wrap
         }
         Text {
             width: parent.width
-            text: "PBookOrbit now has its own name and icon in your applications."
-                  + " Restart your device to see them."
+            text: launcherTileDialog.restarting
+                  ? "Your device is restarting. This can take a minute."
+                  : "PBookOrbit now has its own name and icon in your applications."
+                    + " Restart your device to see them."
             font.pointSize: 7.25
             wrapMode: Text.Wrap
         }

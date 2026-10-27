@@ -12,7 +12,8 @@ Item {
     id: dialog
     // Theme icon: icon_question, icon_error, icon_info...
     property string icon: "icon_question"
-    // The buttons, left to right: [label, action]
+    // The buttons, left to right: [label, action]. None for a dialog that only says what
+    // is happening.
     property var buttons: []
     // How far something has got, 0-100, for a progress bar under the message; -1 for none
     property int percent: -1
@@ -95,7 +96,7 @@ Item {
             x: panel.border.width
             y: body.y + body.height
             width: panel.width - 2 * x
-            height: Units.dp(54)                                // 118px
+            height: dialog.buttons.length > 0 ? Units.dp(54) : 0   // 118px
 
             Repeater {
                 model: dialog.buttons
@@ -138,6 +139,7 @@ Item {
         }
         // Line above the buttons
         Rectangle {
+            visible: dialog.buttons.length > 0
             x: buttonRow.x
             y: buttonRow.y
             width: buttonRow.width
