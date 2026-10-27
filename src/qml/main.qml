@@ -200,6 +200,11 @@ Window {
         applyBooksOf(booksOfQuery)
         showingBooksOf = true
     }
+    // For the book menu's "All books of" items and the book info page's links: "author" or
+    // "series", the names to match and the page's title
+    function openBooksOfChosen(field, values, title) {
+        openBooksOf(field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author", title, field, values)
+    }
     function applyBooksOf(query) {
         bookOrbit.showBooksOf(booksOfField, booksOfValues, query.sortFields[query.sortIndex], query.descending(),
                               filterFormats[query.filterIndex], query.downloadedOnly,
@@ -762,6 +767,11 @@ Window {
         anchors.fill: parent
         visible: root.showingInfo
         onBack: root.showingInfo = false
+        // The books-of page is under this one, so this one closes
+        onBooksOfChosen: (field, values, title) => {
+            root.showingInfo = false
+            root.openBooksOfChosen(field, values, title)
+        }
     }
 
     // Over the pages, from any of their book lists
@@ -772,10 +782,7 @@ Window {
             bookInfoPage.show(book)
             root.showingInfo = true
         }
-        onBooksOfChosen: (field, values, title) => {
-            root.openBooksOf(field === "series" ? "Series" : values.length > 1 ? "Authors" : "Author",
-                             title, field, values)
-        }
+        onBooksOfChosen: (field, values, title) => root.openBooksOfChosen(field, values, title)
         onDeleteChosen: (book) => deleteDialog.ask(book)
         onOpenWithChosen: (target, app) => {
             if (target.option === undefined)

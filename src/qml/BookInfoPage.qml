@@ -4,7 +4,8 @@ import "night.js" as Night
 
 // A book's details, laid out like the system library's Book info page (screenshot 11):
 // the cover at the left with title, author, series and the file on the device beside it,
-// then a row of ADDED, SIZE and FORMAT. Below those come what BookOrbit knows besides
+// then a row of ADDED, SIZE and FORMAT. Author and series go to all their books, as the
+// book menu's "All books of" items do. Below those come what BookOrbit knows besides
 // (published, pages or an audiobook's length, language, description), fetched when the
 // page opens; offline they just don't appear. The whole page scrolls when the
 // description is long.
@@ -20,6 +21,8 @@ Rectangle {
     property var details: ({})
 
     signal back()
+    // As BookMenu's: "author" or "series", the names to match and the page's title
+    signal booksOfChosen(string field, var values, string title)
 
     function show(newBook) {
         book = newBook
@@ -160,11 +163,14 @@ Rectangle {
                     x: cover.width + Units.dp(15)
                     width: parent.width - x
 
+                    // Label, value, and for a link the field and names to go to
                     Repeater {
                         model: [
                             ["Title", page.book.title || ""],
-                            [(page.book.authors || []).length > 1 ? "Authors" : "Author", (page.book.authors || []).join(", ")],
-                            ["Series", page.book.seriesText || ""],
+                            [(page.book.authors || []).length > 1 ? "Authors" : "Author", (page.book.authors || []).join(", "),
+                             "author", page.book.authors || []],
+                            ["Series", page.book.seriesText || "",
+                             "series", page.book.seriesName ? [page.book.seriesName] : []],
                             [page.devicePaths.length > 1 ? "Files" : "File name", page.devicePaths.join("\n")],
                         ]
                         InfoField {
@@ -172,6 +178,8 @@ Rectangle {
                             width: fields.width
                             label: modelData[0]
                             value: modelData[1]
+                            tappable: modelData.length > 2 && modelData[3].length > 0
+                            onClicked: page.booksOfChosen(modelData[2], modelData[3], modelData[3].join(", "))
                         }
                     }
                 }
