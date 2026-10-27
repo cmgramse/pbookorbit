@@ -50,3 +50,12 @@
 - Compiled QML: most bindings run as bytecode, not C++ (NOTES.md has why). Time how long
   the first book list takes to fill on the device; if it's slow, start with `BookRow` and
   `GroupRow` (typed functions, required properties, then typed units and singletons).
+- Firmware 6.11 on B288/B300 devices (Era, Verse Pro, InkPad 4 and others since October
+  2026; there is no 6.11 SDK for them, so they would run the 6.10 build): check the app
+  starts. KOReader's launcher (`applications/koreader.app`) works around "firmware
+  6.11.1480 rejecting executable-stack system libraries" (koreader/koreader#15720) by
+  exporting `GLIBC_TUNABLES="${GLIBC_TUNABLES}${GLIBC_TUNABLES:+:}glibc.rtld.execstack=2"`
+  before it starts. The app itself has a non-executable stack, but the 6.10 SDK's
+  `libinkview` and `libhwconfig` are marked executable-stack (`readelf -lW`, GNU_STACK
+  RWE), so the firmware's may be too. If the app fails to start there, give it a small
+  shell launcher that sets that variable and then runs the binary, as KOReader's does.
