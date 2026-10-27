@@ -3,7 +3,7 @@
 PB_KIT ?= kit
 PB := $(if $(wildcard $(PB_KIT)/pb.sh),$(PB_KIT)/pb.sh,pb)
 
-.PHONY: setup run pc arm release shell clean
+.PHONY: setup run pc arm release shell clean icons
 
 # Fetch the kit, its SDK and the container image
 setup:
@@ -27,6 +27,14 @@ arm:
 release:
 	$(if $(SERVER),,$(error set SERVER, e.g. make release SERVER=books.example.com))
 	PB_QMAKE_ARGS="SUGGESTED_SERVER=$(SERVER)" $(PB) arm .
+
+# Render the app's icons (src/icons/*.bmp, built into the app) from their line art
+# (src/icons/*.svg): 110x110 8-bit grey BMPs, the size of the Era Color's theme icons.
+# Needs rsvg-convert and ImageMagick.
+icons:
+	for svg in src/icons/*.svg; do \
+		rsvg-convert "$$svg" | magick - -colorspace Gray -type Palette -depth 8 -compress None "BMP3:$${svg%.svg}.bmp" || exit 1; \
+	done
 
 # Shell in the build container
 shell:

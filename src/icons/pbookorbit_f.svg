@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="110" viewBox="0 0 110 110">
+  <!-- A book with an orbit around it, after the theme's desktop_app_* tiles: line art
+       74 px across in 3 px strokes. make icons renders the .bmp beside it. -->
+  <rect width="110" height="110" fill="white"/>
+  <!-- Focused: the same drawing in white on a black disc, as the theme's own tiles -->
+  <circle cx="55" cy="55" r="55" fill="black"/>
+  <g transform="translate(55 55)" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- The far half of the orbit, which the book hides -->
+    <path transform="rotate(-20)" d="M 37 0 A 37 12.58 0 0 0 -37 0"/>
+    <rect x="-19.24" y="-26.64" width="38.48" height="53.28" rx="3" fill="black"/>
+    <!-- The spine -->
+    <path d="M -11.54 -26.64 V 26.64"/>
+    <!-- The near half, crossing in front of the book with a margin cleared round it,
+         and a moon on it clear of the book -->
+    <g transform="rotate(-20)">
+      <path d="M -37 0 A 37 12.58 0 0 0 37 0" stroke="black" stroke-width="9" stroke-linecap="butt"/>
+      <path d="M -37 0 A 37 12.58 0 0 0 37 0"/>
+      <circle cx="-33.53" cy="5.32" r="5.4" fill="white" stroke="none"/>
+    </g>
+  </g>
+</svg>

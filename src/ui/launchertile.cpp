@@ -6,10 +6,12 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <cstring>
 #include <unistd.h>
 
 namespace {
@@ -120,6 +122,45 @@ bool addToView()
     return added;
 }
 
+// The tile's icon as the task manager draws it: 8-bit grey, like the theme's icons.
+// InkView's LoadBitmap gives 24-bit for a BMP with a palette, which the task manager draws
+// as three squashed copies side by side. Null if the icon can't be read.
+const ibitmap *taskIcon()
+{
+    const QImage image = QImage(ICON_FILE).convertToFormat(QImage::Format_Grayscale8);
+    if (image.isNull())
+        return nullptr;
+    // Never freed: the task manager may draw it from here for as long as the app runs
+    ibitmap *icon = NewBitmap8(image.width(), image.height());
+    if (!icon)
+        return nullptr;
+    for (int y = 0; y < image.height(); ++y)
+        memcpy(icon->data + y * icon->scanline, image.constScanLine(y), image.width());
+    return icon;
+}
+
+// The task manager names a task after its program, pbookorbit, unless the firmware's
+// language file has a better name for it (it has @koreader=KOReader, but nothing for us),
+// and gives it an icon only if the theme has one for it. The task can set both itself.
+void nameTask()
+{
+    const int task = GetCurrentTask();
+    // Kept as it is: OpenTask and FindTaskByAppName find the app by it
+    const taskinfo *info = GetTaskInfo(task);
+    const char *appname = info ? info->appname : nullptr;
+    const ibitmap *icon = taskIcon();
+    const QByteArray title = TITLE.toUtf8();
+    const int parameters = SetTaskParameters(task, appname, title.constData(), const_cast<ibitmap *>(icon),
+                                             TASK_DONTCHANGE);
+    // KOReader names its subtask, the open book, the same way
+    const int subtask = SetSubtaskInfo(task, 0, title.constData(), "");
+    diagnostics::log(QString("task %1 (%2): named %3, icon %4; SetTaskParameters %5, SetSubtaskInfo %6")
+                         .arg(task).arg(QString::fromUtf8(appname ? appname : "no appname"), TITLE,
+                              icon ? QString("%1x%2 depth %3").arg(icon->width).arg(icon->height).arg(icon->depth)
+                                   : QString("not loaded"))
+                         .arg(parameters).arg(subtask));
+}
+
 }
 
 LauncherTile::LauncherTile(QObject *parent)
@@ -129,6 +170,7 @@ LauncherTile::LauncherTile(QObject *parent)
     if (saveIfMissing(ICON_FILE, ":/icons/pbookorbit.bmp")
             && saveIfMissing(FOCUSED_ICON_FILE, ":/icons/pbookorbit_f.bmp"))
         m_added = addToView();
+    nameTask();
 }
 
 void LauncherTile::restartDevice()

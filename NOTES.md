@@ -108,14 +108,39 @@ the format in `_comment` arrays inside the file itself (read on the Era Color, 6
 - `apps.json` beside it is the home screen's row of shortcuts (`{"id": ...}` per app,
   `SYS_Apps` for the applications list). The user picks those: the app leaves it alone.
 - Icons: KOReader's for the Era Color are 106x110, 8-bit uncompressed BMP; its focused
-  one is a 110 px black disc cut to 106 wide, with the drawing in white. The app's
-  (`src/icons`) are the same size, but its focused disc is 106 px so it isn't cut off. pocketbook-statistics found 106x64 on a PB629,
+  one is a 110 px black disc cut to 106 wide, with the drawing in white. The theme's own
+  icons (`desktop_app_*`, `ctrl_panel_*`) are 110x110, and so are the app's (`src/icons`,
+  rendered from the `.svg` beside them by `make icons`). pocketbook-statistics found 106x64 on a PB629,
   and that an icon of the wrong size isn't shown at all (48 px wide) or puts the label
   out of line with its neighbours' (128 px tall).
 - The launcher reads the file at boot, so a new tile shows after a restart. The app can
   restart the device as KOReader does (its `frontend/device/pocketbook/device.lua`):
   `iv_ipc_request(MSG_REBOOT, 1, nullptr, 0, 0)`. Confirmed on the Era Color. Confirmed on
   the Era Color: the tile appeared and opened the app.
+
+## The task manager
+
+The task manager names a task with `TaskNameToHumanName(appname)`: the program's name
+without its folder and extension (`pbookorbit`), looked up as `@pbookorbit` in the
+firmware's language file, or left as it is. KOReader shows as KOReader only because the
+firmware's `en.txt` has `@koreader=KOReader`. The built-in apps' icons there are theme
+icons, `ctrl_panel_<app>` (110x110, e.g. `ctrl_panel_sudoku`), and any other app gets
+`ctrl_panel_app_unknown`.
+
+A task can set its own name and icon: `SetTaskParameters(task, appname, name, icon,
+flags)` (`TASK_DONTCHANGE` keeps the flags) and `SetSubtaskInfo(task, subtask, name,
+book)`, which KOReader calls with the open book's title. The work is done by the
+firmware's `hw_task_setparameters`, which isn't in the SDK, so whether a NULL appname
+means "unchanged" is unknown: the app passes its own appname back, from `GetTaskInfo`.
+`src/ui/launchertile.cpp` makes both calls at startup with the tile's title and icon.
+Confirmed on the Era Color: the name shows.
+
+The icon has to be 8-bit grey, as the theme's are (`GetResource` gives depth 8, rows
+padded to 4 bytes). The message carries the `ibitmap` as it is (header, then height x
+scanline bytes), and the task manager draws whatever comes as 8-bit: InkView's
+`LoadBitmap` turns an 8-bit BMP with a palette into a 24-bit bitmap, which came out as
+three squashed copies of the picture side by side. The app draws the icon into
+`NewBitmap8` itself.
 
 ## InkView dialogs from Qt
 
