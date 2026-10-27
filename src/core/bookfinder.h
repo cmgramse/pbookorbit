@@ -1,6 +1,6 @@
 #pragma once
 
-#include "downloads.h"
+#include "core/downloads.h"
 
 #include <QHash>
 #include <QList>

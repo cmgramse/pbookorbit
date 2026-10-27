@@ -1,6 +1,6 @@
-#include "invertedimageprovider.h"
+#include "ui/invertedimageprovider.h"
 
-#include "diagnostics.h"
+#include "core/diagnostics.h"
 
 #include <QImageReader>
 #include <QUrl>

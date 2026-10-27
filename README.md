@@ -59,7 +59,7 @@ The app writes `pbookorbit.log` to the root of the device's USB storage
 (`build/pbookorbit/<sdk>/pc/system/mnt/ext1` in the emulator). The log is cleared each time the app
 starts. Every 10 seconds it records the frames rendered, memory use (`VmRSS`) and thread
 count. It also logs every request with its status and time, every Wi-Fi connect, and each
-time the book list switches A2 on or off while it scrolls (see `eink.h`).
+time the book list switches A2 on or off while it scrolls (see `src/ui/eink.h`).
 
 On e-ink every frame is a slow screen update, so `frames` should be 0 while the app is idle.
 Anything that animates (a blinking cursor, `BusyIndicator`, transitions, Flickable momentum)

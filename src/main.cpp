@@ -7,16 +7,15 @@
 #include <QQuickWindow>
 #include <QStyleHints>
 
-#include "bookfinder.h"
-#include "bookorbitclient.h"
-#include "collectionicons.h"
-#include "database.h"
-#include "diagnostics.h"
-#include "covers.h"
-#include "downloads.h"
-#include "eink.h"
-#include "invertedimageprovider.h"
-#include "themeimageprovider.h"
+#include "core/bookfinder.h"
+#include "core/bookorbitclient.h"
+#include "core/database.h"
+#include "core/diagnostics.h"
+#include "ui/covers.h"
+#include "core/downloads.h"
+#include "ui/eink.h"
+#include "ui/invertedimageprovider.h"
+#include "ui/themeimageprovider.h"
 
 int main(int argc, char *argv[])
 {
@@ -41,7 +40,6 @@ int main(int argc, char *argv[])
 
     // /mnt/ext1/system/cache on the device, ./system/cache in the emulator
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
-    CollectionIcons collectionIcons(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-icons"));
     Downloads downloads(&client, &database);
     BookFinder bookFinder(&client, &downloads, &database);
     Eink eink;
@@ -56,7 +54,6 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("windowHeight", ScreenHeight() - PanelHeight());
     engine.rootContext()->setContextProperty("bookOrbit", &client);
     engine.rootContext()->setContextProperty("covers", &covers);
-    engine.rootContext()->setContextProperty("collectionIcons", &collectionIcons);
     engine.rootContext()->setContextProperty("downloads", &downloads);
     engine.rootContext()->setContextProperty("bookFinder", &bookFinder);
     engine.rootContext()->setContextProperty("eink", &eink);

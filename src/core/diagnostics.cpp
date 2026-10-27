@@ -1,4 +1,4 @@
-#include "diagnostics.h"
+#include "core/diagnostics.h"
 
 #include <inkview.h>
 #include <QDateTime>

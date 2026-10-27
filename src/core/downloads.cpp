@@ -1,9 +1,9 @@
-#include "downloads.h"
+#include "core/downloads.h"
 
-#include "bookorbitclient.h"
-#include "database.h"
-#include "diagnostics.h"
-#include "formats.h"
+#include "core/bookorbitclient.h"
+#include "core/database.h"
+#include "core/diagnostics.h"
+#include "core/formats.h"
 
 #include <common_utilities/einkinterface.h>
 #include <inkview.h>

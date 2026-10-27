@@ -107,7 +107,7 @@ browser unless the user turns on syncing them to their account:
   first. The settings can't be cleared (`PUT` rejects null, no `DELETE`).
 - `accent` is a palette name ("teal" by default, "wisteria", ...). The web client defines
   each as OKLCH lightness/chroma for its light and dark themes plus a hue, and a tone
-  ("vivid" or "pastel"); `accents.cpp` has the light-theme values, converted to sRGB.
+  ("vivid" or "pastel"); `src/ui/accents.cpp` has the light-theme values, converted to sRGB.
   Pastel accents take dark text.
 
 The app uses the accent for the on-device format pills, falling back to teal. It reads
@@ -145,7 +145,7 @@ the app BookOrbit's thumbnail.) Details:
   120 on the device and in the emulator alike.
 - **In the emulator `adjustAreaDefault()` hardly changes anything**, so colours there
   look like the plain image; judge them on the device.
-- `einkcolors.cpp` uses it for covers and, averaged over a patch, for the accent colour.
+- `src/ui/einkcolors.cpp` uses it for covers and, averaged over a patch, for the accent colour.
 
 Before the probe, the transform was fitted from screenshots alone: HSV saturation
 S' = 1 - (1 - S)^5 matched the dark covers but not the bright one; saturating around

@@ -37,7 +37,5 @@
         <file>qml/AuthorPortrait.qml</file>
         <file>qml/InfoField.qml</file>
         <file>qml/InfoCells.qml</file>
-        <file>lucide/lucide-icons.json</file>
-        <file>images/bookorbit-icon.png</file>
     </qresource>
 </RCC>

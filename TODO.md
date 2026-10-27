@@ -14,11 +14,11 @@
   server don't show until the app restarts; the collections list is fetched every time its
   tab opens. Series covers have no version in the list, so a changed one isn't fetched
   again.
-- Libraries: the list shows the first library (`loadLibrary()` in `bookorbitclient.cpp`).
+- Libraries: the list shows the first library (`loadLibrary()` in `src/core/bookorbitclient.cpp`).
   Choose one when the server has several.
 - Jump rail: dragging along it, and jumping by date for the date sorts (the jump-buckets
   endpoint returns days or months for those).
-- Make the server address configurable (`DEFAULT_SERVER_URL` in `bookorbitclient.cpp`).
+- Make the server address configurable (`DEFAULT_SERVER_URL` in `src/core/bookorbitclient.cpp`).
 - Test data for reading status: the `app` test account has no reading progress or
   statuses, so "Completed" and "N% read" can't be seen in the emulator. Add a mock, e.g. an
   environment variable that makes `decorateBook()` give books sample progress and statuses.

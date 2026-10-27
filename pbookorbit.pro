@@ -2,9 +2,37 @@ TARGET = pbookorbit.app
 QT += quick network
 CONFIG += c++17 qtquickcompiler
 
-SOURCES += main.cpp accents.cpp bookfinder.cpp bookorbitclient.cpp booklistmodel.cpp collectionicons.cpp covers.cpp database.cpp downloads.cpp einkcolors.cpp diagnostics.cpp eink.cpp invertedimageprovider.cpp themeimageprovider.cpp
-HEADERS += accents.h bookfinder.h bookorbitclient.h booklistmodel.h collectionicons.h covers.h database.h downloads.h einkcolors.h formats.h diagnostics.h eink.h invertedimageprovider.h themeimageprovider.h
-RESOURCES += qml.qrc
+INCLUDEPATH += src
+
+SOURCES += \
+    src/main.cpp \
+    src/core/bookfinder.cpp \
+    src/core/booklistmodel.cpp \
+    src/core/bookorbitclient.cpp \
+    src/core/database.cpp \
+    src/core/diagnostics.cpp \
+    src/core/downloads.cpp \
+    src/ui/accents.cpp \
+    src/ui/covers.cpp \
+    src/ui/eink.cpp \
+    src/ui/einkcolors.cpp \
+    src/ui/invertedimageprovider.cpp \
+    src/ui/themeimageprovider.cpp
+HEADERS += \
+    src/core/bookfinder.h \
+    src/core/booklistmodel.h \
+    src/core/bookorbitclient.h \
+    src/core/database.h \
+    src/core/diagnostics.h \
+    src/core/downloads.h \
+    src/core/formats.h \
+    src/ui/accents.h \
+    src/ui/covers.h \
+    src/ui/eink.h \
+    src/ui/einkcolors.h \
+    src/ui/invertedimageprovider.h \
+    src/ui/themeimageprovider.h
+RESOURCES += src/qml.qrc
 
 # qmake SUGGESTED_SERVER=books.example.com: the server field starts filled in with it, for
 # a build to hand to someone who uses that server. It goes in a generated header, written

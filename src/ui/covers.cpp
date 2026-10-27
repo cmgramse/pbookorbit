@@ -1,8 +1,8 @@
-#include "covers.h"
+#include "ui/covers.h"
 
-#include "bookorbitclient.h"
-#include "diagnostics.h"
-#include "einkcolors.h"
+#include "core/bookorbitclient.h"
+#include "core/diagnostics.h"
+#include "ui/einkcolors.h"
 
 #include <QCryptographicHash>
 #include <QDir>

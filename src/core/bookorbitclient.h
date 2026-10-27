@@ -1,6 +1,6 @@
 #pragma once
 
-#include "booklistmodel.h"
+#include "core/booklistmodel.h"
 
 #include <QColor>
 #include <QJsonArray>
@@ -49,12 +49,11 @@ class BookOrbitClient : public QObject
     // How many there are, or -1 until the server has said
     Q_PROPERTY(int booksOfTotal READ booksOfTotal NOTIFY booksOfChanged)
     // The user's book collections, as loadCollections() lists them, one row each (role
-    // "book", as in the book lists): {id, name, icon (a Lucide icon name or "custom:<slug>"),
-    // bookCount, covers: [{id, coverVersion}] (the last two books added to it that have
-    // covers), authors (of all its books, each once, by surname), formats (of all its
-    // books), bookIds (latest added first)}. These fill in as its books load, and then
-    // bookCount counts an ebook and its audiobook kept as separate records once, as its
-    // book list shows them.
+    // "book", as in the book lists): {id, name, bookCount, covers: [{id, coverVersion}] (the
+    // last two books added to it that have covers), authors (of all its books, each once, by
+    // surname), formats (of all its books), bookIds (latest added first)}. These fill in as
+    // its books load, and then bookCount counts an ebook and its audiobook kept as separate
+    // records once, as its book list shows them.
     Q_PROPERTY(BookListModel *collections READ collections CONSTANT)
     // jumpSections for collections: their letters when sorted by name, else empty. Each
     // row starting one has sectionStart and sectionLabel, as in the book lists.

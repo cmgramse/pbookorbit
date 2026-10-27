@@ -1,4 +1,4 @@
-#include "booklistmodel.h"
+#include "core/booklistmodel.h"
 
 static const int BOOK_ROLE = Qt::UserRole + 1;
 

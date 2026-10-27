@@ -1,6 +1,6 @@
-#include "themeimageprovider.h"
+#include "ui/themeimageprovider.h"
 
-#include "diagnostics.h"
+#include "core/diagnostics.h"
 
 #include <inkview.h>
 #include <cstdlib>

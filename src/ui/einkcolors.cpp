@@ -1,4 +1,4 @@
-#include "einkcolors.h"
+#include "ui/einkcolors.h"
 
 #include <inkview.h>
 

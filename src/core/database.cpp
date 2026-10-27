@@ -1,6 +1,6 @@
-#include "database.h"
+#include "core/database.h"
 
-#include "diagnostics.h"
+#include "core/diagnostics.h"
 
 #include <QDir>
 #include <QFileInfo>

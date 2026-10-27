@@ -1,6 +1,6 @@
-#include "eink.h"
+#include "ui/eink.h"
 
-#include "diagnostics.h"
+#include "core/diagnostics.h"
 
 #include <inkview.h>
 #include <QGuiApplication>

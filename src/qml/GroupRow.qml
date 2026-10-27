@@ -128,36 +128,6 @@ Item {
             height: Math.round(row.coverWidth * 4 / 3)
             author: row.isAuthor ? row.group : ({})
         }
-
-        // A collection's icon, in a white disc with a black edge
-        Rectangle {
-            visible: (row.group.icon || "") !== ""
-            anchors.centerIn: parent
-            width: Units.dp(26)                                 // 57px
-            height: width
-            radius: width / 2
-            color: "white"
-            border.width: 2
-            border.color: "black"
-
-            Image {
-                id: icon
-                anchors.centerIn: parent
-                // As for the covers: bumped to ask again when the download arrives
-                property int revision: 0
-                property string url: revision >= 0 ? collectionIcons.source(row.group.icon || "") : ""
-                Connections {
-                    target: collectionIcons
-                    function onReady(name) {
-                        if (name === row.group.icon)
-                            icon.revision++
-                    }
-                }
-                source: url
-                sourceSize.width: Units.dp(15)
-                sourceSize.height: Units.dp(15)
-            }
-        }
     }
 
     // Name, authors and book count, on the same baselines as a book's title, author and
