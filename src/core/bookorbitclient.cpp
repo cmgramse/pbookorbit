@@ -207,13 +207,11 @@ void BookOrbitClient::signOut()
 }
 
 void BookOrbitClient::setBookQuery(const QString &sortField, bool descending,
-                                   const QStringList &formats, bool onlyListed,
-                                   const QVariantList &onlyBooks)
+                                   const QStringList &formats, bool localOnly)
 {
     m_list.sortField = sortField;
     m_list.sortDescending = descending;
-    m_list.onlyListed = onlyListed;
-    m_list.onlyBooks = onlyBooks;
+    m_list.onlyListed = localOnly;
     m_list.formats = formats;
     refreshBooks();
 }
@@ -227,6 +225,7 @@ void BookOrbitClient::refreshList(PagedBooks &list)
 {
     restartPages(list);
     if (list.onlyListed) {
+        list.onlyBooks = &list == &m_booksOf ? localBooksOf() : m_localBooks;
         showListedBooks(list);
         return;
     }
@@ -307,8 +306,7 @@ void BookOrbitClient::loadSearchResults(int first, int last)
 
 void BookOrbitClient::showBooksOf(const QString &field, const QStringList &values,
                                   const QString &sortField, bool descending,
-                                  const QStringList &formats, bool onlyListed,
-                                  const QVariantList &onlyBooks)
+                                  const QStringList &formats, bool localOnly)
 {
     // Different books: clear the old rows. A new sort or filter of the same books keeps
     // them until the new rows arrive.
@@ -344,24 +342,28 @@ void BookOrbitClient::showBooksOf(const QString &field, const QStringList &value
     m_booksOf.sortField = sortField;
     m_booksOf.sortDescending = descending;
     m_booksOf.formats = formats;
-    m_booksOf.onlyListed = onlyListed;
-    // Just the downloaded books among these
-    m_booksOf.onlyBooks.clear();
-    for (const QVariant &value : onlyBooks) {
+    m_booksOf.onlyListed = localOnly;
+    refreshList(m_booksOf);
+}
+
+QVariantList BookOrbitClient::localBooksOf() const
+{
+    QVariantList books;
+    for (const QVariant &value : m_localBooks) {
         const QVariantMap book = value.toMap();
         bool wanted = false;
-        if (field == "collection") {
+        if (m_booksOfField == "collection") {
             wanted = m_booksOfCollectionIds.contains(book.value("id"));
-        } else if (field == "series") {
-            wanted = values.contains(book.value("seriesName").toString());
+        } else if (m_booksOfField == "series") {
+            wanted = m_booksOfValues.contains(book.value("seriesName").toString());
         } else {
             for (const QString &author : book.value("authors").toStringList())
-                wanted = wanted || values.contains(author);
+                wanted = wanted || m_booksOfValues.contains(author);
         }
         if (wanted)
-            m_booksOf.onlyBooks.append(book);
+            books.append(book);
     }
-    refreshList(m_booksOf);
+    return books;
 }
 
 int BookOrbitClient::booksOfTotal() const
@@ -1443,6 +1445,12 @@ static int localId(const QString &name)
 void BookOrbitClient::setLocalBooks(const QVariantList &books)
 {
     m_localBooks = books;
+    if (m_list.onlyListed)
+        refreshList(m_list);
+    if (m_booksOf.onlyListed)
+        refreshList(m_booksOf);
+    if (m_authors.localOnly)
+        showGroups(m_authors);
     if (m_online)
         return;
     if (m_series.local)
@@ -1675,26 +1683,25 @@ void BookOrbitClient::loadAuthorsPage(int page, int generation)
 }
 
 void BookOrbitClient::setAuthorQuery(const QString &sortField, bool descending, const QStringList &formats,
-                                     bool downloadedOnly, const QVariantList &downloadedBooks)
+                                     bool localOnly)
 {
     m_authors.sort = sortField;
     m_authors.descending = descending;
     m_authors.formats = formats;
-    m_authors.downloadedOnly = downloadedOnly;
-    m_authors.downloadedBooks = downloadedBooks;
+    m_authors.localOnly = localOnly;
     showGroups(m_authors);
 }
 
 void BookOrbitClient::showGroups(Groups &groups)
 {
     QList<QVariantMap> rows;
-    if (&groups == &m_authors && (!groups.formats.isEmpty() || groups.downloadedOnly)) {
-        // Only authors with books in the chosen formats (or downloaded ones, with
-        // downloadedOnly), counting just those books and showing their formats, as the
+    if (&groups == &m_authors && (!groups.formats.isEmpty() || groups.localOnly)) {
+        // Only authors with books in the chosen formats (or local ones, with localOnly),
+        // counting just those books and showing their formats, as the
         // filtered book list does. Authors whose books aren't looked up yet wait.
         QHash<QString, QHash<QString, QStringList>> downloaded;   // author -> key -> formats
         QHash<QString, QHash<QString, QStringList>> downloadedSeries;   // author -> key -> series
-        for (const QVariant &value : std::as_const(groups.downloadedBooks)) {
+        for (const QVariant &value : std::as_const(m_localBooks)) {
             const QVariantMap book = value.toMap();
             bool wanted = groups.formats.isEmpty();
             for (const QString &format : book.value("downloadedFormats").toStringList())
@@ -1718,7 +1725,7 @@ void BookOrbitClient::showGroups(Groups &groups)
             // Matching books by key, with their formats and series
             QHash<QString, QStringList> wantedBooks;
             QHash<QString, QStringList> wantedSeries;
-            if (groups.downloadedOnly) {
+            if (groups.localOnly) {
                 wantedBooks = downloaded.value(row.value("name").toString());
                 wantedSeries = downloadedSeries.value(row.value("name").toString());
             } else {

@@ -147,11 +147,10 @@ public:
     //   sortField   addedAt, title, author or lastReadAt
     //   descending  Z to A, or newest first
     //   formats     only books in these formats; empty for all
-    //   onlyListed  list onlyBooks (from Downloads.downloadedBooks()) locally instead of
-    //               asking the server, so it works offline
+    //   localOnly   list the local books (see setLocalBooks) instead of asking the server,
+    //               so it works offline
     Q_INVOKABLE void setBookQuery(const QString &sortField, bool descending,
-                                  const QStringList &formats, bool onlyListed = false,
-                                  const QVariantList &onlyBooks = {});
+                                  const QStringList &formats, bool localOnly = false);
     // Reloads the book list from page one
     Q_INVOKABLE void refreshBooks();
     // Loads whichever pages cover rows first to last and aren't loaded yet. Called while
@@ -170,12 +169,12 @@ public:
     // until the new ones arrive.
     Q_INVOKABLE void showBooksOf(const QString &field, const QStringList &values,
                                  const QString &sortField, bool descending,
-                                 const QStringList &formats = {}, bool onlyListed = false,
-                                 const QVariantList &onlyBooks = {});
+                                 const QStringList &formats = {}, bool localOnly = false);
     // loadBooks() for booksOf
     Q_INVOKABLE void loadBooksOf(int first, int last);
-    // The books on the device, as Downloads.downloadedBooks() lists them. Offline, the
-    // series, authors and search are built from these.
+    // The books on the device, as Downloads.downloadedBooks() lists them, for the lists
+    // set to local books only. Offline, the series, authors and search are built from
+    // these. Updates the lists showing them.
     Q_INVOKABLE void setLocalBooks(const QVariantList &books);
     // Fetches the user's collections, then each one's books for covers, authors and
     // formats. Existing rows stay until the new ones arrive.
@@ -191,9 +190,9 @@ public:
     // counts. Existing rows stay until the new ones arrive.
     Q_INVOKABLE void loadAuthors();
     // Sorts authors by "name", "sortName", "bookCount" or "lastAddedAt", and keeps only
-    // those with books in formats (and, with downloadedOnly, among downloadedBooks).
+    // those with books in formats (and, with localOnly, among the local books).
     Q_INVOKABLE void setAuthorQuery(const QString &sortField, bool descending, const QStringList &formats,
-                                    bool downloadedOnly = false, const QVariantList &downloadedBooks = {});
+                                    bool localOnly = false);
     // Fills authorSeriesList with the series containing books by author, then looks up
     // their formats
     Q_INVOKABLE void showAuthorSeries(const QString &author);
@@ -302,8 +301,7 @@ private:
         bool descending = false;
         // Authors' filter (see setAuthorQuery)
         QStringList formats;
-        bool downloadedOnly = false;
-        QVariantList downloadedBooks;
+        bool localOnly = false;
         // Whether every row's books have been looked up (series and authors only)
         bool booksLoaded = false;
         // Rows built from the local books while offline, to fetch again once online
@@ -356,8 +354,10 @@ private:
     void loadLibrary(std::function<void()> then);
     // Builds the BookOrbit query for a list's sort and filter
     static QJsonObject bookQuery(const PagedBooks &list);
-    // Reloads from page one, or lists onlyBooks locally
+    // Reloads from page one, or lists the local books
     void refreshList(PagedBooks &list);
+    // The local books among booksOf's author, series or collection
+    QVariantList localBooksOf() const;
     // Filters, sorts and sections onlyBooks locally, matching the server's lists
     void showListedBooks(PagedBooks &list);
     // Loads the A-Z jump buckets for a list's query, then calls then

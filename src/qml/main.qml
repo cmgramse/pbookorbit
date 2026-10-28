@@ -127,7 +127,7 @@ Window {
         sortIndex: 1   // Title, matching bookOrbit's default
         onApplied: {
             bookOrbit.setBookQuery(sortFields[sortIndex], descending(), root.filterFormats[filterIndex],
-                                   downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
+                                   downloadedOnly)
             bookList.positionViewAtBeginning()
         }
     }
@@ -166,7 +166,7 @@ Window {
         sortDescendingByDefault: [false, false, true, true]
         onApplied: {
             bookOrbit.setAuthorQuery(sortFields[sortIndex], descending(), root.filterFormats[filterIndex],
-                                     downloadedOnly, downloadedOnly ? downloads.downloadedBooks() : [])
+                                     downloadedOnly)
             authorsPage.list.positionViewAtBeginning()
         }
     }
@@ -210,8 +210,7 @@ Window {
     }
     function applyBooksOf(query) {
         bookOrbit.showBooksOf(booksOfField, booksOfValues, query.sortFields[query.sortIndex], query.descending(),
-                              filterFormats[query.filterIndex], query.downloadedOnly,
-                              query.downloadedOnly ? downloads.downloadedBooks() : [])
+                              filterFormats[query.filterIndex], query.downloadedOnly)
         booksOfPage.list.positionViewAtBeginning()
     }
     // An author's books use the library's sorts
@@ -241,17 +240,10 @@ Window {
         sortIndex: 1
         onApplied: root.applyBooksOf(collectionBooksQuery)
     }
-    // Downloads (and details lookups) change the downloaded book list
+    // Downloads (and details lookups) change the downloaded book list, and with it the
+    // lists showing it
     readonly property int downloadsRevision: downloads.revision
-    onDownloadsRevisionChanged: {
-        bookOrbit.setLocalBooks(downloads.downloadedBooks())
-        if (libraryQuery.downloadedOnly)
-            libraryQuery.applied()
-        if (showingBooksOf && booksOfQuery.downloadedOnly)
-            booksOfQuery.applied()
-        if (authorsQuery.downloadedOnly)
-            authorsQuery.applied()
-    }
+    onDownloadsRevisionChanged: bookOrbit.setLocalBooks(downloads.downloadedBooks())
 
     // Going offline or back online changes what lists that aren't downloaded only show
     Connections {
