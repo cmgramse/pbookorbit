@@ -1,109 +1,109 @@
 # How PBookOrbit works
 
-Technical notes for working on the app: how it talks to BookOrbit, what it keeps on the
-device, and how it fits into the PocketBook's launcher. For building it, see the
-[README](../README.md#development). Findings about the PocketBook firmware and SDK are in
+Notes for working on the app: how it talks to BookOrbit, what it stores on the device,
+and how it hooks into the PocketBook launcher. Build instructions are in the
+[README](../README.md#development), and firmware and SDK findings are in
 [NOTES.md](../NOTES.md).
 
 ## Signing in
 
-The sign-in page takes the server's address (`books.example.com`; https is assumed unless
-`http://` is typed) and the same username and password as the BookOrbit website. Once a
-sign-in has worked, the server is saved and shown as a pill; its cross forgets it, to
-sign in to another. A build can suggest a server (`make release SERVER=...`).
+The sign-in page asks for the server address (`books.example.com`, with https assumed
+unless `http://` is typed), plus the same username and password as the BookOrbit website.
+After a successful sign-in the server is saved and shown as a pill. Builds can prefill a server with `make release SERVER=...`.
 
-The app opens a session for the device, which BookOrbit lists in the account's sessions
-as "PocketBook <model>". The password is not saved: the session's refresh token is, in the
-app's database. Signing out ends the session on the server.
+Each device gets its own session, listed in the BookOrbit account as "PocketBook <model>".
+The password isn't stored; the session's refresh token is, in the app's database. Signing
+out ends the session on the server.
 
 ## Local data
 
-The app keeps its data in an SQLite database, `pbookorbit.db`, in the system config folder:
-`/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in the
-emulator. `PBOOKORBIT_DB` points the app at a different file, e.g. for automated tests.
-With the device on USB, `sqlite3 <mount>/system/config/pbookorbit.db` opens it on a PC.
+Data lives in an SQLite database, `pbookorbit.db`, in the system config folder
+(`/mnt/ext1/system/config` on the device, `build/pbookorbit/<sdk>/pc/system/config` in
+the emulator). Set `PBOOKORBIT_DB` to use a different file, for example in tests. With
+the device plugged in, `sqlite3 <mount>/system/config/pbookorbit.db` opens it from a PC.
 
-- `settings`: key/value. `serverUrl`, `username`, `refreshToken`, `accent` (the account's
-  BookOrbit accent colour), `recentSearches` (a JSON array), `findBooksOffered` (0/1) and
+- `settings` is key/value: `serverUrl`, `username`, `refreshToken`, `accent` (the
+  BookOrbit accent colour), `recentSearches` (JSON array), `findBooksOffered` (0/1) and
   `diagnosticsLogging` (0/1).
-- `books`: a local cache of BookOrbit books by id. `data` is the book's list entry as JSON,
-  so what's kept can grow without changing the table. `title` and `series` are generated
-  columns pulled out of it for querying; add more the same way with
+- `books` caches BookOrbit books by id. `data` holds the book's list entry as JSON, so
+  new fields don't need a schema change. `title` and `series` are generated columns for
+  querying; more can be added with
   `ALTER TABLE books ADD COLUMN ... GENERATED ALWAYS AS (json_extract(data, '$.field'))`.
-- `book_files`: the books' files on the device (`path`, `book_id`), downloaded or found.
+- `book_files` maps files on the device (`path`) to books (`book_id`), whether downloaded
+  or found.
 
-Only the downloaded books are cached so far. Deleting a book's files keeps its cache entry.
+Only downloaded books are cached at the moment. Deleting a book's files leaves its cache
+entry in place.
 
-Covers and authors' photos are cached as PNGs in `/mnt/ext1/system/cache/pbookorbit-covers`.
+Covers and author photos are cached as PNGs in `/mnt/ext1/system/cache/pbookorbit-covers`.
 
-## Downloads and books already on the device
+## Downloads and existing books
 
-Ebooks download to `/mnt/ext1/Books` and audiobooks to `/mnt/ext1/Audio Books`, after
-which the app asks the system to scan for new books so they show in the system library.
-Ebooks open in the system reader; audiobooks play in the system Audiobooks app
+Ebooks download to `/mnt/ext1/Books` and audiobooks to `/mnt/ext1/Audio Books`. After
+each download the app asks the system to rescan, so the book appears in the system
+library. Ebooks open in the system reader and audiobooks in the Audiobooks app
 (`/ebrmain/bin/audio_books.app`).
 
-**Find books on this device** (in the header menu) looks through the Books, Audio Books
-and Downloads folders for files the app hasn't recorded, such as books downloaded with
-KOReader, and records the ones in the library as downloaded. A file is a library book
-when, in order:
+"Find books on this device" in the header menu scans Books, Audio Books and Downloads for
+files the app hasn't recorded (books downloaded with KOReader, for instance) and marks the
+ones in the library as downloaded. A file matches a library book if, checked in order:
 
-1. KOReader's BookOrbit plugin says so: its state file (`bookorbit_sync_state*.lua` in
-   `applications/koreader/settings`) lists the book and file ids of every file it
-   downloaded or matched, for this server, and the file is unchanged.
-2. Its partial MD5 matches a library file's. This is KOReader's hash
-   (`util.partialMD5`), which BookOrbit stores for each file.
-3. Its name is a library file's name.
+1. KOReader's BookOrbit plugin (if installed) lists it for this server in its state file
+   (`bookorbit_sync_state*.lua` in `applications/koreader/settings`), and the file
+   hasn't changed.
+2. Its partial MD5 matches a library file. This is KOReader's hash
+   (`util.partialMD5`), which BookOrbit stores for every file.
+3. Its file name matches a library file's.
 
-For 2 and 3, the candidates are the library books whose title is in the file's name with
-the same format. A file whose name has a book's title and author but matched neither way
-is kept as unsure, for the user to add or not. See `src/core/bookfinder.h`.
+For 2 and 3, the candidates are books in the same format whose title appears in the file
+name. A file whose name contains a book's title and author but doesn't match either way is
+kept as an unsure match for the user to confirm. See `src/core/bookfinder.h`.
 
 ## Home screen tile and task manager
 
-Each time it starts, the app makes sure it has a tile in the applications, named
-PBookOrbit with its own icon.
+On every start the app checks it has a PBookOrbit tile, with its own icon, on the
+applications screen.
 
-- The icons are built into the app (`src/icons`, rendered from the `.svg` files there by
-  `make icons`) and written to `applications/icons/pbookorbit.bmp` and `pbookorbit_f.bmp`
-  (the focused one) on the device, only if they aren't there: replace them there to
-  change the tile, or delete them to get the app's own back at the next start. Keep them
-  110x110, 8-bit grey (on the Era Color), or the tile won't line up.
-- The app adds itself to the launcher's `system/config/desktop/view.json` as `U_pbookorbit`,
-  at the end of the first group of tiles, keeping a copy of the file as it was
-  (`view.json.before-pbookorbit`). Moving or removing the tile on the device sticks: the
-  app only places it the first time.
-- The launcher reads `view.json` at boot, so the tile shows after a restart. The first
-  time, the app says so and offers to restart the device.
-- The app also gives its running task the tile's name and icon, so the task manager
-  shows PBookOrbit rather than `pbookorbit`.
+- The icons are built into the app from the SVGs in `src/icons` (`make icons`) and
+  written to `applications/icons/pbookorbit.bmp` and `pbookorbit_f.bmp` (focused) if
+  they're missing. Replace them there to change the tile, or delete them to get the
+  defaults back on the next start. On the Era Color they need to be 110x110, 8-bit grey,
+  or the tile won't line up.
+- The app adds itself to the launcher's `system/config/desktop/view.json` as
+  `U_pbookorbit`, at the end of the first group, after saving the original as
+  `view.json.before-pbookorbit`. It only places the tile once, so moving or removing it
+  on the device sticks.
+- The launcher only reads `view.json` at boot, so the tile appears after a restart. The
+  first time, the app explains this and offers to restart.
+- The running task is given the same name and icon, so the task manager shows PBookOrbit
+  instead of `pbookorbit`.
 
-The code is `src/ui/launchertile.cpp`. NOTES.md has the format of `view.json` and how the
-task manager gets its names and icons.
+The code is in `src/ui/launchertile.cpp`. NOTES.md covers the `view.json` format and how
+the task manager picks names and icons.
 
 ## Diagnostics log
 
-The app writes `pbookorbit.log` to the root of the device's USB storage
-(`build/pbookorbit/<sdk>/pc/system/mnt/ext1` in the emulator), cleared each time the app
-starts. `diagnostics::log()` always writes, for errors and what the app found out at
-startup. `diagnostics::trace()` writes only while diagnostics logging is on (tap the title
-six times), for detail: every request with its status and time, every Wi-Fi connect, each
-time the book list switches A2 on or off while it scrolls (see `src/ui/eink.h`), and every
-10 seconds the frames rendered, memory use (`VmRSS`) and thread count.
+`pbookorbit.log` is written to the root of the device's storage
+(`build/pbookorbit/<sdk>/pc/system/mnt/ext1` in the emulator) and cleared on each start.
+`diagnostics::log()` always writes, for errors and startup information.
+`diagnostics::trace()` only writes while diagnostics logging is on (tap the title six
+times). It records each request with status and timing, Wi-Fi connections, the book list
+switching A2 on and off while scrolling (see `src/ui/eink.h`), and every 10 seconds the
+frames rendered, memory use (`VmRSS`) and thread count.
 
-On e-ink every frame is a slow screen update, so `frames` should be 0 while the app is idle.
-Anything that animates (a blinking cursor, `BusyIndicator`, transitions, Flickable momentum)
-keeps the display busy and makes the whole device feel hung.
+Every frame on e-ink is a slow screen update, so `frames` should be 0 when the app is
+idle. Anything that animates (a blinking cursor, `BusyIndicator`, transitions, Flickable
+momentum) keeps the display busy and makes the whole device feel frozen.
 
 ## The BookOrbit API
 
-BookOrbit doesn't document its API. What's below comes from its source
-(`server/src/modules/`, with types in `packages/types/src/`) and its web client's calls
-(`client/src`), or from trying the endpoints against a server.
+BookOrbit's API isn't documented. This comes from its source (`server/src/modules/`,
+types in `packages/types/src/`), its web client (`client/src`), and testing against a
+server.
 
 - Base URL: `<server>/api/v1`
-- Errors use NestJS's format: `{"statusCode": 401, "message": "Invalid credentials"}`.
-  `message` can also be an array.
+- Errors are in NestJS format: `{"statusCode": 401, "message": "Invalid credentials"}`,
+  where `message` may also be an array.
 
 ### Sessions
 
@@ -115,62 +115,61 @@ returns `NativeCredentials` and the user:
  "refreshTokenExpiresAt": "...", "sessionId": 17, "user": {...}}
 ```
 
-`clientKind: "native"` puts the refresh token in the body. Without it, the server sets
+`clientKind: "native"` returns the refresh token in the body. Without it the server sets
 browser cookies instead.
 
-- The access token lasts about 15 minutes. Send it as `Authorization: Bearer <accessToken>`.
-- The refresh token lasts 7 days. `POST /auth/refresh` with `{"refreshToken"}` returns new
-  `NativeCredentials`, including a **new** refresh token. The old one stops working shortly
-  after, so always save the new one, and never run two refreshes at once.
+- Access tokens last about 15 minutes. Send them as `Authorization: Bearer <accessToken>`.
+- Refresh tokens last 7 days. `POST /auth/refresh` with `{"refreshToken"}` returns new
+  `NativeCredentials` with a new refresh token, and the old one stops working shortly
+  after. Always save the new one, and never run two refreshes at once.
 - `POST /auth/logout` with `{"refreshToken"}` ends the session.
-- Login is rate-limited to 5 attempts a minute.
+- Login is limited to 5 attempts a minute.
 
-The client refreshes when a request gets a 401, then retries the request once.
+On a 401 the client refreshes and retries the request once.
 
 ### Libraries and books
 
-- `GET /libraries` lists the user's libraries, `[{id, name, bookCount, ...}]`. The app
-  uses the first.
-- `POST /libraries/:id/books` with a `BookQuery` (`packages/types/src/query.ts`) returns
-  a page of the library's books:
+- `GET /libraries` returns the user's libraries, `[{id, name, bookCount, ...}]`. The app
+  uses the first one.
+- `POST /libraries/:id/books` takes a `BookQuery` (`packages/types/src/query.ts`) and
+  returns a page of books:
 
   ```json
   {"sort": [{"field": "addedAt", "dir": "desc"}], "pagination": {"page": 1, "size": 20},
    "q": "optional search text", "filter": {"optional": "GroupRule"}}
   ```
 
-  It returns `{items, total, page, size}`. Each item has `id`, `title`, `authors`,
+  The response is `{items, total, page, size}`. Items include `id`, `title`, `authors`,
   `seriesName`, `seriesIndex`, `files: [{id, format, role, sizeBytes}]`, `hasCover`,
-  `readingProgress`, `readStatus` and more. The sort fields are listed in
-  `StaticSortField`.
-- `POST /libraries/:id/books/jump-buckets` with the same query gives the sections the
-  A–Z rail jumps to.
-- `GET /books/:id` returns one book in full, including its files' `filename` and
+  `readingProgress` and `readStatus`. Sort fields are listed in `StaticSortField`.
+- `POST /libraries/:id/books/jump-buckets` takes the same query and returns the A-Z rail's
+  sections.
+- `GET /books/:id` returns a single book in full, including each file's `filename` and
   `fileHash`.
-- `GET /books/:id/thumbnail` is the book's cover.
-- `GET /books/files/:fileId/download` downloads one of a book's files.
+- `GET /books/:id/thumbnail` returns the cover.
+- `GET /books/files/:fileId/download` downloads a file.
 
 ### Collections
 
-- `GET /collections` lists the user's own collections and others' public ones, in the
+- `GET /collections` returns the user's collections and other users' public ones, in the
   user's order: `[{id, mediaType, name, icon, displayOrder, bookCount, ...}]`.
-- `POST /collections/:id/books/query` and `.../jump-buckets` work like the library's
-  book query, for a collection's books (with a `collectionOrder` sort).
+- `POST /collections/:id/books/query` and `.../jump-buckets` work like the library
+  equivalents, with an extra `collectionOrder` sort.
 
 ### Authors and series
 
 - `GET /authors?libraryId=&sort=name&order=asc&page=&size=` lists a library's authors.
-- `GET /authors/:id` returns one author: `name`, `sortName`, `description` (plain text),
-  `bookCount`, `birthDate`/`birthYear`, `deathDate`/`deathYear`, `website`, `genres`,
-  `imageUrl` and more.
+- `GET /authors/:id` returns one author, including `name`, `sortName`, `description`
+  (plain text), `bookCount`, `birthDate`/`birthYear`, `deathDate`/`deathYear`,
+  `website`, `genres` and `imageUrl`.
 - `GET /series?libraryId=&sort=name&order=asc&page=&size=` lists a library's series, each
   with `coverBookIds` for its covers.
-- `GET /series?libraryId=&author=<text>` lists the series with an author whose name
-  contains the text, ignoring case. `author=Martin` finds every Martin's series, so the
-  client keeps only those whose `authors` include the exact name.
+- `GET /series?libraryId=&author=<text>` lists series with any author whose name contains
+  the text, ignoring case. `author=Martin` matches every Martin, so the client filters to
+  series whose `authors` include the exact name.
 
 ### Preferences
 
 - `GET /user-preferences/theme` returns `{settings: {theme, accent, ...}}`, or
-  `{settings: null}` for a user who has never synced their theme to the server. The app
-  takes the accent colour from it.
+  `{settings: null}` if the user has never synced their theme. The app reads the accent
+  colour from it.
