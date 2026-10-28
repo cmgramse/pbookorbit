@@ -6,7 +6,7 @@ import "units.js" as Units
 // the system's pill switch on the right, as in system settings. A black line closes the
 // group above (like under a MenuHeading), with a gap before the row. Smaller than the radio
 // rows (8pt, switch at 3/4 size) to keep it low-key. The row below the line is the tap
-// target, inverted while pressed.
+// target, inverted while pressed. Dimmed when disabled.
 Item {
     id: item
     property alias text: label.text
@@ -38,7 +38,7 @@ Item {
             id: label
             x: item.sideMargin
             anchors.verticalCenter: parent.verticalCenter
-            color: mouse.pressed ? "white" : "black"
+            color: mouse.pressed ? "white" : item.enabled ? "black" : "#808080"
             font.pointSize: 8
         }
         // The theme's 145x61px switch at 3/4 size
@@ -53,6 +53,7 @@ Item {
             sourceSize.height: height
             source: "image://theme/" + (item.checked ? "switch_on" : "switch_off")
                     + (mouse.pressed ? "@inverted" : "")
+            opacity: item.enabled ? 1 : 0.5
         }
         MouseArea {
             id: mouse

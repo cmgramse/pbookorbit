@@ -27,8 +27,8 @@
 - The list entries have no lastReadAt, so the Recently read sort shows every date section
   as "Never" (in the downloaded list it also can't order by it). Find where BookOrbit
   keeps the last read date.
-- Offline start: the app still opens on the full library, which needs the server. It
-  could open on the downloaded books when there is no network.
+- Opening a downloaded book in the emulator froze the app until it was force-quit (seen
+  offline, 28 October 2026). Try the same book online to see whether offline matters.
 - Check on the device that downloaded books show in the system library without a reboot
   (the app asks the scanner to scan; see NOTES.md for what else could be done).
 - Books with an ebook and an audiobook: once one version is downloaded, a tap opens it;

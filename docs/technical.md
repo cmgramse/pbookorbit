@@ -27,6 +27,11 @@ covers wait. The app checks the server again when the system reports Wi-Fi conne
 (`EVT_NET_CONNECTED`), or when the user asks (`goOnline()`); any reply means online.
 A session refresh that fails offline keeps the session.
 
+Offline, a Wi-Fi button in the header calls `goOnline()`, and every list shows downloaded
+books only, with the switch for it turned on and disabled. Back online, each list goes
+back to the user's own setting. Views that need the server say they aren't available
+offline.
+
 Set `PBOOKORBIT_OFFLINE=1` to run as though there were no network, for testing.
 
 ## Local data

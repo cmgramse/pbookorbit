@@ -83,6 +83,7 @@ Window {
         // "Orbit" in the user's BookOrbit accent colour
         title: "PocketBook × Book<font color=\"" + Night.color(bookOrbit.accentColor) + "\">Orbit</font>"
         menuOpen: menu.visible
+        showOffline: bookOrbit.signedIn && !bookOrbit.online
         showSearch: bookOrbit.signedIn
         // Only has Sign out
         showMenu: bookOrbit.signedIn
@@ -92,6 +93,7 @@ Window {
             diagnostics.toggle()
             diagnosticsDialog.visible = true
         }
+        onOfflineClicked: bookOrbit.goOnline()
         onSearchClicked: root.openSearch()
         onMenuClicked: menu.visible = !menu.visible
     }
@@ -249,6 +251,30 @@ Window {
         if (authorsQuery.downloadedOnly)
             authorsQuery.applied()
     }
+
+    // Going offline or back online changes what lists that aren't downloaded only show
+    Connections {
+        target: bookOrbit
+        function onOnlineChanged() {
+            if (!libraryQuery.downloadedChosen)
+                libraryQuery.applied()
+            if (showingBooksOf && !booksOfQuery.downloadedChosen)
+                booksOfQuery.applied()
+            if (!authorsQuery.downloadedChosen)
+                authorsQuery.applied()
+            if (!bookOrbit.online)
+                return
+            // Whatever couldn't load offline
+            if (showingCollections)
+                bookOrbit.loadCollections()
+            if (showingSeries && !bookOrbit.seriesLoaded)
+                bookOrbit.loadSeries()
+            if (showingAuthors && !bookOrbit.authorsLoaded)
+                bookOrbit.loadAuthors()
+        }
+    }
+    // Starting offline: list the downloaded books before bookOrbit.start() loads the list
+    Component.onCompleted: if (!bookOrbit.online) libraryQuery.applied()
 
     // The sort and filter shown by the menus, for whichever page is in front
     readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
@@ -591,6 +617,8 @@ Window {
         SwitchMenuItem {
             text: "Downloaded only"
             checked: root.activeQuery.downloadedOnly
+            // Always on offline
+            enabled: bookOrbit.online
             onClicked: root.activeQuery.setDownloadedOnly(!root.activeQuery.downloadedOnly)
         }
     }

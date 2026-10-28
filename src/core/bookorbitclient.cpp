@@ -55,6 +55,7 @@ BookOrbitClient::BookOrbitClient(Database *database, QObject *parent)
     // has revoked it, the first request signs out.
     m_signedIn = !m_serverUrl.isEmpty() && !m_refreshToken.isEmpty();
     m_simulateOffline = qEnvironmentVariableIntValue("PBOOKORBIT_OFFLINE") != 0;
+    m_online = !m_simulateOffline;
 
     // Wi-Fi also disconnects when idle, so only a connection is news: the server may be
     // back. Not in the emulator.
@@ -1627,8 +1628,10 @@ void BookOrbitClient::callJson(const QByteArray &method, const QString &path, co
             }
             onSuccess(doc);
         },
-        [this, onFailed](int, const QString &message) {
-            setError(message);
+        [this, onFailed](int status, const QString &message) {
+            // Offline shows in the header instead
+            if (status != 0)
+                setError(message);
             if (onFailed)
                 onFailed();
         });

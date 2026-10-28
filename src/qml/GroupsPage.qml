@@ -67,9 +67,10 @@ Item {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                visible: bookOrbit.error !== "" || (groupList.count === 0 && page.loaded)
+                visible: bookOrbit.error !== "" || (groupList.count === 0 && (page.loaded || !bookOrbit.online))
                 topPadding: Units.dp(8)
-                text: bookOrbit.error !== "" ? bookOrbit.error : page.emptyText
+                text: bookOrbit.error !== "" ? bookOrbit.error
+                      : page.loaded ? page.emptyText : "Not available offline"
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -96,7 +97,7 @@ Item {
     }
     Spinner {
         list: groupList
-        visible: bookOrbit.error === "" && groupList.count === 0 && !page.loaded
+        visible: bookOrbit.error === "" && groupList.count === 0 && !page.loaded && bookOrbit.online
     }
     JumpRail {
         list: groupList

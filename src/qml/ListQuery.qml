@@ -14,8 +14,10 @@ QtObject {
     property int sortIndex: 0
     property bool sortReversed: false
     property int filterIndex: 0
-    // Only books on the device, combined with the content type
-    property bool downloadedOnly: false
+    // Only books on the device, combined with the content type: as chosen, and always
+    // while offline. Back online, the list returns to the choice.
+    property bool downloadedChosen: false
+    readonly property bool downloadedOnly: downloadedChosen || !bookOrbit.online
 
     readonly property bool sortDescending: sortDescendingByDefault[sortIndex] !== sortReversed
 
@@ -45,7 +47,7 @@ QtObject {
         applied()
     }
     function setDownloadedOnly(on) {
-        downloadedOnly = on
+        downloadedChosen = on
         applied()
     }
 }
