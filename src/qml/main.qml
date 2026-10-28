@@ -83,7 +83,7 @@ Window {
         // "Orbit" in the user's BookOrbit accent colour
         title: "PocketBook × Book<font color=\"" + Night.color(bookOrbit.accentColor) + "\">Orbit</font>"
         menuOpen: menu.visible
-        showOffline: bookOrbit.signedIn && !bookOrbit.online
+        offline: bookOrbit.signedIn && !bookOrbit.online
         showSearch: bookOrbit.signedIn
         // Only has Sign out
         showMenu: bookOrbit.signedIn
@@ -93,7 +93,6 @@ Window {
             diagnostics.toggle()
             diagnosticsDialog.visible = true
         }
-        onOfflineClicked: bookOrbit.goOnline()
         onSearchClicked: root.openSearch()
         onMenuClicked: menu.visible = !menu.visible
     }
@@ -669,6 +668,15 @@ Window {
         anchors.right: parent.right
         anchors.rightMargin: Units.dp(9)
 
+        // Offline: asks the system to connect
+        PopupMenuItem {
+            visible: bookOrbit.signedIn && !bookOrbit.online
+            text: "Reconnect"
+            onClicked: {
+                menu.visible = false
+                bookOrbit.goOnline()
+            }
+        }
         // Needs the server's library
         PopupMenuItem {
             visible: bookOrbit.signedIn && bookOrbit.online

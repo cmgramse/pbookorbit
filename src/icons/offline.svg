@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <!-- The header's offline badge: a red disc with a white crossed-out Wi-Fi sign, shown
+       after the title at dp(17). make icons renders the .bmp beside it, in colour. -->
+  <circle cx="50" cy="50" r="50" fill="#d50000"/>
+  <g fill="none" stroke="white" stroke-width="9.09" stroke-linecap="round">
+    <circle cx="50" cy="70" r="8.18" fill="white" stroke="none"/>
+    <path d="M 34.59 57.25 A 20 20 0 0 1 65.41 57.25"/>
+    <path d="M 20.72 45.78 A 38 38 0 0 1 79.28 45.78"/>
+    <!-- The line through it, edged in red to part it from the arcs -->
+    <path d="M 27 24 L 73 80" stroke="#d50000" stroke-width="22.73"/>
+    <path d="M 27 24 L 73 80"/>
+  </g>
+</svg>

@@ -39,5 +39,6 @@
         <file>qml/InfoCells.qml</file>
         <file>icons/pbookorbit.bmp</file>
         <file>icons/pbookorbit_f.bmp</file>
+        <file>icons/offline.bmp</file>
     </qresource>
 </RCC>

@@ -1,8 +1,9 @@
 import QtQuick
 import "units.js" as Units
+import "night.js" as Night
 
-// Top toolbar: home button, title, optional offline, search and menu buttons, and a 1px
-// line below.
+// Top toolbar: home button, title, optional search and menu buttons, and a 1px line below.
+// Offline, a small crossed-out Wi-Fi icon follows the title.
 // As in the system apps, home goes to the dashboard. The title is tappable too; six quick
 // taps emit secretTapped(). Follows AppHeader.qml from the SDK's qml_test: theme icons at
 // natural size, dp(15) from the edges. Taller than dp(56) if the theme's icons are.
@@ -11,13 +12,11 @@ Rectangle {
     property alias title: titleText.text
     property bool menuOpen: false
     property bool showSearch: false
-    // A Wi-Fi button that asks to connect
-    property bool showOffline: false
+    property bool offline: false
     property bool showMenu: true
     signal homeClicked()
     signal titleClicked()
     signal secretTapped()
-    signal offlineClicked()
     signal searchClicked()
     signal menuClicked()
 
@@ -76,6 +75,21 @@ Rectangle {
         }
     }
 
+    // Just after the title's text, outside its layout so the title stays centred: a red
+    // badge with a crossed-out Wi-Fi sign (src/icons/offline.svg), a little taller than
+    // the capitals. Keeps its colours in night mode.
+    Image {
+        id: offlineIcon
+        visible: header.offline
+        width: Units.dp(17)
+        height: width
+        sourceSize.width: width
+        sourceSize.height: height
+        x: titleText.x + (titleText.width + Math.min(titleText.contentWidth, titleText.width)) / 2 + Units.dp(5)
+        anchors.verticalCenter: titleText.verticalCenter
+        source: Night.image("qrc:/icons/offline.bmp")
+    }
+
     Row {
         id: rightButtons
         anchors.right: parent.right
@@ -83,13 +97,6 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         anchors.verticalCenterOffset: -separator.height / 2
 
-        IconButton {
-            visible: header.showOffline
-            icon: "wifi"
-            pressedIcon: "wifi@inverted"
-            fallbackText: "Offline"
-            onClicked: header.offlineClicked()
-        }
         IconButton {
             visible: header.showSearch
             icon: "search"
