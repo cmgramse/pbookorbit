@@ -46,6 +46,8 @@ int main(int argc, char *argv[])
     Covers covers(&client, QString::fromUtf8(USERDATA "/cache/pbookorbit-covers"));
     Downloads downloads(&client, &database);
     BookFinder bookFinder(&client, &downloads, &database);
+    // Saved with the book, for offline
+    QObject::connect(&downloads, &Downloads::downloaded, &client, &BookOrbitClient::loadBookDetails);
     Browser browser;
     Eink eink;
     eink.followNightMode();

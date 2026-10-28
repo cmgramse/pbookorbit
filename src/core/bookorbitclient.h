@@ -204,9 +204,11 @@ public:
     // "Adrian Tchaikovsky") on a gradient chosen from the name, near the accent hue.
     // Returns {initials, from, to, color}, saturated for e-ink.
     Q_INVOKABLE QVariantMap authorMonogram(const QString &name) const;
-    // Fetches an author's details and emits authorDetails(), with empty details on failure
+    // Fetches an author's details and emits authorDetails(), with the saved ones (or none)
+    // on failure
     Q_INVOKABLE void loadAuthorDetails(int authorId);
-    // Fetches a book's full details and emits bookDetails(), with empty details on failure
+    // Fetches a book's full details and emits bookDetails(), with the saved ones (or none)
+    // on failure. Saved for books with saved list entries, i.e. on the device.
     Q_INVOKABLE void loadBookDetails(int bookId);
 
     // Adds text to the top of the recent searches (moving it if already there, ignoring
@@ -325,6 +327,8 @@ private:
     // books, as though looked up
     void showLocalSeries(Groups &groups);
     void showLocalAuthors();
+    // Offline: the saved collections with local books, counting only those
+    void showLocalCollections();
     // Offline: the local books matching the search text
     void searchLocalBooks(const QString &text);
     // On the device, connects Wi-Fi if needed: with the system's dialog if ask, otherwise

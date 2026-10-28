@@ -28,6 +28,35 @@ static const char *SCHEMA = R"sql(
         book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS book_files_book_id ON book_files(book_id);
+
+    CREATE TABLE IF NOT EXISTS book_details (
+        id      INTEGER PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+        data    TEXT NOT NULL CHECK (json_valid(data)),
+        updated INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS authors (
+        id      INTEGER PRIMARY KEY,                -- BookOrbit's author id
+        name    TEXT NOT NULL,
+        -- From the authors list and GET /authors/:id, either NULL until fetched
+        entry   TEXT CHECK (entry IS NULL OR json_valid(entry)),
+        details TEXT CHECK (details IS NULL OR json_valid(details)),
+        updated INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS authors_name ON authors(name);
+
+    CREATE TABLE IF NOT EXISTS collections (
+        id       INTEGER PRIMARY KEY,               -- BookOrbit's collection id
+        position INTEGER NOT NULL,                  -- in the user's order
+        data     TEXT NOT NULL CHECK (json_valid(data))
+    );
+
+    CREATE TABLE IF NOT EXISTS collection_books (
+        collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+        position      INTEGER NOT NULL,             -- newest first
+        book_id       INTEGER NOT NULL,
+        PRIMARY KEY (collection_id, position)
+    ) WITHOUT ROWID;
 )sql";
 
 Database::Database(const QString &path)
@@ -214,6 +243,127 @@ QList<Database::Book> Database::booksWithFiles() const
         sqlite3_finalize(statement);
     }
     return books;
+}
+
+// JSON text for a map
+static QString json(const QVariantMap &map)
+{
+    return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(map)).toJson(QJsonDocument::Compact));
+}
+
+// A map from JSON text, empty for NULL
+static QVariantMap jsonMap(const QString &text)
+{
+    return QJsonDocument::fromJson(text.toUtf8()).object().toVariantMap();
+}
+
+void Database::saveBookDetails(int bookId, const QVariantMap &details)
+{
+    exec("INSERT INTO book_details (id, data, updated) "
+         "SELECT ?1, ?2, unixepoch() WHERE EXISTS (SELECT 1 FROM books WHERE id = ?1) "
+         "ON CONFLICT (id) DO UPDATE SET data = excluded.data, updated = excluded.updated",
+         {bookId, json(details)});
+}
+
+QVariantMap Database::bookDetails(int bookId) const
+{
+    QVariantMap details;
+    if (sqlite3_stmt *statement = prepare("SELECT data FROM book_details WHERE id = ?", {bookId})) {
+        if (sqlite3_step(statement) == SQLITE_ROW)
+            details = jsonMap(columnText(statement, 0));
+        sqlite3_finalize(statement);
+    }
+    return details;
+}
+
+void Database::saveAuthors(const QList<QVariantMap> &entries)
+{
+    for (const QVariantMap &entry : entries) {
+        exec("INSERT INTO authors (id, name, entry, updated) VALUES (?, ?, ?, unixepoch()) "
+             "ON CONFLICT (id) DO UPDATE SET name = excluded.name, entry = excluded.entry, "
+             "updated = excluded.updated",
+             {entry.value("id").toInt(), entry.value("name").toString(), json(entry)});
+    }
+}
+
+void Database::saveAuthorDetails(int authorId, const QVariantMap &details)
+{
+    exec("INSERT INTO authors (id, name, details, updated) VALUES (?, ?, ?, unixepoch()) "
+         "ON CONFLICT (id) DO UPDATE SET name = excluded.name, details = excluded.details, "
+         "updated = excluded.updated",
+         {authorId, details.value("name").toString(), json(details)});
+}
+
+QHash<QString, Database::Author> Database::authorsNamed(const QStringList &names) const
+{
+    QHash<QString, Author> authors;
+    const QString list = QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(names)).toJson(QJsonDocument::Compact));
+    if (sqlite3_stmt *statement = prepare(
+            "SELECT id, name, entry, details FROM authors "
+            "WHERE name IN (SELECT value FROM json_each(?))", {list})) {
+        while (sqlite3_step(statement) == SQLITE_ROW) {
+            authors.insert(columnText(statement, 1),
+                           Author{sqlite3_column_int(statement, 0), jsonMap(columnText(statement, 2)),
+                                  jsonMap(columnText(statement, 3))});
+        }
+        sqlite3_finalize(statement);
+    }
+    return authors;
+}
+
+QVariantMap Database::authorDetails(int authorId) const
+{
+    QVariantMap details;
+    if (sqlite3_stmt *statement = prepare("SELECT details FROM authors WHERE id = ?", {authorId})) {
+        if (sqlite3_step(statement) == SQLITE_ROW)
+            details = jsonMap(columnText(statement, 0));
+        sqlite3_finalize(statement);
+    }
+    return details;
+}
+
+void Database::saveCollections(const QList<QVariantMap> &entries)
+{
+    QJsonArray ids;
+    for (const QVariantMap &entry : entries)
+        ids.append(entry.value("id").toInt());
+    exec("DELETE FROM collections WHERE id NOT IN (SELECT value FROM json_each(?))",
+         {QString::fromUtf8(QJsonDocument(ids).toJson(QJsonDocument::Compact))});
+    for (int i = 0; i < entries.size(); i++) {
+        exec("INSERT INTO collections (id, position, data) VALUES (?, ?, ?) "
+             "ON CONFLICT (id) DO UPDATE SET position = excluded.position, data = excluded.data",
+             {entries.at(i).value("id").toInt(), i, json(entries.at(i))});
+    }
+}
+
+void Database::saveCollectionBooks(int collectionId, const QVariantList &bookIds)
+{
+    exec("DELETE FROM collection_books WHERE collection_id = ?", {collectionId});
+    for (int i = 0; i < bookIds.size(); i++) {
+        exec("INSERT INTO collection_books (collection_id, position, book_id) VALUES (?, ?, ?)",
+             {collectionId, i, bookIds.at(i).toInt()});
+    }
+}
+
+QList<Database::Collection> Database::collections() const
+{
+    QList<Collection> collections;
+    if (sqlite3_stmt *statement = prepare(
+            "SELECT collections.id, collections.data, collection_books.book_id FROM collections "
+            "LEFT JOIN collection_books ON collection_books.collection_id = collections.id "
+            "ORDER BY collections.position, collection_books.position")) {
+        int lastId = -1;
+        while (sqlite3_step(statement) == SQLITE_ROW) {
+            const int id = sqlite3_column_int(statement, 0);
+            if (collections.isEmpty() || lastId != id)
+                collections.append(Collection{jsonMap(columnText(statement, 1)), {}});
+            lastId = id;
+            if (sqlite3_column_type(statement, 2) != SQLITE_NULL)
+                collections.last().bookIds.append(sqlite3_column_int(statement, 2));
+        }
+        sqlite3_finalize(statement);
+    }
+    return collections;
 }
 
 void Database::transaction(const std::function<void()> &writes)

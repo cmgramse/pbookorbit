@@ -263,7 +263,7 @@ Window {
                 bookOrbit.showAuthorSeries(authorSeriesView.name)
             if (showingAuthors && !bookOrbit.authorsLoaded)
                 bookOrbit.loadAuthors()
-            if (showingCollections && bookOrbit.online)
+            if (showingCollections)
                 bookOrbit.loadCollections()
         }
     }
@@ -450,7 +450,7 @@ Window {
         model: bookOrbit.collections
         jumpSections: bookOrbit.collectionJumpSections
         loaded: bookOrbit.collectionsLoaded
-        emptyText: "No collections"
+        emptyText: bookOrbit.online ? "No collections" : "No collections with downloaded books"
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -465,7 +465,7 @@ Window {
         tabOverhang: sortMenu.border.width - 1
         onSortClicked: root.toggleDropdown(sortMenu)
         onSortIconClicked: collectionsQuery.reverseSort()
-        // Reloaded every time the view opens
+        // Reloaded every time the view opens. Offline, the saved collections' downloaded books.
         onVisibleChanged: if (visible) bookOrbit.loadCollections()
         onGroupClicked: (collection) => root.openBooksOf("Collection", collection.name, "collection",
                                                         [String(collection.id)])
@@ -477,7 +477,7 @@ Window {
         model: bookOrbit.seriesList
         jumpSections: bookOrbit.seriesJumpSections
         loaded: bookOrbit.seriesLoaded
-        emptyText: "No series"
+        emptyText: bookOrbit.online ? "No series" : "No series with downloaded books"
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -746,7 +746,7 @@ Window {
             model: bookOrbit.authorSeriesList
             jumpSections: bookOrbit.authorSeriesJumpSections
             loaded: bookOrbit.authorSeriesLoaded
-            emptyText: "No series"
+            emptyText: bookOrbit.online ? "No series" : "No series with downloaded books"
             sortText: "By " + authorSeriesQuery.sortOptions[authorSeriesQuery.sortIndex]
             sortReversed: authorSeriesQuery.sortReversed
             descending: authorSeriesQuery.sortDescending

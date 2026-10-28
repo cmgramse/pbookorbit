@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QSet>
 #include <QString>
@@ -21,6 +22,11 @@ struct sqlite3_stmt;
 //                ALTER TABLE ... ADD COLUMN ... GENERATED.
 //   book_files   files of those books on the device, downloaded or found. A book can have
 //                two: an ebook and an audiobook.
+//   book_details those books' full details (GET /books/:id), for offline
+//   authors      BookOrbit authors by id: the authors list's entry and their details
+//                (GET /authors/:id), each as JSON, for offline
+//   collections  the user's collections in their order, and each one's book ids
+//   collection_books
 //
 // Uses the system libsqlite3 (linked by libcommon_utilities), which every device has. Qt's
 // Sql module isn't used because the firmware may not ship it.
@@ -60,6 +66,34 @@ public:
         QStringList files;
     };
     QList<Book> booksWithFiles() const;
+
+    // Saves a saved book's details. Does nothing for other books.
+    void saveBookDetails(int bookId, const QVariantMap &details);
+    // A book's saved details, or empty
+    QVariantMap bookDetails(int bookId) const;
+
+    // Saves authors' list entries (id, name, sortName, imageUrl, ...)
+    void saveAuthors(const QList<QVariantMap> &entries);
+    void saveAuthorDetails(int authorId, const QVariantMap &details);
+    // Saved authors with these names: list entry and details, either possibly empty
+    struct Author {
+        int id;
+        QVariantMap entry;
+        QVariantMap details;
+    };
+    QHash<QString, Author> authorsNamed(const QStringList &names) const;
+    QVariantMap authorDetails(int authorId) const;
+
+    // Replaces the saved collections with these, in this order. Collections still there
+    // keep their book ids.
+    void saveCollections(const QList<QVariantMap> &entries);
+    // A collection's book ids, newest first
+    void saveCollectionBooks(int collectionId, const QVariantList &bookIds);
+    struct Collection {
+        QVariantMap entry;
+        QVariantList bookIds;
+    };
+    QList<Collection> collections() const;
 
     // Runs writes in a single transaction: one write to storage, all or nothing
     void transaction(const std::function<void()> &writes);

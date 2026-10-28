@@ -36,7 +36,10 @@ QML hands the client the downloaded books (`setLocalBooks()`), and offline the S
 Authors views, an author's series and search are built from them. Rows built this way have
 negative ids, no author photos, and only the downloaded books' formats; back online they
 count as not loaded, so each view fetches the server's rows when it next shows. Authors
-already fetched that session are kept, filtered to downloaded books. "Find books on this
+already fetched that session are kept, filtered to downloaded books. Authors take their
+id, sort name and photo from the `authors` table where they've been fetched before, and
+Collections lists the saved collections that have downloaded books. Author and book
+details show what was last saved. "Find books on this
 device" is hidden offline, since it needs the server's library.
 
 Set `PBOOKORBIT_OFFLINE=1` to run as though there were no network, for testing.
@@ -57,6 +60,13 @@ the device plugged in, `sqlite3 <mount>/system/config/pbookorbit.db` opens it fr
   `ALTER TABLE books ADD COLUMN ... GENERATED ALWAYS AS (json_extract(data, '$.field'))`.
 - `book_files` maps files on the device (`path`) to books (`book_id`), whether downloaded
   or found.
+
+- `book_details` keeps those books' full details (`GET /books/:id`), saved when a book
+  downloads and whenever its Book info page loads them.
+- `authors` keeps BookOrbit authors by id, with the authors list's entry and their
+  details (`GET /authors/:id`) as JSON, each saved when fetched.
+- `collections` and `collection_books` keep the user's collections in order, and each
+  one's book ids, newest first.
 
 Only downloaded books are cached at the moment. Deleting a book's files leaves its cache
 entry in place.

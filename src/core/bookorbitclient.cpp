@@ -382,11 +382,14 @@ void BookOrbitClient::loadBookDetails(int bookId)
     // details, and offline it just shows less.
     download(QString("/books/%1").arg(bookId),
         [this, bookId](const QByteArray &data) {
-            emit bookDetails(bookId, QJsonDocument::fromJson(data).object().toVariantMap());
+            const QVariantMap details = QJsonDocument::fromJson(data).object().toVariantMap();
+            m_database->saveBookDetails(bookId, details);
+            emit bookDetails(bookId, details);
         },
-        [this, bookId](int, const QString &message) {
-            diagnostics::log(QString("book %1 details: %2").arg(bookId).arg(message));
-            emit bookDetails(bookId, QVariantMap());
+        [this, bookId](int status, const QString &message) {
+            if (status != 0)
+                diagnostics::log(QString("book %1 details: %2").arg(bookId).arg(message));
+            emit bookDetails(bookId, m_database->bookDetails(bookId));
         });
 }
 
@@ -430,10 +433,11 @@ void BookOrbitClient::setOnline(bool online)
     diagnostics::log(online ? "online" : "offline");
     // Rows built offline stay on screen until the server's arrive
     if (online) {
-        for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+        for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
             if (groups->local)
                 groups->loaded = false;
         }
+        emit collectionsChanged();
         emit seriesListChanged();
         emit authorsChanged();
         emit authorSeriesChanged();
@@ -1037,16 +1041,23 @@ static void sortAuthors(QStringList &authors)
 void BookOrbitClient::loadCollections()
 {
     const int generation = ++m_collections.generation;
+    if (!m_online) {
+        showLocalCollections();
+        return;
+    }
     // [{id, mediaType, name, icon, displayOrder, bookCount, ...}]: the user's collections
     // and others' public ones, in the user's order
     callJson("GET", "/collections", QJsonDocument(), [this, generation](const QJsonDocument &doc) {
         if (generation != m_collections.generation)
             return;
         m_collections.rows.clear();
+        m_collections.local = false;
+        QList<QVariantMap> entries;
         for (const QJsonValue &value : doc.array()) {
             QVariantMap row = value.toObject().toVariantMap();
             if (row.value("mediaType").toString() != "books")
                 continue;   // podcast collections
+            entries.append(row);
             row.insert("covers", QVariantList());
             row.insert("authors", QStringList());
             row.insert("formats", QStringList());
@@ -1054,6 +1065,7 @@ void BookOrbitClient::loadCollections()
             row.insert("bookKeys", QStringList());
             m_collections.rows.append(row);
         }
+        m_database->transaction([this, &entries]() { m_database->saveCollections(entries); });
         m_collections.loaded = true;
         showGroups(m_collections);
         for (const QVariantMap &row : std::as_const(m_collections.rows)) {
@@ -1116,8 +1128,13 @@ void BookOrbitClient::loadCollectionBooks(int collectionId, int page, int genera
             // Counted once all its books are in
             if (!more) {
                 for (QVariantMap &row : m_collections.rows) {
-                    if (row.value("id").toInt() == collectionId)
-                        row.insert("bookCount", row.value("bookKeys").toStringList().size());
+                    if (row.value("id").toInt() != collectionId)
+                        continue;
+                    row.insert("bookCount", row.value("bookKeys").toStringList().size());
+                    const QVariantList bookIds = row.value("bookIds").toList();
+                    m_database->transaction([this, collectionId, &bookIds]() {
+                        m_database->saveCollectionBooks(collectionId, bookIds);
+                    });
                 }
             }
             showGroups(m_collections);
@@ -1229,14 +1246,17 @@ QVariantMap BookOrbitClient::authorMonogram(const QString &name) const
 
 void BookOrbitClient::loadAuthorDetails(int authorId)
 {
-    // Quiet: offline, the page just shows less
+    // Quiet: offline, the page shows what was saved
     download(QString("/authors/%1").arg(authorId),
         [this, authorId](const QByteArray &data) {
-            emit authorDetails(authorId, QJsonDocument::fromJson(data).object().toVariantMap());
+            const QVariantMap details = QJsonDocument::fromJson(data).object().toVariantMap();
+            m_database->saveAuthorDetails(authorId, details);
+            emit authorDetails(authorId, details);
         },
-        [this, authorId](int, const QString &message) {
-            diagnostics::log(QString("author %1 details: %2").arg(authorId).arg(message));
-            emit authorDetails(authorId, QVariantMap());
+        [this, authorId](int status, const QString &message) {
+            if (status != 0)
+                diagnostics::log(QString("author %1 details: %2").arg(authorId).arg(message));
+            emit authorDetails(authorId, m_database->authorDetails(authorId));
         });
 }
 
@@ -1459,6 +1479,8 @@ void BookOrbitClient::setLocalBooks(const QVariantList &books)
         showLocalSeries(m_authorSeries);
     if (m_authors.local)
         showLocalAuthors();
+    if (m_collections.local)
+        showLocalCollections();
 }
 
 void BookOrbitClient::showLocalSeries(Groups &groups)
@@ -1539,8 +1561,18 @@ void BookOrbitClient::showLocalAuthors()
         for (const QString &author : book.value("authors").toStringList())
             booksOf[author].append(book);
     }
+    // Ids, sort names and photos from when they were last fetched
+    const QHash<QString, Database::Author> saved = m_database->authorsNamed(booksOf.keys());
     m_authors.rows.clear();
     for (auto it = booksOf.constBegin(); it != booksOf.constEnd(); ++it) {
+        const auto found = saved.constFind(it.key());
+        // The list entry, or failing that the details, which have the same fields
+        QVariantMap entry;
+        if (found != saved.constEnd())
+            entry = found->entry.isEmpty() ? found->details : found->entry;
+        QString sortName = entry.value("sortName").toString();
+        if (sortName.isEmpty())
+            sortName = authorSortKey(it.key());
         QVariantMap keyed;        // companion key -> formats
         QVariantMap bookSeries;   // companion key -> series
         QHash<QString, QStringList> seriesOfBooks;
@@ -1567,12 +1599,12 @@ void BookOrbitClient::showLocalAuthors()
         sortFormats(formats);
         m_authors.rows.append(QVariantMap{
             {"kind", "author"},
-            {"id", localId(it.key())},
+            {"id", found != saved.constEnd() ? found->id : localId(it.key())},
             {"name", it.key()},
-            {"sortName", authorSortKey(it.key())},
+            {"sortName", sortName},
             {"bookCount", int(keyed.size())},
             {"serverCount", int(keyed.size())},
-            {"photo", QString()},
+            {"photo", entry.value("imageUrl").toString()},
             {"lastAddedAt", lastAddedAt},
             {"formats", formats},
             {"books", keyed},
@@ -1584,6 +1616,58 @@ void BookOrbitClient::showLocalAuthors()
     m_authors.loaded = true;
     m_authors.booksLoaded = true;
     showGroups(m_authors);
+}
+
+void BookOrbitClient::showLocalCollections()
+{
+    QHash<int, QVariantMap> local;   // book id -> book
+    for (const QVariant &value : std::as_const(m_localBooks)) {
+        const QVariantMap book = value.toMap();
+        local.insert(book.value("id").toInt(), book);
+    }
+    m_collections.rows.clear();
+    for (const Database::Collection &collection : m_database->collections()) {
+        // As loadCollectionBooks() fills them in, from the local books only
+        QVariantList covers;
+        QStringList authors;
+        QStringList formats;
+        QStringList bookKeys;
+        for (const QVariant &bookId : collection.bookIds) {
+            const auto found = local.constFind(bookId.toInt());
+            if (found == local.constEnd())
+                continue;
+            const QVariantMap &book = *found;
+            const QString key = companionKey(book);
+            if (!bookKeys.contains(key))
+                bookKeys.append(key);
+            if (covers.size() < 2 && book.value("hasCover").toBool())
+                covers.append(QVariantMap{{"id", book.value("id")}, {"coverVersion", book.value("coverVersion")}});
+            for (const QString &author : book.value("authors").toStringList()) {
+                if (!authors.contains(author))
+                    authors.append(author);
+            }
+            for (const QString &format : book.value("downloadedFormats").toStringList()) {
+                if (!formats.contains(format))
+                    formats.append(format);
+            }
+        }
+        if (bookKeys.isEmpty())
+            continue;
+        sortAuthors(authors);
+        sortFormats(formats);
+        QVariantMap row = collection.entry;
+        row.insert("covers", covers);
+        row.insert("authors", authors);
+        row.insert("formats", formats);
+        // All of them, for the collection's order
+        row.insert("bookIds", collection.bookIds);
+        row.insert("bookKeys", bookKeys);
+        row.insert("bookCount", int(bookKeys.size()));
+        m_collections.rows.append(row);
+    }
+    m_collections.local = true;
+    m_collections.loaded = true;
+    showGroups(m_collections);
 }
 
 void BookOrbitClient::searchLocalBooks(const QString &text)
@@ -1652,6 +1736,10 @@ void BookOrbitClient::loadAuthorsPage(int page, int generation)
             m_authors.booksLoaded = false;
             m_authors.local = false;
         }
+        QList<QVariantMap> entries;
+        for (const QJsonValue &value : items)
+            entries.append(value.toObject().toVariantMap());
+        m_database->transaction([this, &entries]() { m_database->saveAuthors(entries); });
         for (const QJsonValue &value : items) {
             const QJsonObject author = value.toObject();
             const QString name = author.value("name").toString();
