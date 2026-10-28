@@ -34,6 +34,11 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(QString username READ username NOTIFY usernameChanged)
     Q_PROPERTY(bool signedIn READ signedIn NOTIFY signedInChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    // Whether the server can be reached, as far as the app knows. Starts true; goes false
+    // when a request gets no reply or Wi-Fi can't reconnect without asking, and true again
+    // on any reply. While false, requests other than goOnline(), sign-in and downloads
+    // fail at once with NO_CONNECTION.
+    Q_PROPERTY(bool online READ online NOTIFY onlineChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(BookListModel *books READ books CONSTANT)
     Q_PROPERTY(int totalBooks READ totalBooks NOTIFY booksChanged)
@@ -91,6 +96,8 @@ class BookOrbitClient : public QObject
 public:
     using DataHandler = std::function<void(const QByteArray &)>;
     using ErrorHandler = std::function<void(int status, const QString &message)>;
+    // The error for requests that can't be sent, with status 0
+    static inline const QString NO_CONNECTION = QStringLiteral("No connection");
 
     explicit BookOrbitClient(Database *database, QObject *parent = nullptr);
 
@@ -99,6 +106,7 @@ public:
     QString username() const { return m_username; }
     bool signedIn() const { return m_signedIn; }
     bool busy() const { return m_pending > 0; }
+    bool online() const { return m_online; }
     QString error() const { return m_error; }
     BookListModel *books() { return &m_list.model; }
     int totalBooks() const { return m_list.total; }
@@ -132,6 +140,8 @@ public:
     // Clears the saved server so another can be used. Only when signed out.
     Q_INVOKABLE void forgetServer();
     Q_INVOKABLE void signOut();
+    // Asks the system to connect Wi-Fi (its own dialog), then checks the server is there
+    Q_INVOKABLE void goOnline();
 
     // Sets the book list's sort and filter, and reloads it.
     //   sortField   addedAt, title, author or lastReadAt
@@ -219,6 +229,7 @@ signals:
     void usernameChanged();
     void signedInChanged();
     void busyChanged();
+    void onlineChanged();
     void errorChanged();
     void booksChanged();
     void jumpSectionsChanged();
@@ -307,8 +318,14 @@ private:
     void loadGroupBooks(Groups *groups, int first, int page, int generation);
     // Loads authors one page at a time
     void loadAuthorsPage(int page, int generation);
-    // On the device, asks the system to connect Wi-Fi if needed
-    void ensureNetwork();
+    // On the device, connects Wi-Fi if needed: with the system's dialog if ask, otherwise
+    // silently. Returns whether it's connected.
+    bool ensureNetwork(bool ask);
+    // Refreshes the session to see whether the server can be reached
+    void checkServer();
+    // Fails a request without sending it
+    void failOffline(const ErrorHandler &onError);
+    void setOnline(bool online);
     // withToken adds the access token (login, refresh and logout don't use it). Quiet
     // requests don't set busy.
     void send(const QByteArray &method, const QString &path, const QJsonDocument &body,
@@ -371,6 +388,9 @@ private:
     QString m_accessToken;
     QString m_refreshToken;
     bool m_signedIn = false;
+    bool m_online = true;
+    // PBOOKORBIT_OFFLINE=1: every request fails as though there were no network
+    bool m_simulateOffline = false;
     int m_pending = 0;
     QString m_error;
     int m_libraryId = -1;

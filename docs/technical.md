@@ -15,6 +15,20 @@ Each device gets its own session, listed in the BookOrbit account as "PocketBook
 The password isn't stored; the session's refresh token is, in the app's database. Signing
 out ends the session on the server.
 
+## Offline
+
+The app counts as online until a request gets no reply: no connection, a refused one, or
+a time-out. Wi-Fi turns itself off when idle, so before each request the app reconnects
+it with `NetConnectSilent()`, and failing that it's offline. Only things the user starts
+(signing in, a download) show the system's Wi-Fi dialog (`NetConnect2()`).
+
+While offline, requests fail at once with "No connection" instead of being sent, and
+covers wait. The app checks the server again when the system reports Wi-Fi connected
+(`EVT_NET_CONNECTED`), or when the user asks (`goOnline()`); any reply means online.
+A session refresh that fails offline keeps the session.
+
+Set `PBOOKORBIT_OFFLINE=1` to run as though there were no network, for testing.
+
 ## Local data
 
 Data lives in an SQLite database, `pbookorbit.db`, in the system config folder

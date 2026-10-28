@@ -19,6 +19,22 @@ Covers::Covers(BookOrbitClient *client, const QString &cacheDir, QObject *parent
     , m_cacheDir(cacheDir)
 {
     QDir().mkpath(m_cacheDir);
+    connect(m_client, &BookOrbitClient::onlineChanged, this, [this]() {
+        if (!m_client->online())
+            return;
+        for (int bookId : std::exchange(m_missedBooks, {}))
+            emit ready(bookId);
+        for (int authorId : std::exchange(m_missedAuthors, {}))
+            emit photoReady(authorId);
+    });
+}
+
+void Covers::missed(const Request &request)
+{
+    if (request.authorId >= 0)
+        m_missedAuthors.insert(request.authorId);
+    else
+        m_missedBooks.insert(request.bookId);
 }
 
 QString Covers::cacheFile(const QString &name, const QString &version, const QSize &size) const
@@ -53,7 +69,10 @@ QString Covers::fetch(const Request &request)
 {
     if (QFileInfo::exists(request.file))
         return QUrl::fromLocalFile(request.file).toString();
-
+    if (!m_client->online()) {
+        missed(request);
+        return QString();
+    }
     if (!m_wanted.contains(request.file)) {
         m_wanted.insert(request.file);
         m_queue.prepend(request);
@@ -102,7 +121,10 @@ void Covers::startDownloads()
             [this, request](int status, const QString &message) {
                 m_running--;
                 m_wanted.remove(request.file);
-                diagnostics::log(QString("%1: %2 (%3)").arg(request.path, message).arg(status));
+                if (!m_client->online())
+                    missed(request);
+                else
+                    diagnostics::log(QString("%1: %2 (%3)").arg(request.path, message).arg(status));
                 startDownloads();
             });
     }

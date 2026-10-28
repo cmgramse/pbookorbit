@@ -16,6 +16,7 @@ class BookOrbitClient;
 //
 // QML calls source(). If the cover isn't cached, it returns empty, starts a download and
 // emits ready(bookId) when done. authorPhoto() and photoReady(authorId) work the same way.
+// Offline it doesn't download, and emits them once back online so QML asks again.
 class Covers : public QObject
 {
     Q_OBJECT
@@ -49,6 +50,8 @@ private:
     // Cached file URL, or "" while downloading
     QString fetch(const Request &request);
     void startDownloads();
+    // Notes a cover or photo to ask for again once online
+    void missed(const Request &request);
 
     BookOrbitClient *m_client;
     QString m_cacheDir;
@@ -56,4 +59,7 @@ private:
     QList<Request> m_queue;
     QSet<QString> m_wanted;
     int m_running = 0;
+    // Wanted while offline
+    QSet<int> m_missedBooks;
+    QSet<int> m_missedAuthors;
 };
