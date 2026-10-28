@@ -32,6 +32,13 @@ books only, with the switch for it turned on and disabled. Back online, each lis
 back to the user's own setting. Views that need the server say they aren't available
 offline.
 
+QML hands the client the downloaded books (`setLocalBooks()`), and offline the Series and
+Authors views, an author's series and search are built from them. Rows built this way have
+negative ids, no author photos, and only the downloaded books' formats; back online they
+count as not loaded, so each view fetches the server's rows when it next shows. Authors
+already fetched that session are kept, filtered to downloaded books. "Find books on this
+device" is hidden offline, since it needs the server's library.
+
 Set `PBOOKORBIT_OFFLINE=1` to run as though there were no network, for testing.
 
 ## Local data

@@ -174,6 +174,9 @@ public:
                                  const QVariantList &onlyBooks = {});
     // loadBooks() for booksOf
     Q_INVOKABLE void loadBooksOf(int first, int last);
+    // The books on the device, as Downloads.downloadedBooks() lists them. Offline, the
+    // series, authors and search are built from these.
+    Q_INVOKABLE void setLocalBooks(const QVariantList &books);
     // Fetches the user's collections, then each one's books for covers, authors and
     // formats. Existing rows stay until the new ones arrive.
     Q_INVOKABLE void loadCollections();
@@ -303,6 +306,8 @@ private:
         QVariantList downloadedBooks;
         // Whether every row's books have been looked up (series and authors only)
         bool booksLoaded = false;
+        // Rows built from the local books while offline, to fetch again once online
+        bool local = false;
     };
 
     // Endpoint for library book queries
@@ -318,6 +323,12 @@ private:
     void loadGroupBooks(Groups *groups, int first, int page, int generation);
     // Loads authors one page at a time
     void loadAuthorsPage(int page, int generation);
+    // Offline: rows for the series (the library's or the author's) or authors of the local
+    // books, as though looked up
+    void showLocalSeries(Groups &groups);
+    void showLocalAuthors();
+    // Offline: the local books matching the search text
+    void searchLocalBooks(const QString &text);
     // On the device, connects Wi-Fi if needed: with the system's dialog if ask, otherwise
     // silently. Returns whether it's connected.
     bool ensureNetwork(bool ask);
@@ -410,6 +421,7 @@ private:
     // Author whose series m_authorSeries holds
     QString m_authorSeriesName;
     QStringList m_recentSearches;
+    QVariantList m_localBooks;
     QString m_accent;   // BookOrbit accent name, e.g. "teal"; empty for the default
     bool m_refreshing = false;
     QList<std::function<void()>> m_afterRefresh;

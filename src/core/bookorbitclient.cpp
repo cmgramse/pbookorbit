@@ -9,6 +9,8 @@
 #include <common_utilities/einkinterface.h>
 #include <inkview.h>
 #include <QDateTime>
+#include <algorithm>
+#include <limits>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -273,6 +275,11 @@ void BookOrbitClient::search(const QString &text)
         emit searchChanged();
         return;
     }
+    if (!m_online) {
+        searchLocalBooks(q);
+        return;
+    }
+    m_search.onlyListed = false;
     emit searchChanged();   // searchTotal is -1 until the results arrive
     const int generation = m_search.queryGeneration;
     loadLibrary([this, generation, q]() {
@@ -419,6 +426,16 @@ void BookOrbitClient::setOnline(bool online)
         return;
     m_online = online;
     diagnostics::log(online ? "online" : "offline");
+    // Rows built offline stay on screen until the server's arrive
+    if (online) {
+        for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+            if (groups->local)
+                groups->loaded = false;
+        }
+        emit seriesListChanged();
+        emit authorsChanged();
+        emit authorSeriesChanged();
+    }
     emit onlineChanged();
 }
 
@@ -585,7 +602,8 @@ static QString letterSection(const QString &key)
 
 void BookOrbitClient::showListedBooks(PagedBooks &list)
 {
-    const bool letters = isLetterSort(list.sortField);
+    // Search results have no sections, as from the server
+    const bool letters = isLetterSort(list.sortField) && &list != &m_search;
     const bool seriesNumbers = list.sortField == "seriesIndex";
     list.sections = letters ? Sections::Letters
                   : seriesNumbers ? Sections::SeriesNumbers
@@ -682,6 +700,8 @@ void BookOrbitClient::showListedBooks(PagedBooks &list)
     emit jumpSectionsChanged();
     if (&list == &m_list)
         emit booksChanged();
+    else if (&list == &m_search)
+        emit searchChanged();
     else
         emit booksOfChanged();
 }
@@ -1122,6 +1142,10 @@ static const int MAX_RULE_VALUES = 20;
 void BookOrbitClient::loadSeries()
 {
     const int generation = ++m_series.generation;
+    if (!m_online) {
+        showLocalSeries(m_series);
+        return;
+    }
     loadLibrary([this, generation]() {
         if (generation == m_series.generation)
             loadSeriesPage(&m_series, 0, generation);
@@ -1138,6 +1162,10 @@ void BookOrbitClient::showAuthorSeries(const QString &author)
         showGroups(m_authorSeries);
     }
     m_authorSeriesName = author;
+    if (!m_online) {
+        showLocalSeries(m_authorSeries);
+        return;
+    }
     loadLibrary([this, generation]() {
         if (generation == m_authorSeries.generation)
             loadSeriesPage(&m_authorSeries, 0, generation);
@@ -1226,8 +1254,10 @@ void BookOrbitClient::loadSeriesPage(Groups *groups, int page, int generation)
         const QJsonObject result = doc.object();
         const QJsonArray items = result.value("items").toArray();
         // The old rows stay until the first page of new ones
-        if (page == 0)
+        if (page == 0) {
             groups->rows.clear();
+            groups->local = false;
+        }
         for (const QJsonValue &value : items) {
             const QJsonObject series = value.toObject();
             QStringList authors = series.value("authors").toVariant().toStringList();
@@ -1397,6 +1427,187 @@ void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int ge
         });
 }
 
+// Finished, as decorateBook() shows "Completed"
+static bool isFinished(const QVariantMap &book)
+{
+    const QString status = book.value("readStatus").toMap().value("status").toString();
+    return status == "read" || status == "skimmed" || book.value("readingProgress").toDouble() >= 100;
+}
+
+// A stable id for a row built offline, negative so it can't clash with the server's
+static int localId(const QString &name)
+{
+    return -int(qHash(name) & 0x7fffffff) - 1;
+}
+
+void BookOrbitClient::setLocalBooks(const QVariantList &books)
+{
+    m_localBooks = books;
+    if (m_online)
+        return;
+    if (m_series.local)
+        showLocalSeries(m_series);
+    if (m_authorSeries.local)
+        showLocalSeries(m_authorSeries);
+    if (m_authors.local)
+        showLocalAuthors();
+}
+
+void BookOrbitClient::showLocalSeries(Groups &groups)
+{
+    const bool ofAuthor = &groups == &m_authorSeries;
+    QMap<QString, QList<QVariantMap>> booksOf;   // series name -> books
+    for (const QVariant &value : std::as_const(m_localBooks)) {
+        const QVariantMap book = value.toMap();
+        if (ofAuthor && !book.value("authors").toStringList().contains(m_authorSeriesName, Qt::CaseInsensitive))
+            continue;
+        for (const QString &name : seriesNames(book))
+            booksOf[name].append(book);
+    }
+    groups.rows.clear();
+    for (auto it = booksOf.constBegin(); it != booksOf.constEnd(); ++it) {
+        QList<QVariantMap> books = it.value();
+        // Series order for the covers, books numbered in another series last
+        const QString name = it.key();
+        const auto index = [name](const QVariantMap &book) {
+            return book.value("seriesName").toString() == name && !book.value("seriesIndex").isNull()
+                ? book.value("seriesIndex").toDouble() : std::numeric_limits<double>::max();
+        };
+        std::stable_sort(books.begin(), books.end(), [index](const QVariantMap &a, const QVariantMap &b) {
+            return index(a) < index(b);
+        });
+        QVariantMap keyed;   // companion key -> formats
+        QSet<QString> finished;
+        QStringList formats;
+        QStringList authors;
+        QVariantList covers;
+        QString lastAddedAt;
+        for (const QVariantMap &book : std::as_const(books)) {
+            const QString key = companionKey(book);
+            QStringList bookFormats = keyed.value(key).toStringList();
+            for (const QString &format : book.value("downloadedFormats").toStringList()) {
+                if (!bookFormats.contains(format))
+                    bookFormats.append(format);
+                if (!formats.contains(format))
+                    formats.append(format);
+            }
+            keyed.insert(key, bookFormats);
+            if (isFinished(book))
+                finished.insert(key);
+            for (const QString &author : book.value("authors").toStringList()) {
+                if (!authors.contains(author))
+                    authors.append(author);
+            }
+            if (covers.size() < 2 && book.value("hasCover").toBool())
+                covers.append(QVariantMap{{"id", book.value("id")}, {"coverVersion", book.value("coverVersion")}});
+            lastAddedAt = qMax(lastAddedAt, book.value("addedAt").toString());
+        }
+        sortFormats(formats);
+        sortAuthors(authors);
+        groups.rows.append(QVariantMap{
+            {"id", localId(name)},
+            {"name", name},
+            {"bookCount", int(keyed.size())},
+            {"serverCount", int(keyed.size())},
+            {"covers", covers},
+            {"authors", authors},
+            {"formats", formats},
+            {"books", keyed},
+            {"lastAddedAt", lastAddedAt},
+            {"readProgress", double(finished.size()) / keyed.size()},
+        });
+    }
+    groups.local = true;
+    groups.loaded = true;
+    groups.booksLoaded = true;
+    showGroups(groups);
+}
+
+void BookOrbitClient::showLocalAuthors()
+{
+    QMap<QString, QList<QVariantMap>> booksOf;   // author -> books
+    for (const QVariant &value : std::as_const(m_localBooks)) {
+        const QVariantMap book = value.toMap();
+        for (const QString &author : book.value("authors").toStringList())
+            booksOf[author].append(book);
+    }
+    m_authors.rows.clear();
+    for (auto it = booksOf.constBegin(); it != booksOf.constEnd(); ++it) {
+        QVariantMap keyed;        // companion key -> formats
+        QVariantMap bookSeries;   // companion key -> series
+        QHash<QString, QStringList> seriesOfBooks;
+        QStringList formats;
+        QString lastAddedAt;
+        for (const QVariantMap &book : it.value()) {
+            const QString key = companionKey(book);
+            QStringList bookFormats = keyed.value(key).toStringList();
+            for (const QString &format : book.value("downloadedFormats").toStringList()) {
+                if (!bookFormats.contains(format))
+                    bookFormats.append(format);
+                if (!formats.contains(format))
+                    formats.append(format);
+            }
+            keyed.insert(key, bookFormats);
+            QStringList &series = seriesOfBooks[key];
+            for (const QString &name : seriesNames(book)) {
+                if (!series.contains(name))
+                    series.append(name);
+            }
+            bookSeries.insert(key, series);
+            lastAddedAt = qMax(lastAddedAt, book.value("addedAt").toString());
+        }
+        sortFormats(formats);
+        m_authors.rows.append(QVariantMap{
+            {"kind", "author"},
+            {"id", localId(it.key())},
+            {"name", it.key()},
+            {"sortName", authorSortKey(it.key())},
+            {"bookCount", int(keyed.size())},
+            {"serverCount", int(keyed.size())},
+            {"photo", QString()},
+            {"lastAddedAt", lastAddedAt},
+            {"formats", formats},
+            {"books", keyed},
+            {"bookSeries", bookSeries},
+            {"seriesCount", seriesCount(seriesOfBooks)},
+        });
+    }
+    m_authors.local = true;
+    m_authors.loaded = true;
+    m_authors.booksLoaded = true;
+    showGroups(m_authors);
+}
+
+void BookOrbitClient::searchLocalBooks(const QString &text)
+{
+    // Books with every word of the text in their title, an author or a series, ignoring
+    // case and punctuation
+    QStringList wanted;
+    for (const QString &word : words(text))
+        wanted.append(looseText(word));
+    m_search.onlyBooks.clear();
+    for (const QVariant &value : std::as_const(m_localBooks)) {
+        const QVariantMap book = value.toMap();
+        QStringList fields{looseText(book.value("title").toString())};
+        for (const QString &author : book.value("authors").toStringList())
+            fields.append(looseText(author));
+        for (const QString &series : seriesNames(book))
+            fields.append(looseText(series));
+        const bool matches = std::all_of(wanted.cbegin(), wanted.cend(), [&fields](const QString &word) {
+            return std::any_of(fields.cbegin(), fields.cend(), [&word](const QString &field) {
+                return field.contains(word);
+            });
+        });
+        if (matches)
+            m_search.onlyBooks.append(book);
+    }
+    m_search.onlyListed = true;
+    m_search.sortField = "title";
+    m_search.sortDescending = false;
+    m_search.formats.clear();
+    showListedBooks(m_search);
+}
+
 void BookOrbitClient::setSeriesSort(const QString &field, bool descending)
 {
     m_series.sort = field;
@@ -1407,6 +1618,10 @@ void BookOrbitClient::setSeriesSort(const QString &field, bool descending)
 void BookOrbitClient::loadAuthors()
 {
     const int generation = ++m_authors.generation;
+    if (!m_online) {
+        showLocalAuthors();
+        return;
+    }
     loadLibrary([this, generation]() {
         if (generation == m_authors.generation)
             loadAuthorsPage(0, generation);
@@ -1427,6 +1642,7 @@ void BookOrbitClient::loadAuthorsPage(int page, int generation)
         if (page == 0) {
             m_authors.rows.clear();
             m_authors.booksLoaded = false;
+            m_authors.local = false;
         }
         for (const QJsonValue &value : items) {
             const QJsonObject author = value.toObject();

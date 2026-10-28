@@ -244,6 +244,7 @@ Window {
     // Downloads (and details lookups) change the downloaded book list
     readonly property int downloadsRevision: downloads.revision
     onDownloadsRevisionChanged: {
+        bookOrbit.setLocalBooks(downloads.downloadedBooks())
         if (libraryQuery.downloadedOnly)
             libraryQuery.applied()
         if (showingBooksOf && booksOfQuery.downloadedOnly)
@@ -262,19 +263,25 @@ Window {
                 booksOfQuery.applied()
             if (!authorsQuery.downloadedChosen)
                 authorsQuery.applied()
-            if (!bookOrbit.online)
-                return
-            // Whatever couldn't load offline
-            if (showingCollections)
-                bookOrbit.loadCollections()
-            if (showingSeries && !bookOrbit.seriesLoaded)
+            // Offline, series are the downloaded books'. Back online, rows built offline
+            // count as not loaded.
+            if (showingSeries && (!bookOrbit.seriesLoaded || !bookOrbit.online))
                 bookOrbit.loadSeries()
+            if (showingAuthorSeries)
+                bookOrbit.showAuthorSeries(authorSeriesView.name)
             if (showingAuthors && !bookOrbit.authorsLoaded)
                 bookOrbit.loadAuthors()
+            if (showingCollections && bookOrbit.online)
+                bookOrbit.loadCollections()
         }
     }
-    // Starting offline: list the downloaded books before bookOrbit.start() loads the list
-    Component.onCompleted: if (!bookOrbit.online) libraryQuery.applied()
+    Component.onCompleted: {
+        bookOrbit.setLocalBooks(downloads.downloadedBooks())
+        // Starting offline: list the downloaded books before bookOrbit.start() loads the
+        // list
+        if (!bookOrbit.online)
+            libraryQuery.applied()
+    }
 
     // The sort and filter shown by the menus, for whichever page is in front
     readonly property ListQuery activeQuery: showingBooksOf ? booksOfQuery
@@ -494,8 +501,8 @@ Window {
         onSortClicked: root.toggleDropdown(sortMenu)
         onSortIconClicked: seriesQuery.reverseSort()
         // Loaded the first time the view opens: large libraries have many series, and their
-        // formats take a request per few series
-        onVisibleChanged: if (visible && !bookOrbit.seriesLoaded) bookOrbit.loadSeries()
+        // formats take a request per few series. Offline, the downloaded books' each time.
+        onVisibleChanged: if (visible && (!bookOrbit.seriesLoaded || !bookOrbit.online)) bookOrbit.loadSeries()
         onGroupClicked: (series) => root.openBooksOf("Series", series.name, "series", [series.name])
     }
 
@@ -670,8 +677,9 @@ Window {
         anchors.right: parent.right
         anchors.rightMargin: Units.dp(9)
 
+        // Needs the server's library
         PopupMenuItem {
-            visible: bookOrbit.signedIn
+            visible: bookOrbit.signedIn && bookOrbit.online
             text: "Find books on this device"
             onClicked: {
                 menu.visible = false
