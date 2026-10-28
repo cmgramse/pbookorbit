@@ -3,7 +3,7 @@
 PB_KIT ?= kit
 PB := $(if $(wildcard $(PB_KIT)/pb.sh),$(PB_KIT)/pb.sh,pb)
 
-.PHONY: setup run pc arm release shell clean icons
+.PHONY: setup run run-offline pc arm release shell clean icons
 
 # Fetch the kit, its SDK and the container image
 setup:
@@ -13,6 +13,10 @@ setup:
 # Build for PC and open the app in the emulator
 run:
 	$(PB) run .
+
+# Same, acting as though there were no network (see Offline in docs/technical.md)
+run-offline:
+	PB_ENV="PBOOKORBIT_OFFLINE=1 $(PB_ENV)" $(PB) run .
 
 # Build for PC only
 pc:
