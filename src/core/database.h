@@ -52,6 +52,9 @@ public:
 
     // Saves a book's list entry, replacing any existing one
     void saveBook(int bookId, const QVariantMap &entry);
+    // Replaces the list entries of those books already saved, ignoring the rest. Returns
+    // how many changed.
+    int updateBooks(const QList<QVariantMap> &entries);
     // Records a downloaded file for a book. The book must already be saved.
     void addBookFile(int bookId, const QString &path);
     void removeBookFile(const QString &path);

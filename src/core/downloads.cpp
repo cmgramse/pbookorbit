@@ -68,6 +68,12 @@ Downloads::Downloads(BookOrbitClient *client, Database *database, QObject *paren
     }
 }
 
+void Downloads::entriesChanged()
+{
+    m_revision++;
+    emit changed();
+}
+
 QVariantList Downloads::downloadedBooks() const
 {
     QVariantList books;

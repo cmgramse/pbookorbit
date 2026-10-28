@@ -68,7 +68,8 @@ the device plugged in, `sqlite3 <mount>/system/config/pbookorbit.db` opens it fr
 - `collections` and `collection_books` keep the user's collections in order, and each
   one's book ids, newest first.
 
-Only downloaded books are cached at the moment. Deleting a book's files leaves its cache
+Only downloaded books are cached at the moment. Their entries are replaced whenever they
+appear in a list fetched from the server, so status and progress stay current. Deleting a book's files leaves its cache
 entry in place.
 
 Covers and author photos are cached as PNGs in `/mnt/ext1/system/cache/pbookorbit-covers`,

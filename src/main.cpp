@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
     BookFinder bookFinder(&client, &downloads, &database);
     // Saved with the book, for offline
     QObject::connect(&downloads, &Downloads::downloaded, &client, &BookOrbitClient::loadBookDetails);
+    // So the downloaded book lists show the latest status and progress
+    QObject::connect(&client, &BookOrbitClient::savedBooksChanged, &downloads, &Downloads::entriesChanged);
     Browser browser;
     Eink eink;
     eink.followNightMode();

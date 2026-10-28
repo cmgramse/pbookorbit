@@ -247,6 +247,8 @@ signals:
     void bookDetails(int bookId, const QVariantMap &details);
     void recentSearchesChanged();
     void accentChanged();
+    // Saved books' list entries were updated from the server
+    void savedBooksChanged();
 
 private:
     // How a list is sectioned: not at all, A-Z (from the server's jump buckets), by day
@@ -329,6 +331,8 @@ private:
     void showLocalAuthors();
     // Offline: the saved collections with local books, counting only those
     void showLocalCollections();
+    // Updates the saved entries of any of these books (see Database::updateBooks)
+    void updateSavedBooks(const QJsonArray &items);
     // Offline: the local books matching the search text
     void searchLocalBooks(const QString &text);
     // On the device, connects Wi-Fi if needed: with the system's dialog if ask, otherwise

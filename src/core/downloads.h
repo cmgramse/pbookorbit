@@ -77,6 +77,8 @@ public:
     };
     // Records them as though the app had downloaded them
     void addExisting(const QList<Existing> &books);
+    // Bumps revision, for saved entries updated elsewhere
+    void entriesChanged();
 
 signals:
     void changed();

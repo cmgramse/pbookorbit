@@ -828,6 +828,7 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
                 pages->total = result.value("total").toInt();
                 pages->model.reset(pages->total);
             }
+            updateSavedBooks(result.value("items").toArray());
             QVariantList books;
             QVariantList records;
             for (const QJsonValue &item : result.value("items").toArray()) {
@@ -1089,6 +1090,7 @@ void BookOrbitClient::loadCollectionBooks(int collectionId, int page, int genera
                 return;
             const QJsonObject result = QJsonDocument::fromJson(data).object();
             const QJsonArray items = result.value("items").toArray();
+            updateSavedBooks(items);
             for (QVariantMap &row : m_collections.rows) {
                 if (row.value("id").toInt() != collectionId)
                     continue;
@@ -1369,6 +1371,7 @@ void BookOrbitClient::loadGroupBooks(Groups *groups, int first, int page, int ge
                 return;
             const QJsonObject result = QJsonDocument::fromJson(data).object();
             const QJsonArray items = result.value("items").toArray();
+            updateSavedBooks(items);
             // Each row's books, with a separately stored ebook and audiobook counted once
             // and their formats combined
             QHash<QString, QHash<QString, QStringList>> booksOf;   // name -> key -> formats
@@ -1668,6 +1671,17 @@ void BookOrbitClient::showLocalCollections()
     m_collections.local = true;
     m_collections.loaded = true;
     showGroups(m_collections);
+}
+
+void BookOrbitClient::updateSavedBooks(const QJsonArray &items)
+{
+    QList<QVariantMap> entries;
+    for (const QJsonValue &item : items)
+        entries.append(item.toObject().toVariantMap());
+    int changed = 0;
+    m_database->transaction([this, &entries, &changed]() { changed = m_database->updateBooks(entries); });
+    if (changed > 0)
+        emit savedBooksChanged();
 }
 
 void BookOrbitClient::searchLocalBooks(const QString &text)

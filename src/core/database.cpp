@@ -127,6 +127,12 @@ void Database::exec(const char *sql, const QVariantList &values)
     sqlite3_finalize(statement);
 }
 
+// JSON text for a map
+static QString json(const QVariantMap &map)
+{
+    return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(map)).toJson(QJsonDocument::Compact));
+}
+
 // Text of a column in the current row
 static QString columnText(sqlite3_stmt *statement, int column)
 {
@@ -186,10 +192,22 @@ void Database::remove(const QString &key)
 
 void Database::saveBook(int bookId, const QVariantMap &entry)
 {
-    const QString data = QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(entry)).toJson(QJsonDocument::Compact));
+    const QString data = json(entry);
     exec("INSERT INTO books (id, data, updated) VALUES (?, ?, unixepoch()) "
          "ON CONFLICT (id) DO UPDATE SET data = excluded.data, updated = excluded.updated",
          {bookId, data});
+}
+
+int Database::updateBooks(const QList<QVariantMap> &entries)
+{
+    int changed = 0;
+    for (const QVariantMap &entry : entries) {
+        exec("UPDATE books SET data = ?2, updated = unixepoch() WHERE id = ?1 AND data IS NOT ?2",
+             {entry.value("id").toInt(), json(entry)});
+        if (m_db)
+            changed += sqlite3_changes(m_db);
+    }
+    return changed;
 }
 
 void Database::addBookFile(int bookId, const QString &path)
@@ -243,12 +261,6 @@ QList<Database::Book> Database::booksWithFiles() const
         sqlite3_finalize(statement);
     }
     return books;
-}
-
-// JSON text for a map
-static QString json(const QVariantMap &map)
-{
-    return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(map)).toJson(QJsonDocument::Compact));
 }
 
 // A map from JSON text, empty for NULL
