@@ -27,6 +27,12 @@
   keeps the last read date.
 - Opening a downloaded book in the emulator froze the app until it was force-quit (seen
   offline, 28 October 2026). Try the same book online to see whether offline matters.
+- Quitting with the home button in the emulator sometimes crashes (segfault, exit 139,
+  right after the emulator prints `hw_close`; the log stops without its usual shutdown
+  lines). Seen a few times on 28 October 2026, at least once offline. Headless runs that
+  quit with the home button or close the window exit cleanly, so it hasn't been
+  reproduced. Next time, get a backtrace (run under gdb in `kit/pb.sh shell .`, or enable
+  core dumps in the container).
 - Check on the device that downloaded books show in the system library without a reboot
   (the app asks the scanner to scan; see NOTES.md for what else could be done).
 - Books with an ebook and an audiobook: once one version is downloaded, a tap opens it;
