@@ -71,7 +71,11 @@ the device plugged in, `sqlite3 <mount>/system/config/pbookorbit.db` opens it fr
 Only downloaded books are cached at the moment. Deleting a book's files leaves its cache
 entry in place.
 
-Covers and author photos are cached as PNGs in `/mnt/ext1/system/cache/pbookorbit-covers`.
+Covers and author photos are cached as PNGs in `/mnt/ext1/system/cache/pbookorbit-covers`,
+named `<book id>` or `author-<author id>`, then a hash of the version and the size drawn.
+Offline, a cover or photo not cached at the size wanted is scaled from the largest cached
+copy, of whatever version, and saved under that version's name, so the current version is
+still fetched once online.
 
 ## Downloads and existing books
 

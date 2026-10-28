@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QSet>
@@ -17,6 +18,7 @@ class BookOrbitClient;
 // QML calls source(). If the cover isn't cached, it returns empty, starts a download and
 // emits ready(bookId) when done. authorPhoto() and photoReady(authorId) work the same way.
 // Offline it doesn't download, and emits them once back online so QML asks again.
+// Meanwhile it rescales a copy cached at another size, or of another version, if any.
 class Covers : public QObject
 {
     Q_OBJECT
@@ -42,11 +44,16 @@ private:
         int authorId;
         QString path;
         QSize size;
+        QString name;   // see cacheFile()
         QString file;
     };
 
-    // name is "<bookId>" for a cover or "author-<authorId>" for a photo
-    QString cacheFile(const QString &name, const QString &version, const QSize &size) const;
+    // name is "<bookId>" for a cover or "author-<authorId>" for a photo, and versionHash
+    // is versionHash()'s
+    QString cacheFile(const QString &name, const QString &versionHash, const QSize &size) const;
+    // Offline: the cached copy at the request's size, rescaled from the largest copy of
+    // any version if needed, or "" if there's none
+    QString localCopy(const Request &request);
     // Cached file URL, or "" while downloading
     QString fetch(const Request &request);
     void startDownloads();
@@ -62,4 +69,8 @@ private:
     // Wanted while offline
     QSet<int> m_missedBooks;
     QSet<int> m_missedAuthors;
+    // Cached file names by name (see cacheFile), read from the folder when first needed
+    // offline and again after each time online
+    QHash<QString, QStringList> m_cached;
+    bool m_cachedRead = false;
 };
