@@ -425,8 +425,10 @@ private:
     void loadPages(PagedBooks &list, int first, int last);
     void loadPage(PagedBooks &list, int page);
     // Finds other records of the same books on a newly loaded page (e.g. a separate
-    // audiobook with the same title and first author) and merges their formats in
-    void lookUpCompanions(PagedBooks *list, int first, const QVariantList &books, int generation);
+    // audiobook with the same title and first author), merges their formats into the page's
+    // rows and calls then with them. If the lookup fails, then gets the rows unmerged.
+    void lookUpCompanions(PagedBooks *list, const QVariantList &books, const QVariantList &rows,
+                          int generation, std::function<void(const QVariantList &rows)> then);
     // Adds display fields to a row: section, sectionLabel, statusText, seriesText, and
     // variants, formats and hidden (see addCompanions)
     QVariantMap decorateBook(const QVariantMap &book, const PagedBooks &list) const;

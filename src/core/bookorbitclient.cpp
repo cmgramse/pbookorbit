@@ -852,21 +852,8 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
         [this, pages, page, generation](const QJsonDocument &doc) {
             if (generation != pages->queryGeneration)
                 return;   // stale reply
-            pages->loadingPages.remove(page);
-            pages->loadedPages.insert(page);
             const QJsonObject result = doc.object();
-            // A new query's first page resets the list to the right length. Cached rows
-            // stay until their pages load, so the list doesn't jump back to the top.
-            const bool firstPage = pages->listGeneration != generation;
-            if (firstPage) {
-                pages->listGeneration = generation;
-                pages->total = result.value("total").toInt();
-                if (pages->cached)
-                    pages->model.resize(pages->total);
-                else
-                    pages->model.reset(pages->total);
-                pages->cached = false;
-            }
+            const int total = result.value("total").toInt();
             updateSavedBooks(result.value("items").toArray());
             QVariantList books;
             QVariantList records;
@@ -874,22 +861,44 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
                 records.append(item.toObject().toVariantMap());
                 books.append(decorateBook(records.last().toMap(), *pages));
             }
-            const int first = page * BOOKS_PAGE_SIZE;
-            pages->model.setBooks(first, books);
-            lookUpCompanions(pages, first, records, generation);
-            if (pages == &m_list && first < CACHED_LIBRARY_ROWS)
-                m_libraryCacheTimer.start();
-            if (firstPage && pages->wantedLast >= 0)
-                loadPages(*pages, pages->wantedFirst, pages->wantedLast);
-            // Include the next row, whose section start depends on this page's last
-            updateSectionStarts(*pages, first, first + int(books.size()));
-            if (pages == &m_list) {
-                emit booksChanged();
-            } else if (pages == &m_booksOf) {
-                emit booksOfChanged();
-            } else {
-                emit searchChanged();
-            }
+            // Shown once merged with their companions, so an ebook and its audiobook don't
+            // show as two rows first
+            lookUpCompanions(pages, records, books, generation,
+                [this, pages, page, generation, total](const QVariantList &rows) {
+                    if (generation != pages->queryGeneration)
+                        return;
+                    pages->loadingPages.remove(page);
+                    pages->loadedPages.insert(page);
+                    // A new query's first page resets the list to the right length. Cached
+                    // rows stay until their pages load, so the list doesn't jump back to the
+                    // top.
+                    const bool firstPage = pages->listGeneration != generation;
+                    if (firstPage) {
+                        pages->listGeneration = generation;
+                        pages->total = total;
+                        if (pages->cached)
+                            pages->model.resize(pages->total);
+                        else
+                            pages->model.reset(pages->total);
+                        pages->cached = false;
+                    }
+                    const int first = page * BOOKS_PAGE_SIZE;
+                    pages->model.setBooks(first, rows);
+                    if (pages == &m_list && first < CACHED_LIBRARY_ROWS)
+                        m_libraryCacheTimer.start();
+                    if (firstPage && pages->wantedLast >= 0)
+                        loadPages(*pages, pages->wantedFirst, pages->wantedLast);
+                    // Include the next row, whose section start depends on this page's
+                    // last. Hidden rows pass their section boxes on to the next row.
+                    updateSectionStarts(*pages, first, first + int(rows.size()));
+                    if (pages == &m_list) {
+                        emit booksChanged();
+                    } else if (pages == &m_booksOf) {
+                        emit booksOfChanged();
+                    } else {
+                        emit searchChanged();
+                    }
+                });
         },
         [pages, page, generation]() {
             if (generation == pages->queryGeneration)
@@ -897,10 +906,13 @@ void BookOrbitClient::loadPage(PagedBooks &list, int page)
         });
 }
 
-void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVariantList &books, int generation)
+void BookOrbitClient::lookUpCompanions(PagedBooks *list, const QVariantList &books, const QVariantList &rows,
+                                       int generation, std::function<void(const QVariantList &rows)> then)
 {
-    if (books.isEmpty())
+    if (books.isEmpty()) {
+        then(rows);
         return;
+    }
     // Every record that might share a title and first author with a book on the page,
     // ignoring the list's filter: titles containing each word, and an author containing the
     // first author's longest word. Punctuation is dropped since records spell it
@@ -929,9 +941,10 @@ void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVaria
         {"pagination", QJsonObject{{"page", 0}, {"size", 4 * BOOKS_PAGE_SIZE}}},
     };
     callJson("POST", libraryBooksPath(), QJsonDocument(query),
-        [this, list, first, books, generation](const QJsonDocument &doc) {
+        [this, list, books, rows, generation, then](const QJsonDocument &doc) {
             if (generation != list->queryGeneration)
                 return;
+            QVariantList merged = rows;
             QHash<QString, QList<QVariantMap>> byKey;
             for (const QJsonValue &item : doc.object().value("items").toArray()) {
                 const QVariantMap record = item.toObject().toVariantMap();
@@ -946,7 +959,7 @@ void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVaria
                 }
                 if (companions.isEmpty())
                     continue;
-                QVariantMap row = list->model.book(first + i);
+                QVariantMap row = merged.at(i).toMap();
                 addCompanions(row, companions, list->mergePairs);
                 // In a collection with all formats listed, drop the audiobook row if its
                 // ebook record is in the collection too, matching the collection counts
@@ -956,17 +969,18 @@ void BookOrbitClient::lookUpCompanions(PagedBooks *list, int first, const QVaria
                         if (m_booksOfCollectionIds.contains(companion.value("id")))
                             inCollection.append(companion);
                     }
-                    QVariantMap merged = list->model.book(first + i);
-                    addCompanions(merged, inCollection, true);
-                    row.insert("hidden", merged.value("hidden"));
+                    QVariantMap inCollectionRow = merged.at(i).toMap();
+                    addCompanions(inCollectionRow, inCollection, true);
+                    row.insert("hidden", inCollectionRow.value("hidden"));
                 }
-                for (const char *field : {"variants", "formats", "hidden"})
-                    list->model.setField(first + i, field, row.value(field));
+                merged[i] = row;
             }
-            // Hidden rows pass their section boxes on to the next row
-            updateSectionStarts(*list, first, first + int(books.size()));
-            if (list == &m_list && first < CACHED_LIBRARY_ROWS)
-                m_libraryCacheTimer.start();
+            then(merged);
+        },
+        // Unmerged, rather than not at all
+        [list, rows, generation, then]() {
+            if (generation == list->queryGeneration)
+                then(rows);
         });
 }
 
@@ -1019,7 +1033,7 @@ QVariantMap BookOrbitClient::decorateBook(const QVariantMap &book, const PagedBo
     row.insert("statusText", statusText);
     row.insert("seriesText", seriesText);
 
-    // Its own versions and formats. lookUpCompanions adds other records' later.
+    // Its own versions and formats. lookUpCompanions adds other records'.
     row.insert("variants", ownVariants(book));
     row.insert("formats", ownFormats(book));
     row.insert("hidden", false);
