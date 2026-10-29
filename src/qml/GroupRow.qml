@@ -37,6 +37,7 @@ Item {
 
     TapArea {
         anchors.fill: parent
+        list: row.ListView.view
         onTapped: row.clicked()
     }
 

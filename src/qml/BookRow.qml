@@ -50,6 +50,7 @@ Item {
 
     TapArea {
         anchors.fill: parent
+        list: row.ListView.view
         enabled: row.book.loaded === true
         pressAndHoldInterval: 750
         onTapped: row.clicked()
