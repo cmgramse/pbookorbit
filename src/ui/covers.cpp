@@ -127,6 +127,9 @@ QString Covers::localCopy(const Request &request)
 
 QString Covers::fetch(const Request &request)
 {
+    // Not laid out yet: asked again once it has a size
+    if (request.size.isEmpty())
+        return QString();
     if (QFileInfo::exists(request.file))
         return QUrl::fromLocalFile(request.file).toString();
     if (!m_client->online()) {
