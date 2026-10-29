@@ -463,6 +463,8 @@ private:
     int m_pending = 0;
     QString m_error;
     int m_libraryId = -1;
+    // Waiting for loadLibrary()'s request; not empty while it's in flight
+    QList<std::function<void()>> m_afterLibrary;
     // Main library list
     PagedBooks m_list;
     // Saves the library's list cache once a refresh settles

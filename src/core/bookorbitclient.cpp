@@ -473,17 +473,23 @@ void BookOrbitClient::loadLibrary(std::function<void()> then)
         then();
         return;
     }
+    // Calls made while it's being fetched wait for the same request
+    m_afterLibrary.append(then);
+    if (m_afterLibrary.size() > 1)
+        return;
     // [{id, name, bookCount, ...}] in the user's order. TODO: let the user choose when
     // there are several; this uses the first.
-    callJson("GET", "/libraries", QJsonDocument(), [this, then](const QJsonDocument &doc) {
+    callJson("GET", "/libraries", QJsonDocument(), [this](const QJsonDocument &doc) {
+        const auto queued = std::exchange(m_afterLibrary, {});
         const QJsonArray libraries = doc.array();
         if (libraries.isEmpty()) {
             setError("No libraries on this server");
             return;
         }
         m_libraryId = libraries.first().toObject().value("id").toInt();
-        then();
-    });
+        for (const auto &fn : queued)
+            fn();
+    }, [this]() { m_afterLibrary.clear(); });
 }
 
 // Lower-case letters and digits only, so "Carl’s" matches "Carl's" and "S.A." matches "S.
@@ -2347,6 +2353,7 @@ void BookOrbitClient::clearSession()
     m_refreshToken.clear();
     m_database->remove("refreshToken");
     m_libraryId = -1;
+    m_afterLibrary.clear();
     m_database->clearListCaches();
     m_libraryCacheTimer.stop();
     for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
