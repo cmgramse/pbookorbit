@@ -46,6 +46,8 @@ public:
     Q_INVOKABLE QStringList formatsOnDevice(int bookId) const;
     // Kinds of a book's files on the device: "ebook", "audiobook" or both
     Q_INVOKABLE QStringList kindsOnDevice(int bookId) const;
+    // "ebook" or "audiobook", for a format such as "epub"
+    Q_INVOKABLE QString kindOf(const QString &format) const;
     // Downloaded books' list entries as saved at download time, plus downloadedFormats
     Q_INVOKABLE QVariantList downloadedBooks() const;
     // The file a download would fetch, {id, format, sizeBytes, folder} where folder is
@@ -54,8 +56,9 @@ public:
     // Downloads the primary file, or fileId's. Emits downloaded(bookId), or sets error.
     Q_INVOKABLE void download(const QVariantMap &book, int fileId = -1);
     Q_INVOKABLE void cancel();
-    // Opens a downloaded book: ebooks in the reader, audiobooks in the audiobook app
-    Q_INVOKABLE bool open(int bookId);
+    // Opens a downloaded book: ebooks in the reader, audiobooks in the audiobook app. The
+    // ebook if both are on the device, unless kind ("ebook" or "audiobook") says which.
+    Q_INVOKABLE bool open(int bookId, const QString &kind = QString());
     // Apps that can open this format, as the system's Open with menu lists them, e.g.
     // [{app: "koreader.app", name: "KOReader"}]. Read from the firmware's and
     // /mnt/ext1/system/config's extensions.cfg (KOReader registers itself in the latter).

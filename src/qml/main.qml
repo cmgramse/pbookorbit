@@ -57,6 +57,14 @@ Window {
             downloadDialog.show(book, variants)
     }
 
+    // Opens target (as BookMenu's openWithTarget) in app, downloading it first if needed
+    function openWith(target, app) {
+        if (target.option === undefined)
+            downloads.openWith(target.bookId, target.format, app.app)
+        else
+            downloadDialog.show(target.option.book, [target.option], app)
+    }
+
     // Tapping the title scrolls the current list back to the top
     function backToTop() {
         menu.visible = false
@@ -297,7 +305,7 @@ Window {
                                                     : pageButtons
     readonly property bool overlayOpen: dropdownOpen || menu.visible || bookMenu.visible
                                         || deleteDialog.visible || downloadDialog.visible
-                                        || findBooksDialog.visible
+                                        || findBooksDialog.visible || bookInfoPage.menuOpen
 
     function pageFront(direction) {
         if (frontPageButtons && frontPageButtons.visible && !overlayOpen)
@@ -829,6 +837,10 @@ Window {
             root.showingInfo = false
             root.openBooksOfChosen(field, values, title)
         }
+        onOpenChosen: (bookId, kind) => downloads.open(bookId, kind)
+        onDownloadChosen: (book, versions) => downloadDialog.show(book, versions)
+        onDeleteChosen: (book, kind) => deleteDialog.ask(book, kind)
+        onOpenWithChosen: (target, app) => root.openWith(target, app)
     }
 
     // Over the pages, opened from any of their book lists
@@ -841,12 +853,7 @@ Window {
         }
         onBooksOfChosen: (field, values, title) => root.openBooksOfChosen(field, values, title)
         onDeleteChosen: (book) => deleteDialog.ask(book)
-        onOpenWithChosen: (target, app) => {
-            if (target.option === undefined)
-                downloads.openWith(target.bookId, target.format, app.app)
-            else
-                downloadDialog.show(target.option.book, [target.option], app)
-        }
+        onOpenWithChosen: (target, app) => root.openWith(target, app)
     }
 
     // Confirms deleting a book from the device, as the system library does (screenshot 13).
@@ -858,11 +865,15 @@ Window {
         // The book's records, and the kinds on the device ("ebook", "audiobook")
         property var ids: []
         property var kinds: []
+        // Set when asked about one version only
+        property string onlyKind: ""
         // Set if a file couldn't be deleted
         property bool failed: false
 
-        function ask(newBook) {
+        // onlyKind deletes just that version, after a Yes/No
+        function ask(newBook, newOnlyKind) {
             book = newBook
+            onlyKind = newOnlyKind || ""
             ids = [newBook.id]
             for (const variant of newBook.variants || []) {
                 if (ids.indexOf(variant.bookId) < 0)
@@ -876,7 +887,7 @@ Window {
                 }
             }
             // Ebook first, as DownloadDialog lists them
-            kinds = ["ebook", "audiobook"].filter(k => onDevice.indexOf(k) >= 0)
+            kinds = onlyKind !== "" ? [onlyKind] : ["ebook", "audiobook"].filter(k => onDevice.indexOf(k) >= 0)
             failed = false
             visible = true
         }
@@ -884,7 +895,7 @@ Window {
         icon: failed ? "icon_error" : "icon_question"
         buttons: failed ? [["Close", "no"]]
                  : kinds.length > 1 ? kinds.map(k => [k, k]).concat([["Cancel", "no"]])
-                 : [["No", "no"], ["Yes", "all"]]
+                 : [["No", "no"], ["Yes", onlyKind !== "" ? onlyKind : "all"]]
         onPressed: (action) => {
             if (action !== "no") {
                 let deleted = true
@@ -905,7 +916,8 @@ Window {
                   : deleteDialog.kinds.length > 1
                   ? "Delete the " + deleteDialog.kinds.join(" or the ") + " of " + (deleteDialog.book.title || "")
                     + " from your device?"
-                  : "Are you sure you want to delete " + (deleteDialog.book.title || "") + " from your device?"
+                  : "Are you sure you want to delete " + (deleteDialog.onlyKind !== "" ? "the " + deleteDialog.onlyKind + " of " : "")
+                    + (deleteDialog.book.title || "") + " from your device?"
             font.pointSize: 7.25
             wrapMode: Text.Wrap
         }

@@ -113,6 +113,11 @@ QStringList Downloads::kindsOnDevice(int bookId) const
     return kinds;
 }
 
+QString Downloads::kindOf(const QString &format) const
+{
+    return mediaKind(format);
+}
+
 QStringList Downloads::pathsOnDevice(int bookId) const
 {
     QStringList paths;
@@ -417,11 +422,13 @@ bool Downloads::openWith(int bookId, const QString &format, const QString &app)
     return true;
 }
 
-bool Downloads::open(int bookId)
+bool Downloads::open(int bookId, const QString &kind)
 {
     // The ebook, if both are present
     QString path;
     for (const QString &candidate : m_database->bookFiles(bookId)) {
+        if (!kind.isEmpty() && mediaKind(QFileInfo(candidate).suffix()) != kind)
+            continue;
         if (QFileInfo::exists(candidate) && (path.isEmpty() || isAudioFormat(QFileInfo(path).suffix())))
             path = candidate;
     }
