@@ -27,6 +27,14 @@
   keeps the last read date.
 - Opening a downloaded book in the emulator froze the app until it was force-quit (seen
   offline, 28 October 2026). Try the same book online to see whether offline matters.
+- Find books: review unsure matches in a list. Since any title match is now offered, a
+  device with many books can have dozens, and the dialog lists four and adds them all or
+  none. Give them a page of their own, a row per file with the book it looks like, to
+  accept or reject each (and all at once).
+- Read each book file's own metadata (title, authors, series, identifiers; EPUB's OPF,
+  MOBI's EXTH), so Find books can match files whose name and hash no longer match the
+  server's copy, and offline pages can show details nothing saved. Check first what the
+  firmware offers for this rather than unzipping by hand.
 - Quitting with the home button in the emulator sometimes crashes (segfault, exit 139,
   right after the emulator prints `hw_close`; the log stops without its usual shutdown
   lines). Seen a few times on 28 October 2026, at least once offline. Headless runs that

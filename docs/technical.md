@@ -98,8 +98,11 @@ ones in the library as downloaded. A file matches a library book if, checked in 
 3. Its file name matches a library file's.
 
 For 2 and 3, the candidates are books in the same format whose title appears in the file
-name. A file whose name contains a book's title and author but doesn't match either way is
-kept as an unsure match for the user to confirm. See `src/core/bookfinder.h`.
+name. A file that has candidates but matches none of them either way is kept as an unsure
+match, the best candidate, such as an older copy of a book whose file BookOrbit has since
+rewritten with new metadata, changing its hash and name. Unsure matches are only logged for
+now: the dialog says how many books it matched, and they count as not matched until there's
+a list to confirm them in (see TODO.md). See `src/core/bookfinder.h`.
 
 ## Home screen tile and task manager
 

@@ -21,8 +21,9 @@ class Database;
 //   2. Its partial MD5, KOReader's book hash, matches a library file.
 //   3. Its name matches a library file's name.
 // Candidates for 2 and 3 are library books in the same format whose title appears in the
-// file name as whole words; the best three are looked up. A name containing a book's title
-// and author that matches neither way is kept as an unsure guess for the user to confirm.
+// file name as whole words, those with the author in the name too first; the best three are
+// looked up. A file that matches none of them is kept as an unsure guess, the best, which
+// isn't recorded: they're for the user to confirm, once there's a list to do that in.
 class BookFinder : public QObject
 {
     Q_OBJECT
@@ -30,8 +31,8 @@ class BookFinder : public QObject
     Q_PROPERTY(QString state READ state NOTIFY changed)
     // How far the search is, 0-100
     Q_PROPERTY(int percent READ percent NOTIFY changed)
-    // When done: books found and recorded, guesses ({fileName, title} each), and how many
-    // files matched neither
+    // When done: books found and recorded, guesses ({fileName, title} each, not recorded),
+    // and how many files matched neither
     Q_PROPERTY(int foundCount READ foundCount NOTIFY changed)
     Q_PROPERTY(QVariantList unsure READ unsure NOTIFY changed)
     Q_PROPERTY(int notFoundCount READ notFoundCount NOTIFY changed)
@@ -56,8 +57,6 @@ public:
     Q_INVOKABLE void markOffered();
     Q_INVOKABLE void start();
     Q_INVOKABLE void cancel();
-    // Also records the unsure matches
-    Q_INVOKABLE void addUnsure();
 
 signals:
     void changed();

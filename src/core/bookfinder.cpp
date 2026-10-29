@@ -439,13 +439,11 @@ void BookFinder::checkCandidate(int index, int candidate, int generation)
     setPercent(LIBRARY_PERCENT + (100 - LIBRARY_PERCENT) * index / int(m_pending.size()));
     const LocalFile &file = m_pending.at(index);
     if (candidate >= file.candidates.size()) {
-        // 4. None of their files is this one. The best candidate is a guess if the name has
-        // its author as well as its title.
+        // 4. None of their files is this one: the best candidate is a guess for the user to
+        // confirm. It may be an older copy of the right book, since BookOrbit can write
+        // metadata into its files, changing both their hash and their name.
         const int best = file.candidates.first();
-        if (containsWords(file.nameKey, m_authorKeys.at(best)))
-            m_unsure.append({m_library.at(best).value("id").toInt(), file.path, m_library.at(best)});
-        else
-            m_notFoundCount++;
+        m_unsure.append({m_library.at(best).value("id").toInt(), file.path, m_library.at(best)});
         checkCandidate(index + 1, 0, generation);
         return;
     }
@@ -515,14 +513,6 @@ void BookFinder::cancel()
 {
     m_generation++;
     m_state = "idle";
-    emit changed();
-}
-
-void BookFinder::addUnsure()
-{
-    m_downloads->addExisting(m_unsure);
-    m_foundCount += int(m_unsure.size());
-    m_unsure.clear();
     emit changed();
 }
 
