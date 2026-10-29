@@ -51,7 +51,7 @@ Item {
     TapArea {
         anchors.fill: parent
         enabled: row.book.loaded === true
-        pressAndHoldInterval: 1500
+        pressAndHoldInterval: 1000
         onTapped: row.clicked()
         // After a hold this long, releasing doesn't send clicked()
         onPressAndHold: row.held()
