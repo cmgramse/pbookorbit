@@ -339,9 +339,13 @@ private:
     void updateSavedBooks(const QJsonArray &items);
     // Offline: the local books matching the search text
     void searchLocalBooks(const QString &text);
-    // On the device, connects Wi-Fi if needed: with the system's dialog if ask, otherwise
-    // silently. Returns whether it's connected.
-    bool ensureNetwork(bool ask);
+    // On the device, connects Wi-Fi if needed, with the system's dialog. Returns whether it's
+    // connected.
+    bool ensureNetwork();
+    // On the device, connects Wi-Fi silently if needed, then calls then(connected). That takes
+    // seconds, so it's done on another thread and the app carries on drawing. Calls made
+    // meanwhile wait for the same connection.
+    void whenNetwork(std::function<void(bool connected)> then);
     // Refreshes the session to see whether the server can be reached
     void checkServer();
     // Fails a request without sending it
@@ -352,6 +356,9 @@ private:
     void send(const QByteArray &method, const QString &path, const QJsonDocument &body,
               DataHandler onSuccess, ErrorHandler onError, bool withToken = false,
               bool quiet = false);
+    // send() once Wi-Fi is connected
+    void sendNow(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                 DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet);
     // Sends with the access token, refreshing and retrying once on a 401
     void call(const QByteArray &method, const QString &path, const QJsonDocument &body,
               DataHandler onSuccess, ErrorHandler onError, bool quiet = false,
@@ -417,6 +424,8 @@ private:
     // Wi-Fi connected at the last look, and when that was (see eventFilter)
     bool m_networkConnected = false;
     QElapsedTimer m_networkLook;
+    // Waiting for whenNetwork()'s connection; not empty while it connects
+    QList<std::function<void(bool)>> m_afterConnect;
     int m_pending = 0;
     QString m_error;
     int m_libraryId = -1;

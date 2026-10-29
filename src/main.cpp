@@ -82,6 +82,8 @@ int main(int argc, char *argv[])
                          .arg(get_screen_dpi()).arg(get_screen_scale_factor()));
     diagnostics::log(QString("font %1, Qt using %2")
                          .arg(QString::fromUtf8(iv_get_default_font(FONT_FAMILY)), QFontInfo(app.font()).family()));
-    client.start();
+    // Once the first frame is drawn, so the window shows before anything waits on the network
+    QObject::connect(qobject_cast<QQuickWindow *>(engine.rootObjects().first()), &QQuickWindow::frameSwapped,
+                     &client, &BookOrbitClient::start, Qt::SingleShotConnection);
     return app.exec();
 }

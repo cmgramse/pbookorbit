@@ -62,6 +62,9 @@ bar, connecting with `NetConnect2`, and leaving Wi-Fi to switch itself off when 
   when the user taps or presses a key while offline, rather than polling.
 - `NetConnectSilent()` returns -12 at once when Wi-Fi is off, and connects in about 4 s
   when it's on but idle. `NetConnect2()` (the system's dialog) took 7-8 s.
+- `NetConnectSilent()` blocks its thread for those seconds. Called from a worker thread
+  (`QThread::create`) it works on the Era Color (6.10), and the UI draws and scrolls
+  meanwhile.
 
 ## Opening books
 

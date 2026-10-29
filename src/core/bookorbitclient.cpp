@@ -18,6 +18,7 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QScopeGuard>
+#include <QThread>
 #include <QTimer>
 #include <QUrl>
 
@@ -180,7 +181,7 @@ void BookOrbitClient::signIn(const QString &server, const QString &username, con
         {"clientKind", "native"},
         {"deviceLabel", ("PocketBook " + deviceLabel).trimmed().left(100)},
     };
-    ensureNetwork(true);
+    ensureNetwork();
     // Returns NativeCredentials plus the user: {accessToken, refreshToken, sessionId, user, ...}
     send("POST", "/auth/login", QJsonDocument(body),
         [this](const QByteArray &data) {
@@ -423,7 +424,7 @@ void BookOrbitClient::addRecentSearch(const QString &text)
 
 void BookOrbitClient::goOnline()
 {
-    if (ensureNetwork(true))
+    if (ensureNetwork())
         checkServer();
 }
 
@@ -2049,7 +2050,7 @@ void BookOrbitClient::refreshSession(std::function<void()> then)
         });
 }
 
-bool BookOrbitClient::ensureNetwork(bool ask)
+bool BookOrbitClient::ensureNetwork()
 {
     if (m_simulateOffline)
         return false;
@@ -2057,17 +2058,44 @@ bool BookOrbitClient::ensureNetwork(bool ask)
     if (!(QueryNetwork() & NET_CONNECTED)) {
         QElapsedTimer netTimer;
         netTimer.start();
-        // NetConnect2 shows the system's own dialog while it connects
-        const int rc = ask ? NetConnect2(nullptr, 1) : NetConnectSilent(nullptr);
-        (rc != 0 ? diagnostics::log : diagnostics::trace)(QString("%1 -> %2 after %3 ms, %4")
-                .arg(ask ? "NetConnect2" : "NetConnectSilent").arg(rc).arg(netTimer.elapsed())
-                .arg(diagnostics::networkState()));
+        // Shows the system's own dialog while it connects
+        const int rc = NetConnect2(nullptr, 1);
+        (rc != 0 ? diagnostics::log : diagnostics::trace)(QString("NetConnect2 -> %1 after %2 ms, %3")
+                .arg(rc).arg(netTimer.elapsed()).arg(diagnostics::networkState()));
         return rc == 0;
     }
-#else
-    Q_UNUSED(ask)
 #endif
     return true;
+}
+
+void BookOrbitClient::whenNetwork(std::function<void(bool connected)> then)
+{
+    if (m_simulateOffline) {
+        then(false);
+        return;
+    }
+#ifndef EMULATOR
+    if (!(QueryNetwork() & NET_CONNECTED)) {
+        m_afterConnect.append(then);
+        if (m_afterConnect.size() > 1)
+            return;
+        QElapsedTimer netTimer;
+        netTimer.start();
+        auto rc = std::make_shared<int>(0);
+        QThread *thread = QThread::create([rc] { *rc = NetConnectSilent(nullptr); });
+        connect(thread, &QThread::finished, this, [this, thread, rc, netTimer] {
+            thread->deleteLater();
+            (*rc != 0 ? diagnostics::log : diagnostics::trace)(QString("NetConnectSilent -> %1 after %2 ms, %3")
+                    .arg(*rc).arg(netTimer.elapsed()).arg(diagnostics::networkState()));
+            const auto queued = std::exchange(m_afterConnect, {});
+            for (const auto &fn : queued)
+                fn(*rc == 0);
+        });
+        thread->start();
+        return;
+    }
+#endif
+    then(true);
 }
 
 void BookOrbitClient::failOffline(const ErrorHandler &onError)
@@ -2084,7 +2112,7 @@ void BookOrbitClient::startStream(const QString &path, std::function<void(QNetwo
         onError(0, "Not signed in");
         return;
     }
-    if (!ensureNetwork(true)) {
+    if (!ensureNetwork()) {
         failOffline(onError);
         return;
     }
@@ -2110,13 +2138,29 @@ void BookOrbitClient::startStream(const QString &path, std::function<void(QNetwo
 void BookOrbitClient::send(const QByteArray &method, const QString &path, const QJsonDocument &body,
                            DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet)
 {
-    // Reconnects Wi-Fi if it went idle
-    if (!ensureNetwork(false)) {
-        diagnostics::trace(QString("%1 %2 -> no connection").arg(QString::fromLatin1(method), path));
-        failOffline(onError);
-        return;
+    // Busy from the start, as reconnecting Wi-Fi can take seconds
+    if (!quiet) {
+        m_pending++;
+        emit busyChanged();
     }
+    // Reconnects Wi-Fi if it went idle
+    whenNetwork([=](bool connected) {
+        if (!connected) {
+            diagnostics::trace(QString("%1 %2 -> no connection").arg(QString::fromLatin1(method), path));
+            if (!quiet) {
+                m_pending--;
+                emit busyChanged();
+            }
+            failOffline(onError);
+            return;
+        }
+        sendNow(method, path, body, onSuccess, onError, withToken, quiet);
+    });
+}
 
+void BookOrbitClient::sendNow(const QByteArray &method, const QString &path, const QJsonDocument &body,
+                              DataHandler onSuccess, ErrorHandler onError, bool withToken, bool quiet)
+{
     QNetworkRequest request(QUrl(m_serverUrl + "/api/v1" + path));
     // Downloads (the only quiet requests) accept any content type, e.g. JPEG
     request.setRawHeader("Accept", quiet ? "*/*" : "application/json");
@@ -2126,10 +2170,6 @@ void BookOrbitClient::send(const QByteArray &method, const QString &path, const 
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     QNetworkReply *reply = m_nam.sendCustomRequest(request, method, body.isNull() ? QByteArray() : body.toJson(QJsonDocument::Compact));
-    if (!quiet) {
-        m_pending++;
-        emit busyChanged();
-    }
     QElapsedTimer timer;
     timer.start();
 
