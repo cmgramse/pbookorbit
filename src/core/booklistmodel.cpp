@@ -58,6 +58,20 @@ void BookListModel::reset(int count)
     endResetModel();
 }
 
+void BookListModel::resize(int count)
+{
+    const int current = int(m_books.size());
+    if (count > current) {
+        beginInsertRows(QModelIndex(), current, count - 1);
+        m_books.resize(count);
+        endInsertRows();
+    } else if (count < current) {
+        beginRemoveRows(QModelIndex(), count, current - 1);
+        m_books.resize(count);
+        endRemoveRows();
+    }
+}
+
 void BookListModel::setBooks(int first, const QVariantList &books)
 {
     const int last = qMin(first + int(books.size()), int(m_books.size())) - 1;

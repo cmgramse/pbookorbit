@@ -27,6 +27,8 @@ struct sqlite3_stmt;
 //                (GET /authors/:id), each as JSON, for offline
 //   collections  the user's collections in their order, and each one's book ids
 //   collection_books
+//   list_cache   what the lists last showed, by name, as JSON: shown at startup while
+//                the server's lists load
 //
 // Uses the system libsqlite3 (linked by libcommon_utilities), which every device has. Qt's
 // Sql module isn't used because the firmware may not ship it.
@@ -97,6 +99,11 @@ public:
         QVariantList bookIds;
     };
     QList<Collection> collections() const;
+
+    // A list's last rows, shown while the server's load. Cleared on sign-out.
+    void saveListCache(const QString &name, const QVariantMap &data);
+    QVariantMap listCache(const QString &name) const;
+    void clearListCaches();
 
     // Runs writes in a single transaction: one write to storage, all or nothing
     void transaction(const std::function<void()> &writes);

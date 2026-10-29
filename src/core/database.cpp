@@ -57,6 +57,11 @@ static const char *SCHEMA = R"sql(
         book_id       INTEGER NOT NULL,
         PRIMARY KEY (collection_id, position)
     ) WITHOUT ROWID;
+
+    CREATE TABLE IF NOT EXISTS list_cache (
+        name TEXT PRIMARY KEY,                      -- "library", "collections", ...
+        data TEXT NOT NULL CHECK (json_valid(data))
+    ) WITHOUT ROWID;
 )sql";
 
 Database::Database(const QString &path)
@@ -286,6 +291,27 @@ QVariantMap Database::bookDetails(int bookId) const
         sqlite3_finalize(statement);
     }
     return details;
+}
+
+void Database::saveListCache(const QString &name, const QVariantMap &data)
+{
+    exec("INSERT OR REPLACE INTO list_cache (name, data) VALUES (?, ?)", {name, json(data)});
+}
+
+QVariantMap Database::listCache(const QString &name) const
+{
+    QVariantMap data;
+    if (sqlite3_stmt *statement = prepare("SELECT data FROM list_cache WHERE name = ?", {name})) {
+        if (sqlite3_step(statement) == SQLITE_ROW)
+            data = jsonMap(columnText(statement, 0));
+        sqlite3_finalize(statement);
+    }
+    return data;
+}
+
+void Database::clearListCaches()
+{
+    exec("DELETE FROM list_cache");
 }
 
 void Database::saveAuthors(const QList<QVariantMap> &entries)

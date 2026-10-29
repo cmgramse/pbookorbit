@@ -25,6 +25,8 @@ public:
 
     // Resets the list to count placeholders
     void reset(int count);
+    // Adds placeholders at the end, or removes rows from it, leaving the others in place
+    void resize(int count);
     // Fills in rows from first onwards
     void setBooks(int first, const QVariantList &books);
     // Sets one field of a loaded row

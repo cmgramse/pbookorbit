@@ -13,6 +13,7 @@
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QStringList>
+#include <QTimer>
 #include <functional>
 
 class Database;
@@ -284,6 +285,12 @@ private:
         // Generation the rows belong to. The old rows stay until a new query's first page
         // arrives.
         int listGeneration = -1;
+        // The rows are from the list cache, for this query: its first page updates them in
+        // place, keeping the scroll position
+        bool cached = false;
+        // Rows asked for while waiting for the first page, loaded once it's in
+        int wantedFirst = 0;
+        int wantedLast = -1;
         int total = 0;
         // Hide audiobook records whose ebook is a separate record, so one row covers both.
         // Only safe when the ebook is guaranteed to be in the list.
@@ -314,7 +321,20 @@ private:
         bool booksLoaded = false;
         // Rows built from the local books while offline, to fetch again once online
         bool local = false;
+        // Rows from the list cache, shown instead of rows until a load finishes
+        QList<QVariantMap> cached;
+        // Whether the cache has been read. Not until the list is first loaded, as a hidden
+        // list with rows still makes delegates, which fetch covers.
+        bool cacheRead = false;
+        // Collections whose books are still loading
+        int loadingBooks = 0;
     };
+
+    // The rows on screen: the cached ones, until loaded
+    static const QList<QVariantMap> &shownRows(const Groups &groups)
+    {
+        return groups.cached.isEmpty() ? groups.rows : groups.cached;
+    }
 
     // Endpoint for library book queries
     QString libraryBooksPath() const { return QString("/libraries/%1/books").arg(m_libraryId); }
@@ -322,6 +342,20 @@ private:
     void loadCollectionBooks(int collectionId, int page, int generation);
     // Sorts rows into the model and builds the A-Z sections
     void showGroups(Groups &groups);
+    // showGroups() for a load in progress: not while the cached rows are shown
+    void showLoadedGroups(Groups &groups);
+    // A load has finished: shows its rows in place of any cached ones and, if complete,
+    // caches them
+    void finishGroups(Groups &groups, bool complete);
+    // Shows the cached rows, if any, until a load finishes. Only the first time it's
+    // called.
+    void restoreGroups(Groups &groups);
+    // The group's list cache name, or empty if it isn't cached
+    QString cacheName(const Groups &groups) const;
+    // Caches the library list's first rows, for the same sort and filter at the next start
+    void saveLibraryCache();
+    // Shows the cached library rows, if they're for the list's sort and filter
+    void restoreLibrary();
     // Loads series (the library's or an author's) one page at a time
     void loadSeriesPage(Groups *groups, int page, int generation);
     // Looks up books for the rows from first onwards, a request at a time, for formats
@@ -431,6 +465,8 @@ private:
     int m_libraryId = -1;
     // Main library list
     PagedBooks m_list;
+    // Saves the library's list cache once a refresh settles
+    QTimer m_libraryCacheTimer;
     PagedBooks m_search;
     PagedBooks m_booksOf;
     // What booksOf shows (see showBooksOf). For a collection, the book ids
