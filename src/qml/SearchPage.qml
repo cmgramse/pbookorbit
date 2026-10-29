@@ -329,13 +329,11 @@ Rectangle {
         visible: page.showResults && results.count === 0 && bookOrbit.searchTotal !== 0
     }
     // When nothing matches
-    Text {
+    EmptyState {
+        anchors.fill: results
         visible: page.showResults && results.count === 0 && bookOrbit.searchTotal === 0
-        anchors.top: header.bottom
-        anchors.topMargin: Units.dp(26)
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "No books found"
-        color: "#737373"
-        font.pointSize: 8
+        title: "No books found"
+        text: bookOrbit.online ? "Try a different title, author or series."
+                               : "You're currently offline, only downloaded books can be searched."
     }
 }

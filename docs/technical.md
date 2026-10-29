@@ -30,8 +30,8 @@ A session refresh that fails offline keeps the session.
 Offline, a red badge with a crossed-out Wi-Fi sign follows the header's title, the header menu has
 Reconnect (`goOnline()`), and every list shows downloaded
 books only, with the switch for it turned on and disabled. Back online, each list goes
-back to the user's own setting. Views that need the server say they aren't available
-offline.
+back to the user's own setting. Empty lists say so in the middle of the page, with a line
+on why (`EmptyState.qml`), saying when it's because the app is offline.
 
 QML hands the client the downloaded books (`setLocalBooks()`), and offline the Series and
 Authors views, an author's series and search are built from them. Rows built this way have

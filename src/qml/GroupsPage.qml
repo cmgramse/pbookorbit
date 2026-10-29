@@ -21,11 +21,12 @@ Item {
     // Y of the jump rail's first entry (page coordinates) and its spacing
     property real jumpRailTop: NaN
     property real jumpRailPitch: NaN
-    // The model and jump sections, whether they've loaded, and the text to show when there
-    // are none
+    // The model and jump sections, whether they've loaded, and what to say when there are
+    // none (see EmptyState)
     property var model
     property var jumpSections: []
     property bool loaded: false
+    property string emptyTitle
     property string emptyText
     readonly property alias list: groupList
 
@@ -63,14 +64,14 @@ Item {
                 onSortClicked: page.sortClicked()
                 onSortIconClicked: page.sortIconClicked()
             }
+            // An error over rows already shown
             Text {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                visible: bookOrbit.error !== "" || (groupList.count === 0 && (page.loaded || !bookOrbit.online))
+                visible: bookOrbit.error !== "" && groupList.count > 0
                 topPadding: Units.dp(8)
-                text: bookOrbit.error !== "" ? bookOrbit.error
-                      : page.loaded ? page.emptyText : "Not available offline"
+                text: bookOrbit.error
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -89,6 +90,14 @@ Item {
             group: book
             onClicked: page.groupClicked(book)
         }
+    }
+
+    EmptyState {
+        anchors.fill: groupList
+        anchors.topMargin: groupList.headerItem ? groupList.headerItem.height : 0
+        visible: groupList.count === 0 && (bookOrbit.error !== "" || page.loaded)
+        title: bookOrbit.error !== "" ? "Something went wrong" : page.emptyTitle
+        text: bookOrbit.error !== "" ? bookOrbit.error : page.emptyText
     }
 
     ListScrollbar {

@@ -143,17 +143,15 @@ Rectangle {
         visible: books.count === 0 && bookOrbit.booksOfTotal !== 0 && bookOrbit.error === ""
     }
     // If there are no books, or they failed to load
-    Text {
+    EmptyState {
+        id: empty
+        anchors.fill: books
+        anchors.topMargin: books.headerItem ? books.headerItem.height : 0
         visible: books.count === 0 && !spinner.visible
-        anchors.top: header.bottom
-        anchors.topMargin: (books.headerItem ? books.headerItem.height : 0) + Units.dp(26)
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width - 2 * Units.dp(26)
-        horizontalAlignment: Text.AlignHCenter
-        text: bookOrbit.booksOfTotal === 0 ? (page.downloadedOnly ? "No downloaded books" : "No books found")
-              : bookOrbit.error
-        color: "#737373"
-        font.pointSize: 8
-        wrapMode: Text.Wrap
+        title: bookOrbit.booksOfTotal !== 0 ? "Something went wrong"
+               : page.downloadedOnly ? "No downloaded books" : "No books found"
+        text: bookOrbit.booksOfTotal !== 0 ? bookOrbit.error
+              : !page.downloadedOnly ? ""
+              : bookOrbit.online ? "Turn off Downloaded only to see them all." : offlineText
     }
 }

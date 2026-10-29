@@ -384,15 +384,14 @@ Window {
                 onSortClicked: root.toggleDropdown(sortMenu)
                 onSortIconClicked: libraryQuery.reverseSort()
             }
+            // An error over books already shown
             Text {
                 id: status
                 x: Units.dp(26)
                 width: parent.width - 2 * x
-                // The spinner shows while the first books load
-                visible: bookOrbit.error !== "" || (bookList.count === 0 && !bookOrbit.busy && libraryQuery.downloadedOnly)
+                visible: bookOrbit.error !== "" && bookList.count > 0
                 topPadding: Units.dp(8)
-                text: bookOrbit.error !== "" ? bookOrbit.error
-                      : "No downloaded books" + (libraryQuery.filterIndex === 0 ? "" : " of this type")
+                text: bookOrbit.error
                 font.pointSize: 8
                 wrapMode: Text.Wrap
             }
@@ -413,6 +412,20 @@ Window {
             onClicked: root.openBook(book)
             onHeld: bookMenu.open(bookRow)
         }
+    }
+
+    // No downloaded books, or the library couldn't load. The spinner shows while the first
+    // books load.
+    EmptyState {
+        anchors.fill: bookList
+        anchors.topMargin: bookList.headerItem ? bookList.headerItem.height : 0
+        visible: bookList.visible && bookList.count === 0
+                 && (bookOrbit.error !== "" || (!bookOrbit.busy && libraryQuery.downloadedOnly))
+        title: bookOrbit.error !== "" ? "Something went wrong"
+               : ["No downloaded books", "No downloaded ebooks", "No downloaded audiobooks"][libraryQuery.filterIndex]
+        text: bookOrbit.error !== "" ? bookOrbit.error
+              : !bookOrbit.online ? offlineText
+              : "Books you download show here, and can be read offline."
     }
 
     ListScrollbar {
@@ -449,7 +462,9 @@ Window {
         model: bookOrbit.collections
         jumpSections: bookOrbit.collectionJumpSections
         loaded: bookOrbit.collectionsLoaded
-        emptyText: bookOrbit.online ? "No collections" : "No collections with downloaded books"
+        emptyTitle: "No collections"
+        emptyText: bookOrbit.online ? "Collections you make in BookOrbit show here."
+                                    : "You're currently offline, only collections containing downloaded books can be shown."
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -476,7 +491,9 @@ Window {
         model: bookOrbit.seriesList
         jumpSections: bookOrbit.seriesJumpSections
         loaded: bookOrbit.seriesLoaded
-        emptyText: bookOrbit.online ? "No series" : "No series with downloaded books"
+        emptyTitle: "No series"
+        emptyText: bookOrbit.online ? "Series show here once books in the library belong to one."
+                                    : "You're currently offline, only series with downloaded books can be shown."
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -505,9 +522,12 @@ Window {
         // With a filter on, authors appear once their books have been looked up
         loaded: bookOrbit.authorsLoaded && (bookOrbit.authorBooksLoaded
                                             || (authorsQuery.filterIndex === 0 && !authorsQuery.downloadedOnly))
-        emptyText: authorsQuery.downloadedOnly ? "No authors with downloaded books"
-                   : authorsQuery.filterIndex === 0 ? "No authors"
-                   : "No authors with " + root.filterOptions[authorsQuery.filterIndex].toLowerCase()
+        emptyTitle: authorsQuery.downloadedOnly || authorsQuery.filterIndex === 0 ? "No authors"
+                    : "No authors with " + root.filterOptions[authorsQuery.filterIndex].toLowerCase()
+        emptyText: !bookOrbit.online ? "You're currently offline, only authors of downloaded books can be shown."
+                   : authorsQuery.downloadedOnly ? "Turn off Downloaded only to see every author."
+                   : authorsQuery.filterIndex !== 0 ? "Choose All titles to see every author."
+                   : "Authors show here once the library has books."
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -754,7 +774,9 @@ Window {
             model: bookOrbit.authorSeriesList
             jumpSections: bookOrbit.authorSeriesJumpSections
             loaded: bookOrbit.authorSeriesLoaded
-            emptyText: bookOrbit.online ? "No series" : "No series with downloaded books"
+            emptyTitle: "No series"
+            emptyText: bookOrbit.online ? "None of their books are in a series."
+                                        : "You're currently offline, only series with downloaded books can be shown."
             sortText: "By " + authorSeriesQuery.sortOptions[authorSeriesQuery.sortIndex]
             sortReversed: authorSeriesQuery.sortReversed
             descending: authorSeriesQuery.sortDescending
