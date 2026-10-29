@@ -4,7 +4,8 @@ import "units.js" as Units
 // A book's menu, modelled on the system library's (screenshot 12). Holding a row for two
 // seconds frames it briefly (BookRow's focused), then everything but that row fades and the
 // menu opens to its right with an arrow pointing at it, level with the row if it fits or
-// moved up to stay on screen. Tapping outside closes it.
+// moved up to stay on screen. Tapping outside closes it. The list can't scroll meanwhile,
+// and the fade leaves a gap that follows the row, so the row itself stays unfaded.
 //
 // Items: Book info, All books of author, All books of series (if in one), Delete (if on the
 // device) and Open with, which expands in place to list the system's apps for the format
@@ -17,7 +18,10 @@ Item {
     // The held row, until the menu opens; null if it went away meanwhile (the list
     // reloaded)
     property BookRow heldRow: null
-    // The row and its list in this item's coordinates, captured when the menu opened
+    // The row and its list while the menu is open. The row goes null if the list drops it.
+    property BookRow shownRow: null
+    property ListView shownList: null
+    // The row and its list in this item's coordinates
     property rect rowRect
     property rect listRect
 
@@ -43,6 +47,10 @@ Item {
         if (heldRow)
             heldRow.focused = false
         heldRow = null
+        if (shownList)
+            shownList.interactive = true
+        shownRow = null
+        shownList = null
         visible = false
     }
 
@@ -62,13 +70,33 @@ Item {
         const view = row.ListView.view
         if (!view)
             return
-        const rowPos = row.mapToItem(bookMenu, 0, 0)
-        const listPos = view.mapToItem(bookMenu, 0, 0)
-        rowRect = Qt.rect(rowPos.x, rowPos.y, row.width, row.height)
-        listRect = Qt.rect(listPos.x, listPos.y, view.width, view.height)
+        // Also ends a drag the held finger may have started
+        view.interactive = false
+        shownRow = row
+        shownList = view
+        placeRow()
         book = row.book
         openWithOpen = false
         visible = true
+    }
+
+    // Rows above can still change height (e.g. a companion lookup hiding one)
+    function placeRow() {
+        if (!shownRow || !shownList)
+            return
+        const rowPos = shownRow.mapToItem(bookMenu, 0, 0)
+        const listPos = shownList.mapToItem(bookMenu, 0, 0)
+        rowRect = Qt.rect(rowPos.x, rowPos.y, shownRow.width, shownRow.height)
+        listRect = Qt.rect(listPos.x, listPos.y, shownList.width, shownList.height)
+    }
+    Connections {
+        target: bookMenu.shownRow
+        function onYChanged() { bookMenu.placeRow() }
+        function onHeightChanged() { bookMenu.placeRow() }
+    }
+    Connections {
+        target: bookMenu.shownList
+        function onContentYChanged() { bookMenu.placeRow() }
     }
 
     // The book's own record plus any separately stored version (e.g. an audiobook)
@@ -115,36 +143,39 @@ Item {
     // Whether Open with is expanded
     property bool openWithOpen: false
 
-    // The faded window
+    // The faded window, around the row where it shows in the list
+    readonly property color fade: Qt.rgba(1, 1, 1, 0.6)
+    readonly property real gapTop: Math.max(rowRect.y, listRect.y)
+    readonly property real gapBottom: Math.max(gapTop, Math.min(rowRect.y + rowRect.height,
+                                                                listRect.y + listRect.height))
     Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(1, 1, 1, 0.6)
-        MouseArea {
-            anchors.fill: parent
-            onClicked: bookMenu.close()
-        }
+        width: parent.width
+        height: bookMenu.gapTop
+        color: bookMenu.fade
     }
-
-    // The row, unfaded, drawn over the fade where it sits in the list and clipped to the
-    // list. Tapping it also closes the menu.
-    Item {
-        x: bookMenu.listRect.x
-        y: bookMenu.listRect.y
-        width: bookMenu.listRect.width
-        height: bookMenu.listRect.height
-        clip: true
-
-        // Only while open, since a row needs a book
-        Loader {
-            x: bookMenu.rowRect.x - parent.x
-            y: bookMenu.rowRect.y - parent.y
-            active: bookMenu.visible
-            sourceComponent: BookRow {
-                width: bookMenu.rowRect.width
-                book: bookMenu.book
-                onClicked: bookMenu.close()
-            }
-        }
+    Rectangle {
+        y: bookMenu.gapBottom
+        width: parent.width
+        height: parent.height - y
+        color: bookMenu.fade
+    }
+    Rectangle {
+        y: bookMenu.gapTop
+        width: bookMenu.rowRect.x
+        height: bookMenu.gapBottom - y
+        color: bookMenu.fade
+    }
+    Rectangle {
+        x: bookMenu.rowRect.x + bookMenu.rowRect.width
+        y: bookMenu.gapTop
+        width: parent.width - x
+        height: bookMenu.gapBottom - y
+        color: bookMenu.fade
+    }
+    // Tapping anywhere but the menu closes it, the row included
+    MouseArea {
+        anchors.fill: parent
+        onClicked: bookMenu.close()
     }
 
     PopupMenu {
