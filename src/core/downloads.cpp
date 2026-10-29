@@ -103,6 +103,16 @@ QStringList Downloads::formatsOnDevice(int bookId) const
     return formats;
 }
 
+QStringList Downloads::kindsOnDevice(int bookId) const
+{
+    QStringList kinds;
+    for (const QString &format : formatsOnDevice(bookId)) {
+        if (!kinds.contains(mediaKind(format)))
+            kinds.append(mediaKind(format));
+    }
+    return kinds;
+}
+
 QStringList Downloads::pathsOnDevice(int bookId) const
 {
     QStringList paths;
@@ -113,13 +123,15 @@ QStringList Downloads::pathsOnDevice(int bookId) const
     return paths;
 }
 
-bool Downloads::remove(int bookId)
+bool Downloads::remove(int bookId, const QString &kind)
 {
     // Missing files count as deleted. Notes and positions beside the book (KOReader's .sdr
     // folder) are left, as is the database entry.
     bool deleted = true;
     m_database->transaction([&] {
         for (const QString &path : m_database->bookFiles(bookId)) {
+            if (!kind.isEmpty() && mediaKind(QFileInfo(path).suffix()) != kind)
+                continue;
             if (QFileInfo::exists(path) && !QFile::remove(path)) {
                 diagnostics::log(QString("book %1: can't delete %2").arg(bookId).arg(path));
                 deleted = false;

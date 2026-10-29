@@ -850,32 +850,46 @@ Window {
     }
 
     // Confirms deleting a book from the device, as the system library does (screenshot 13).
-    // Deletes every version on the device.
+    // With an ebook and an audiobook on the device it asks which, as DownloadDialog does.
     SystemDialog {
         id: deleteDialog
         anchors.fill: parent
         property var book: ({})
+        // The book's records, and the kinds on the device ("ebook", "audiobook")
+        property var ids: []
+        property var kinds: []
         // Set if a file couldn't be deleted
         property bool failed: false
 
         function ask(newBook) {
             book = newBook
+            ids = [newBook.id]
+            for (const variant of newBook.variants || []) {
+                if (ids.indexOf(variant.bookId) < 0)
+                    ids.push(variant.bookId)
+            }
+            let onDevice = []
+            for (const id of ids) {
+                for (const kind of downloads.kindsOnDevice(id)) {
+                    if (onDevice.indexOf(kind) < 0)
+                        onDevice.push(kind)
+                }
+            }
+            // Ebook first, as DownloadDialog lists them
+            kinds = ["ebook", "audiobook"].filter(k => onDevice.indexOf(k) >= 0)
             failed = false
             visible = true
         }
 
         icon: failed ? "icon_error" : "icon_question"
-        buttons: failed ? [["Close", "no"]] : [["No", "no"], ["Yes", "yes"]]
+        buttons: failed ? [["Close", "no"]]
+                 : kinds.length > 1 ? kinds.map(k => [k, k]).concat([["Cancel", "no"]])
+                 : [["No", "no"], ["Yes", "all"]]
         onPressed: (action) => {
-            if (action === "yes") {
-                const ids = [book.id]
-                for (const variant of book.variants || []) {
-                    if (ids.indexOf(variant.bookId) < 0)
-                        ids.push(variant.bookId)
-                }
+            if (action !== "no") {
                 let deleted = true
                 for (const id of ids)
-                    deleted = downloads.remove(id) && deleted
+                    deleted = downloads.remove(id, action === "all" ? "" : action) && deleted
                 if (!deleted) {
                     failed = true
                     return
@@ -888,6 +902,9 @@ Window {
             width: parent.width
             text: deleteDialog.failed
                   ? "Couldn't delete " + (deleteDialog.book.title || "") + " from your device."
+                  : deleteDialog.kinds.length > 1
+                  ? "Delete the " + deleteDialog.kinds.join(" or the ") + " of " + (deleteDialog.book.title || "")
+                    + " from your device?"
                   : "Are you sure you want to delete " + (deleteDialog.book.title || "") + " from your device?"
             font.pointSize: 7.25
             wrapMode: Text.Wrap

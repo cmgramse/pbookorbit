@@ -44,6 +44,8 @@ public:
     Q_INVOKABLE bool isOnDevice(int bookId) const;
     // Formats of a book's files on the device, e.g. ["epub"]
     Q_INVOKABLE QStringList formatsOnDevice(int bookId) const;
+    // Kinds of a book's files on the device: "ebook", "audiobook" or both
+    Q_INVOKABLE QStringList kindsOnDevice(int bookId) const;
     // Downloaded books' list entries as saved at download time, plus downloadedFormats
     Q_INVOKABLE QVariantList downloadedBooks() const;
     // The file a download would fetch, {id, format, sizeBytes, folder} where folder is
@@ -63,9 +65,10 @@ public:
     Q_INVOKABLE bool openWith(int bookId, const QString &format, const QString &app);
     // The book's files on the device
     Q_INVOKABLE QStringList pathsOnDevice(int bookId) const;
-    // Deletes the book's files and forgets them. Returns false if a file couldn't be
-    // deleted (it stays recorded).
-    Q_INVOKABLE bool remove(int bookId);
+    // Deletes the book's files and forgets them: all of them, or with kind ("ebook" or
+    // "audiobook") only those. Returns false if a file couldn't be deleted (it stays
+    // recorded).
+    Q_INVOKABLE bool remove(int bookId, const QString &kind = QString());
 
     // Every recorded book file, whether or not it still exists
     QSet<QString> recordedPaths() const;
