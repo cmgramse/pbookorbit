@@ -14,8 +14,8 @@ import "night.js" as Night
 // device at first, else the ebook.
 //
 // CHOOSE ACTION at the bottom opens a menu in the middle of the page, as on the system's
-// page (screenshots 21 and 22), for the chosen version: Open book or Download, Open with,
-// and Delete.
+// page (screenshots 21 and 22), for the chosen version: Download, Open with, Delete, and
+// Open book where there's no Open with (audiobooks).
 //
 // The system's page also has a favourite heart, and Add to Collection in its menu.
 Rectangle {
@@ -447,8 +447,10 @@ Rectangle {
             x: (parent.width - width) / 2
             y: (parent.height - height) / 2
 
+            // Only when there's no Open with, as for audiobooks: an ebook opens straight from
+            // the list
             PopupMenuItem {
-                visible: page.versionOnDevice
+                visible: page.versionOnDevice && page.openWithTarget === null
                 icon: "e3_menu_open"
                 text: "Open book"
                 onClicked: {
