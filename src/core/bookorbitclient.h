@@ -3,6 +3,7 @@
 #include "core/booklistmodel.h"
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -228,6 +229,9 @@ public:
     // Calls then with the library id, fetching it first if needed
     void withLibrary(std::function<void(int libraryId)> then, ErrorHandler onError);
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     void serverUrlChanged();
     void usernameChanged();
@@ -410,6 +414,9 @@ private:
     bool m_online = true;
     // PBOOKORBIT_OFFLINE=1: every request fails as though there were no network
     bool m_simulateOffline = false;
+    // Wi-Fi connected at the last look, and when that was (see eventFilter)
+    bool m_networkConnected = false;
+    QElapsedTimer m_networkLook;
     int m_pending = 0;
     QString m_error;
     int m_libraryId = -1;

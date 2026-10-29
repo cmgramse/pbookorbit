@@ -23,8 +23,10 @@ it with `NetConnectSilent()`, and failing that it's offline. Only things the use
 (signing in, a download) show the system's Wi-Fi dialog (`NetConnect2()`).
 
 While offline, requests fail at once with "No connection" instead of being sent, and
-covers wait. The app checks the server again when the system reports Wi-Fi connected
-(`EVT_NET_CONNECTED`), or when the user asks (`goOnline()`); any reply means online.
+covers wait. The app checks the server again when Wi-Fi has connected, which it looks
+for (`QueryNetwork()`) when the user taps or presses a key, at most every 3 seconds, since the system's
+`EVT_NET_CONNECTED` doesn't reach it (see NOTES.md) and polling would cost battery, or when
+the user asks (`goOnline()`); any reply means online.
 A session refresh that fails offline keeps the session.
 
 Offline, a red badge with a crossed-out Wi-Fi sign follows the header's title, the header menu has
@@ -132,9 +134,10 @@ the task manager picks names and icons.
 (`build/pbookorbit/<sdk>/pc/system/mnt/ext1` in the emulator) and cleared on each start.
 `diagnostics::log()` always writes, for errors and startup information.
 `diagnostics::trace()` only writes while diagnostics logging is on (tap the title six
-times). It records each request with status and timing, Wi-Fi connections, the book list
-switching A2 on and off while scrolling (see `src/ui/eink.h`), and every 10 seconds the
-frames rendered, memory use (`VmRSS`) and thread count.
+times). It records each request with status and timing, Wi-Fi connections and changes in
+the network state (`QueryNetwork()`, checked every 2 seconds), the book list switching A2
+on and off while scrolling (see `src/ui/eink.h`), and every 10 seconds the frames rendered,
+memory use (`VmRSS`), thread count and network state.
 
 Every frame on e-ink is a slow screen update, so `frames` should be 0 when the app is
 idle. Anything that animates (a blinking cursor, `BusyIndicator`, transitions, Flickable

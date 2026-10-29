@@ -1,13 +1,11 @@
 #include "core/diagnostics.h"
 
 #include "core/database.h"
-#include <common_utilities/einkinterface.h>
 #include <inkview.h>
 #include <QDateTime>
 #include <QFile>
 #include <QtLogging>
 #include <QQuickWindow>
-#include <QSet>
 #include <QTimer>
 #include <atomic>
 #include <cstdio>
@@ -122,19 +120,6 @@ void start(QQuickWindow *window)
     });
     setTracing(tracing);
 
-    // Which of the system's events reach the app, Wi-Fi's in particular. Handed to the main
-    // thread, since it may not be the one calling.
-    if (auto *platform = pocketbook::utilities::einkPlatform()) {
-        platform->addHandlerForInkvewEvents([window](int type, int par1, int par2) {
-            QMetaObject::invokeMethod(window, [type, par1, par2] {
-                static QSet<int> seen;
-                if (type < 200 && seen.contains(type))
-                    return;
-                seen.insert(type);
-                log(QString("inkview event %1 (%2, %3), %4").arg(type).arg(par1).arg(par2).arg(networkState()));
-            }, Qt::QueuedConnection);
-        });
-    }
     log("started, " + processStats() + (tracing ? ", diagnostics logging on" : ""));
     log(networkState());
     // QML is compiled at build time for this exact Qt version. Any other version ignores it

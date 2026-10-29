@@ -49,6 +49,20 @@ app appeared in the system library, added at the time it opened. That run's log 
 so whether the scan or the opening added it isn't known yet: a download that isn't opened
 would tell. If the scan alone doesn't, option 2 is the fallback.
 
+## Wi-Fi
+
+Logged on the Era Color (6.10, 29 October 2026), turning Wi-Fi off and on from the status
+bar, connecting with `NetConnect2`, and leaving Wi-Fi to switch itself off when idle:
+
+- **`EVT_NET_CONNECTED` and `EVT_NET_DISCONNECTED` never reach the app** (through the e-ink
+  platform's InkView event handler), though other system events do (217, 220, and 271,
+  `EVT_TIME_CHANGED`, several times after each connection).
+- **`QueryNetwork()` follows Wi-Fi**: `0x0203` (`NET_WIFIREADY` set) while connected,
+  `0x0003` while not, whether it was turned off or went idle. So the app looks at it
+  when the user taps or presses a key while offline, rather than polling.
+- `NetConnectSilent()` returns -12 at once when Wi-Fi is off, and connects in about 4 s
+  when it's on but idle. `NetConnect2()` (the system's dialog) took 7-8 s.
+
 ## Opening books
 
 `OpenBook(path, "", OB_ADDTOLAST | OB_WITHRETURN)` opens a book in whatever app the
