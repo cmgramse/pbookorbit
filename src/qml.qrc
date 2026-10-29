@@ -32,6 +32,7 @@
         <file>qml/PageButtons.qml</file>
         <file>qml/JumpRail.qml</file>
         <file>qml/GroupRow.qml</file>
+        <file>qml/TapArea.qml</file>
         <file>qml/GroupsPage.qml</file>
         <file>qml/ListQuery.qml</file>
         <file>qml/AuthorInfoPage.qml</file>

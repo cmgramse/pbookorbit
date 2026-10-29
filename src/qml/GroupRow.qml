@@ -35,9 +35,9 @@ Item {
     width: ListView.view ? ListView.view.width : 0
     height: rowHeight
 
-    MouseArea {
+    TapArea {
         anchors.fill: parent
-        onClicked: row.clicked()
+        onTapped: row.clicked()
     }
 
     // A cover scaled to fit width x height, in its corner of the stack. Shows the system's

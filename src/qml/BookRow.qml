@@ -48,11 +48,11 @@ Item {
     height: book.hidden === true ? 0 : rowHeight
     visible: book.hidden !== true
 
-    MouseArea {
+    TapArea {
         anchors.fill: parent
         enabled: row.book.loaded === true
         pressAndHoldInterval: 1500
-        onClicked: row.clicked()
+        onTapped: row.clicked()
         // After a hold this long, releasing doesn't send clicked()
         onPressAndHold: row.held()
     }
