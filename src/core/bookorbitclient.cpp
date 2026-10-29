@@ -65,7 +65,7 @@ BookOrbitClient::BookOrbitClient(Database *database, QObject *parent)
         platform->addHandlerForInkvewEvents([this](int type, int, int) {
             if (type == EVT_NET_CONNECTED) {
                 QMetaObject::invokeMethod(this, [this]() {
-                    diagnostics::trace("Wi-Fi connected");
+                    diagnostics::trace("Wi-Fi connected, " + diagnostics::networkState());
                     if (!m_online)
                         checkServer();
                 }, Qt::QueuedConnection);
@@ -430,7 +430,7 @@ void BookOrbitClient::setOnline(bool online)
     if (m_online == online)
         return;
     m_online = online;
-    diagnostics::log(online ? "online" : "offline");
+    diagnostics::log(QString(online ? "online, " : "offline, ") + diagnostics::networkState());
     // Rows built offline stay on screen until the server's arrive
     if (online) {
         for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
@@ -2048,8 +2048,9 @@ bool BookOrbitClient::ensureNetwork(bool ask)
         netTimer.start();
         // NetConnect2 shows the system's own dialog while it connects
         const int rc = ask ? NetConnect2(nullptr, 1) : NetConnectSilent(nullptr);
-        (rc != 0 ? diagnostics::log : diagnostics::trace)(QString("%1 -> %2 after %3 ms")
-                .arg(ask ? "NetConnect2" : "NetConnectSilent").arg(rc).arg(netTimer.elapsed()));
+        (rc != 0 ? diagnostics::log : diagnostics::trace)(QString("%1 -> %2 after %3 ms, %4")
+                .arg(ask ? "NetConnect2" : "NetConnectSilent").arg(rc).arg(netTimer.elapsed())
+                .arg(diagnostics::networkState()));
         return rc == 0;
     }
 #else

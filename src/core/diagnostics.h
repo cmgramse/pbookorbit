@@ -21,10 +21,15 @@ void trace(const QString &message);
 // them otherwise.
 void captureQtMessages();
 
-// Logs startup details. While diagnostics logging is on, also logs frames rendered, memory
-// and thread count every 10 seconds. On e-ink each frame is a screen update, so frames
-// should be 0 when idle.
+// Logs startup details, and the system's events from 200 up (Wi-Fi among them) plus the
+// first of each other kind. While diagnostics logging is on, also logs frames rendered,
+// memory, thread count and the network state every 10 seconds, and the network state
+// whenever it changes (checked every 2 seconds). On e-ink each frame is a screen update,
+// so frames should be 0 when idle.
 void start(QQuickWindow *window);
+
+// QueryNetwork() as text, e.g. "net 0x0202 (wifi, wifi ready)"
+QString networkState();
 
 // QML access to log(), trace() and the diagnostics logging switch, which is saved in
 // settings

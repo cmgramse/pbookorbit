@@ -1,11 +1,13 @@
 #include "core/diagnostics.h"
 
 #include "core/database.h"
+#include <common_utilities/einkinterface.h>
 #include <inkview.h>
 #include <QDateTime>
 #include <QFile>
 #include <QtLogging>
 #include <QQuickWindow>
+#include <QSet>
 #include <QTimer>
 #include <atomic>
 #include <cstdio>
@@ -16,8 +18,9 @@ namespace diagnostics {
 static const char *const SETTING = "diagnosticsLogging";
 
 static bool tracing = false;
-// Frame and memory counter, running while tracing
+// Frame and memory counter, and the network watch, running while tracing
 static QTimer *statsTimer = nullptr;
+static QTimer *networkTimer = nullptr;
 
 static QFile *logFile()
 {
@@ -71,13 +74,29 @@ static QString processStats()
     return parts.join(' ');
 }
 
+QString networkState()
+{
+    const int state = QueryNetwork();
+    QStringList flags;
+    const QList<QPair<int, const char *>> names{
+        {NET_BLUETOOTH, "bluetooth"}, {NET_WIFI, "wifi"}, {NET_CDMA3G, "3g"},
+        {NET_BTREADY, "bluetooth ready"}, {NET_WIFIREADY, "wifi ready"}, {NET_CDMA3GREADY, "3g ready"}};
+    for (const auto &[flag, name] : names) {
+        if (state & flag)
+            flags << QString::fromLatin1(name);
+    }
+    return QString("net 0x%1 (%2)").arg(state, 4, 16, QChar('0')).arg(flags.join(", "));
+}
+
 static void setTracing(bool on)
 {
     tracing = on;
-    if (statsTimer && on)
-        statsTimer->start();
-    else if (statsTimer)
-        statsTimer->stop();
+    for (QTimer *timer : {statsTimer, networkTimer}) {
+        if (timer && on)
+            timer->start();
+        else if (timer)
+            timer->stop();
+    }
 }
 
 void start(QQuickWindow *window)
@@ -90,10 +109,34 @@ void start(QQuickWindow *window)
     statsTimer = new QTimer(window);
     statsTimer->setInterval(10000);
     QObject::connect(statsTimer, &QTimer::timeout, [] {
-        log(QString("frames=%1 %2").arg(frames.exchange(0)).arg(processStats()));
+        log(QString("frames=%1 %2 %3").arg(frames.exchange(0)).arg(processStats(), networkState()));
+    });
+    networkTimer = new QTimer(window);
+    networkTimer->setInterval(2000);
+    QObject::connect(networkTimer, &QTimer::timeout, [] {
+        static QString last = networkState();
+        const QString state = networkState();
+        if (state != last)
+            log("network changed: " + last + " -> " + state);
+        last = state;
     });
     setTracing(tracing);
+
+    // Which of the system's events reach the app, Wi-Fi's in particular. Handed to the main
+    // thread, since it may not be the one calling.
+    if (auto *platform = pocketbook::utilities::einkPlatform()) {
+        platform->addHandlerForInkvewEvents([window](int type, int par1, int par2) {
+            QMetaObject::invokeMethod(window, [type, par1, par2] {
+                static QSet<int> seen;
+                if (type < 200 && seen.contains(type))
+                    return;
+                seen.insert(type);
+                log(QString("inkview event %1 (%2, %3), %4").arg(type).arg(par1).arg(par2).arg(networkState()));
+            }, Qt::QueuedConnection);
+        });
+    }
     log("started, " + processStats() + (tracing ? ", diagnostics logging on" : ""));
+    log(networkState());
     // QML is compiled at build time for this exact Qt version. Any other version ignores it
     // and compiles from source on every launch.
     log(QString("Qt %1, QML compiled for %2%3")
