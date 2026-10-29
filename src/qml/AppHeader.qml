@@ -77,16 +77,17 @@ Rectangle {
 
     // Just after the title's text, outside its layout so the title stays centred: a red
     // badge with a crossed-out Wi-Fi sign (src/icons/offline.svg), a little taller than
-    // the capitals. Keeps its colours in night mode.
+    // the capitals. Keeps its colours in night mode. On whole pixels: smoothed between
+    // them, its edge picks up black from outside the image.
     Image {
         id: offlineIcon
         visible: header.offline
-        width: Units.dp(17)
+        width: Math.round(Units.dp(17))
         height: width
         sourceSize.width: width
         sourceSize.height: height
-        x: titleText.x + (titleText.width + Math.min(titleText.contentWidth, titleText.width)) / 2 + Units.dp(5)
-        anchors.verticalCenter: titleText.verticalCenter
+        x: Math.round(titleText.x + (titleText.width + Math.min(titleText.contentWidth, titleText.width)) / 2 + Units.dp(5))
+        y: Math.round(titleText.y + (titleText.height - height) / 2)
         source: Night.image("qrc:/icons/offline.bmp")
     }
 
