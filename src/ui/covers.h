@@ -11,14 +11,15 @@ class BookOrbitClient;
 
 // Cover thumbnails for book lists and photos for the authors list. Downloads a book's
 // thumbnail (GET /books/:id/thumbnail, about 100 KB) or an author's (GET
-// /authors/:id/thumbnail), scales it to its display size (photos cropped to fill, as
-// BookOrbit does), adjusts its colours for the screen (einkcolors.h), and caches it as a
-// PNG on the device.
+// /authors/:id/thumbnail) once per version and keeps it as it came. Each display size is
+// made from that: scaled (photos cropped to fill, as BookOrbit does), its colours adjusted
+// for the screen (einkcolors.h), and cached as a PNG.
 //
-// QML calls source(). If the cover isn't cached, it returns empty, starts a download and
-// emits ready(bookId) when done. authorPhoto() and photoReady(authorId) work the same way.
-// Offline it doesn't download, and emits them once back online so QML asks again.
-// Meanwhile it rescales a copy cached at another size, or of another version, if any.
+// QML calls source(). If the cover hasn't been downloaded, it returns empty, starts a
+// download and emits ready(bookId) when done. authorPhoto() and photoReady(authorId) work
+// the same way. Offline it doesn't download, and emits them once back online so QML asks
+// again. Meanwhile it uses a download of another version, or rescales a copy cached at
+// another size, if any.
 class Covers : public QObject
 {
     Q_OBJECT
@@ -46,13 +47,18 @@ private:
         QSize size;
         QString name;   // see cacheFile()
         QString file;
+        QString source;   // see sourceFile()
     };
 
     // name is "<bookId>" for a cover or "author-<authorId>" for a photo, and versionHash
     // is versionHash()'s
     QString cacheFile(const QString &name, const QString &versionHash, const QSize &size) const;
-    // Offline: the cached copy at the request's size, rescaled from the largest copy of
-    // any version if needed, or "" if there's none
+    // The download, as it came (JPEG or PNG)
+    QString sourceFile(const QString &name, const QString &versionHash) const;
+    // Makes the request's size from a download. Returns the file, or "" if it failed.
+    QString sizeFrom(const Request &request, const QString &source);
+    // Offline: the request's size, made from a download of any version or rescaled from
+    // the largest copy cached, or "" if there's neither
     QString localCopy(const Request &request);
     // Cached file URL, or "" while downloading
     QString fetch(const Request &request);
@@ -69,8 +75,9 @@ private:
     // Wanted while offline
     QSet<int> m_missedBooks;
     QSet<int> m_missedAuthors;
-    // Cached file names by name (see cacheFile), read from the folder when first needed
-    // offline and again after each time online
+    // Cached sizes and downloads by name (see cacheFile and sourceFile), read from the
+    // folder when first needed offline and again after each time online
     QHash<QString, QStringList> m_cached;
+    QHash<QString, QStringList> m_sources;
     bool m_cachedRead = false;
 };
