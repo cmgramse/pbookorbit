@@ -77,6 +77,14 @@ void Eink::leaveA2()
     }
 }
 
+void Eink::requireHqUpdate()
+{
+    if (auto *platform = einkPlatform()) {
+        platform->requireUpdateType(pocketbook::utilities::EinkPlatformInterface::UpdateType::PartialHQ);
+        diagnostics::trace("next update HQ");
+    }
+}
+
 void Eink::setDynamicUpdates(bool enabled)
 {
     auto *platform = einkPlatform();

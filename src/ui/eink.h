@@ -36,6 +36,11 @@ public:
     // Ends A2 and redraws the region normally right away, e.g. when the region disappears
     Q_INVOKABLE void leaveA2();
 
+    // Draws the next update in one high-quality pass. Otherwise a colour image in the
+    // changed area (a cover) gets a second pass of its own, which flashes and briefly draws
+    // it over anything on top of it, such as a menu.
+    Q_INVOKABLE void requireHqUpdate();
+
     // Enables dynamic updates while a text field has focus. Disabling redraws the window at
     // normal quality.
     Q_INVOKABLE void setDynamicUpdates(bool enabled);

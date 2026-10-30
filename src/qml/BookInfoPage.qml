@@ -48,6 +48,8 @@ Rectangle {
         book = newBook
         detailsById = {}
         actions.visible = false
+        // The cover draws in the same pass as the rest of the page
+        eink.requireHqUpdate()
         content.contentY = 0
         // The version on the device, if just one is
         let onDevice = []
@@ -235,7 +237,8 @@ Rectangle {
                         height: Math.min(implicitHeight, parent.height)
                         fillMode: Image.PreserveAspectFit
                         source: Night.image(cover.url)
-                        asynchronous: true
+                        // Loaded before the page first draws, so the screen updates once
+                        // rather than again when it arrives. It's a PNG from the cover cache.
                     }
                 }
 
@@ -431,7 +434,11 @@ Rectangle {
         visible: false
         // Whether Open with is expanded
         property bool openWithOpen: false
-        onVisibleChanged: openWithOpen = false
+        onVisibleChanged: {
+            openWithOpen = false
+            // The cover fades or returns in the same pass as the rest
+            eink.requireHqUpdate()
+        }
 
         Rectangle {
             anchors.fill: parent
