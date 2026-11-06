@@ -4,3 +4,20 @@
 
 # Era Color screenshots, for matching the system UI while the app is built (see TODO.md)
 /scr*.bmp
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*
+
+# project-bootstrap: agent scratch (see docs/agent-rules/workspace-hygiene.md)
+.work/
+
+# Local work and private material
+.confidential/
+.DS_Store
+.env
+.env.*
+!.env.example
