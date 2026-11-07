@@ -314,6 +314,7 @@ Window {
                                                     : showingAuthors ? authorsPage.pageButtons
                                                     : pageButtons
     readonly property bool overlayOpen: dropdownOpen || menu.visible || libraryMenu.visible || bookMenu.visible
+                                        || libraryFallbackDialog.visible
                                         || deleteDialog.visible || downloadDialog.visible
                                         || findBooksDialog.visible || bookInfoPage.menuOpen
 
@@ -706,6 +707,7 @@ Window {
     }
     PopupMenu {
         id: menu
+        objectName: "headerMenu"
         visible: false
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(1)
@@ -1028,6 +1030,7 @@ Window {
     }
     LibraryMenu {
         id: libraryMenu
+        objectName: "libraryMenu"
         client: bookOrbit
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(1)
@@ -1060,6 +1063,7 @@ Window {
     }
     SystemDialog {
         id: libraryFallbackDialog
+        objectName: "libraryFallbackDialog"
         property string label
         anchors.fill: parent
         icon: "icon_information"

@@ -39,6 +39,15 @@ Item {
         name: "LibraryUi"
         when: windowShown
 
+        // A test also fails on any QML warning it caused
+        function init() {
+            warningLog.watch()
+            warningLog.take()
+        }
+        function cleanup() {
+            compare(warningLog.take(), "")
+        }
+
         function test_selectorNeedsTwoLibrariesOnlineAndSignedIn() {
             compare(LibraryUi.selectorVisible(true, true, 0), false)
             compare(LibraryUi.selectorVisible(true, true, 1), false)
