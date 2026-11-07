@@ -2,31 +2,13 @@
 [plugins."agent-sdk-dev@claude-plugins-official"]
 enabled = false
 
-[plugins."anthropic-skills@claude-cowork"]
-enabled = false
-
-[plugins."apollo@claude-cowork"]
-enabled = false
-
-[plugins."artifact-reviewer@claude-cowork"]
-enabled = false
-
 [plugins."artifact-reviewer@iurfriend-skills"]
 enabled = false
 
 [plugins."asana@claude-plugins-official"]
 enabled = false
 
-[plugins."bio-research@claude-cowork"]
-enabled = false
-
-[plugins."brand-dna@claude-cowork"]
-enabled = false
-
 [plugins."brand-dna@iurfriend-skills"]
-enabled = false
-
-[plugins."brand-voice@claude-cowork"]
 enabled = false
 
 [plugins."browser@openai-bundled"]
@@ -42,9 +24,6 @@ enabled = false
 enabled = false
 
 [plugins."build-web-data-visualization@openai-curated"]
-enabled = false
-
-[plugins."business-economics@claude-cowork"]
 enabled = false
 
 [plugins."business-economics@iurfriend-skills"]
@@ -74,9 +53,6 @@ enabled = false
 [plugins."code-review@claude-plugins-official"]
 enabled = true
 
-[plugins."code-simplifier@claude-cowork"]
-enabled = false
-
 [plugins."code-simplifier@iurfriend-skills"]
 enabled = true
 
@@ -86,67 +62,28 @@ enabled = false
 [plugins."codex-security@openai-curated"]
 enabled = false
 
-[plugins."common-room@claude-cowork"]
-enabled = false
-
 [plugins."computer-use@openai-bundled"]
-enabled = false
-
-[plugins."concept-development@claude-cowork"]
 enabled = false
 
 [plugins."concept-development@iurfriend-skills"]
 enabled = false
 
-[plugins."content-creation-framework@claude-cowork"]
-enabled = false
-
 [plugins."content-creation-framework@iurfriend-skills"]
-enabled = false
-
-[plugins."conversion-designer@claude-cowork"]
 enabled = false
 
 [plugins."conversion-designer@iurfriend-skills"]
 enabled = false
 
-[plugins."cowork-plugin-management@claude-cowork"]
-enabled = false
-
-[plugins."creative-media-generation@claude-cowork"]
-enabled = false
-
 [plugins."creative-media-generation@iurfriend-skills"]
-enabled = false
-
-[plugins."customer-support@claude-cowork"]
-enabled = false
-
-[plugins."data-collection-engineering@claude-cowork"]
 enabled = false
 
 [plugins."data-collection-engineering@iurfriend-skills"]
 enabled = false
 
-[plugins."data-visualization@claude-cowork"]
-enabled = false
-
 [plugins."data-visualization@iurfriend-skills"]
 enabled = false
 
-[plugins."data@claude-cowork"]
-enabled = false
-
-[plugins."design@claude-cowork"]
-enabled = false
-
 [plugins."documents@openai-primary-runtime"]
-enabled = false
-
-[plugins."engineering@claude-cowork"]
-enabled = true
-
-[plugins."enterprise-search@claude-cowork"]
 enabled = false
 
 [plugins."extract-design@iurfriend-skills"]
@@ -155,13 +92,7 @@ enabled = false
 [plugins."feature-dev@claude-plugins-official"]
 enabled = false
 
-[plugins."finance@claude-cowork"]
-enabled = false
-
 [plugins."frontend-design@claude-plugins-official"]
-enabled = false
-
-[plugins."funnel-strategist@claude-cowork"]
 enabled = false
 
 [plugins."funnel-strategist@iurfriend-skills"]
@@ -173,28 +104,10 @@ enabled = true
 [plugins."hugging-face@openai-curated"]
 enabled = false
 
-[plugins."human-resources@claude-cowork"]
-enabled = false
-
-[plugins."legal@claude-cowork"]
-enabled = false
-
-[plugins."marketing@claude-cowork"]
-enabled = false
-
-[plugins."measurement-and-optimisation@claude-cowork"]
-enabled = false
-
 [plugins."measurement-and-optimisation@iurfriend-skills"]
 enabled = false
 
 [plugins."mlflow@iurfriend-skills"]
-enabled = false
-
-[plugins."newsroom-os@claude-cowork"]
-enabled = false
-
-[plugins."operations@claude-cowork"]
 enabled = false
 
 [plugins."outlook-calendar@openai-curated"]
@@ -209,9 +122,6 @@ enabled = false
 [plugins."plugin-dev@claude-plugins-official"]
 enabled = false
 
-[plugins."podcast-creator@claude-cowork"]
-enabled = false
-
 [plugins."podcast-creator@iurfriend-skills"]
 enabled = false
 
@@ -221,25 +131,10 @@ enabled = true
 [plugins."presentations@openai-primary-runtime"]
 enabled = false
 
-[plugins."product-management@claude-cowork"]
-enabled = false
-
-[plugins."productivity@claude-cowork"]
-enabled = false
-
-[plugins."project-bootstrap@claude-cowork"]
-enabled = false
-
 [plugins."project-bootstrap@iurfriend-skills"]
 enabled = false
 
-[plugins."sales@claude-cowork"]
-enabled = false
-
 [plugins."security-guidance@claude-plugins-official"]
-enabled = false
-
-[plugins."seo-strategist@claude-cowork"]
 enabled = false
 
 [plugins."seo-strategist@iurfriend-skills"]
@@ -248,25 +143,13 @@ enabled = false
 [plugins."site-architect@iurfriend-skills"]
 enabled = false
 
-[plugins."site-builder@claude-cowork"]
-enabled = false
-
 [plugins."site-builder@iurfriend-skills"]
-enabled = false
-
-[plugins."site-designer@claude-cowork"]
 enabled = false
 
 [plugins."site-designer@iurfriend-skills"]
 enabled = false
 
-[plugins."site-refactor@claude-cowork"]
-enabled = false
-
 [plugins."site-refactor@iurfriend-skills"]
-enabled = false
-
-[plugins."site-reviewer@claude-cowork"]
 enabled = false
 
 [plugins."site-reviewer@iurfriend-skills"]
@@ -275,16 +158,7 @@ enabled = false
 [plugins."skill-creator@claude-plugins-official"]
 enabled = false
 
-[plugins."slack-by-salesforce@claude-cowork"]
-enabled = false
-
-[plugins."social-media@claude-cowork"]
-enabled = false
-
 [plugins."social-media@iurfriend-skills"]
-enabled = false
-
-[plugins."solution-architecture@claude-cowork"]
 enabled = false
 
 [plugins."solution-architecture@iurfriend-skills"]
@@ -301,9 +175,6 @@ enabled = false
 
 [plugins."superpowers@openai-curated"]
 enabled = true
-
-[plugins."team-operations@claude-cowork"]
-enabled = false
 
 [plugins."team-operations@iurfriend-skills"]
 enabled = false
@@ -323,9 +194,6 @@ enabled = true
 [plugins."visualize@openai-bundled"]
 enabled = false
 
-[plugins."voice-assistant@claude-cowork"]
-enabled = false
-
 [plugins."voice-assistant@evonomics-skills"]
 enabled = false
 
@@ -333,42 +201,6 @@ enabled = false
 enabled = false
 
 [plugins."which-skill@iurfriend-skills"]
-enabled = false
-
-[plugins."claude-code-setup@claude-cowork"]
-enabled = false
-
-[plugins."claude-md-management@claude-cowork"]
-enabled = false
-
-[plugins."frontmatter-generation@claude-cowork"]
-enabled = false
-
-[plugins."impeccable@claude-cowork"]
-enabled = false
-
-[plugins."iurfriend-brand-formatting@claude-cowork"]
-enabled = false
-
-[plugins."iurfriend-zoho-copilot@claude-cowork"]
-enabled = false
-
-[plugins."mcp-server-dev@claude-cowork"]
-enabled = false
-
-[plugins."obsidian-skills@claude-cowork"]
-enabled = false
-
-[plugins."open-document-interoperability@claude-cowork"]
-enabled = false
-
-[plugins."site-architect@claude-cowork"]
-enabled = false
-
-[plugins."superpowers@claude-cowork"]
-enabled = false
-
-[plugins."which-skill@claude-cowork"]
 enabled = false
 
 [plugins."computer-history@openai-bundled"]
@@ -448,3 +280,24 @@ enabled = true
 
 [mcp_servers."context7"]
 enabled = true
+
+[plugins."iurfriend-brand-formatting@iurfriend-skills"]
+enabled = false
+
+[plugins."iurfriend-zoho-copilot@iurfriend-skills"]
+enabled = false
+
+[plugins."mcp-server-dev@iurfriend-skills"]
+enabled = false
+
+[plugins."newsroom-os@iurfriend-skills"]
+enabled = false
+
+[plugins."obsidian-skills@iurfriend-skills"]
+enabled = false
+
+[plugins."open-document-interoperability@iurfriend-skills"]
+enabled = false
+
+[plugins."superpowers@iurfriend-skills"]
+enabled = false
