@@ -1,0 +1,1 @@
+#define SUGGESTED_SERVER ""

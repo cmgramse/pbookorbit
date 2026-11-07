@@ -134,6 +134,7 @@ void BookOrbitClient::start()
     // The first request gets an access token from the saved session
     if (m_signedIn) {
         refreshBooks();
+        refreshLibraries();
         loadAccent();
     }
 }
@@ -199,6 +200,7 @@ void BookOrbitClient::signIn(const QString &server, const QString &username, con
             }
             m_database->setText("username", m_username);
             refreshBooks();
+            refreshLibraries();
             loadAccent();
         },
         [this](int, const QString &message) {
@@ -465,31 +467,241 @@ void BookOrbitClient::setOnline(bool online)
         emit authorSeriesChanged();
     }
     emit onlineChanged();
+    // So the choice of libraries appears even if no list needed the server
+    if (online && m_libraries.isEmpty())
+        refreshLibraries();
+}
+
+QVariantList BookOrbitClient::libraries() const
+{
+    QVariantList list;
+    for (const LibraryChoice &library : m_libraries) {
+        list.append(QVariantMap{{"id", library.id}, {"name", library.name},
+                                {"label", library.label}, {"bookCount", library.bookCount}});
+    }
+    return list;
+}
+
+void BookOrbitClient::refreshLibraries()
+{
+    if (m_signedIn && m_online)
+        fetchLibraries();
+}
+
+void BookOrbitClient::selectLibrary(int id)
+{
+    if (!m_signedIn || !m_online || id == m_libraryId || chooseLibrary(m_libraries, id) != id)
+        return;
+    switchToLibrary(id);
+}
+
+int BookOrbitClient::savedLibraryId() const
+{
+    return m_database->text(libraryPreferenceKey(m_serverUrl, m_username)).toInt();
+}
+
+int BookOrbitClient::cacheLibraryId() const
+{
+    return m_libraryId > 0 ? m_libraryId : savedLibraryId();
 }
 
 void BookOrbitClient::loadLibrary(std::function<void()> then)
 {
-    if (m_libraryId >= 0) {
+    if (m_libraryId > 0) {
         then();
         return;
     }
-    // Calls made while it's being fetched wait for the same request
     m_afterLibrary.append(then);
-    if (m_afterLibrary.size() > 1)
+    fetchLibraries();
+}
+
+void BookOrbitClient::fetchLibraries()
+{
+    if (m_librariesLoading)
         return;
-    // [{id, name, bookCount, ...}] in the user's order. TODO: let the user choose when
-    // there are several; this uses the first.
-    callJson("GET", "/libraries", QJsonDocument(), [this](const QJsonDocument &doc) {
-        const auto queued = std::exchange(m_afterLibrary, {});
-        const QJsonArray libraries = doc.array();
-        if (libraries.isEmpty()) {
-            setError("No libraries on this server");
-            return;
+    m_librariesLoading = true;
+    const int epoch = m_libraryEpoch;
+    // A saved session gets its token first. If that fails there's no reply to wait for.
+    if (m_online && m_accessToken.isEmpty() && !m_refreshToken.isEmpty()) {
+        refreshSession([this, epoch]() {
+            if (epoch != m_libraryEpoch)
+                return;
+            m_librariesLoading = false;
+            if (m_accessToken.isEmpty())
+                failLibraryWaiters(0, m_online ? m_error : NO_CONNECTION);
+            else
+                fetchLibraries();
+        });
+        return;
+    }
+    // [{id, name, bookCount, ...}] in the user's order
+    call("GET", "/libraries", QJsonDocument(),
+        [this, epoch](const QByteArray &data) {
+            if (epoch != m_libraryEpoch)
+                return;
+            m_librariesLoading = false;
+            QList<LibraryChoice> libraries;
+            if (!parseLibraries(QJsonDocument::fromJson(data), &libraries)) {
+                const QString message = "Unexpected response from server";
+                setError(message);
+                failLibraryWaiters(0, message);
+            } else if (!libraries.isEmpty()) {
+                applyLibraries(libraries);
+            } else {
+                const QString message = "No libraries available to this account";
+                failLibraryWaiters(0, message);
+                if (m_libraryId > 0) {
+                    m_libraryEpoch++;
+                    resetLibraryViews();
+                    m_libraryId = -1;
+                    m_libraryLabel.clear();
+                    emit currentLibraryChanged();
+                    emit librarySwitched();
+                } else {
+                    dropCachedLibraryRows();
+                }
+                if (!m_libraries.isEmpty()) {
+                    m_libraries.clear();
+                    emit librariesChanged();
+                }
+                setError(message);
+                // Rebuilds from the local books, with no request
+                if (m_list.onlyListed)
+                    refreshList(m_list);
+            }
+        },
+        [this, epoch](int status, const QString &message) {
+            if (epoch != m_libraryEpoch)
+                return;
+            m_librariesLoading = false;
+            // Offline shows in the header instead
+            if (status != 0)
+                setError(message);
+            failLibraryWaiters(status, message);
+        });
+}
+
+void BookOrbitClient::failLibraryWaiters(int status, const QString &message)
+{
+    m_afterLibrary.clear();
+    const auto waiters = std::exchange(m_libraryWaiters, {});
+    for (const LibraryWaiter &waiter : waiters)
+        waiter.onError(status, message);
+}
+
+void BookOrbitClient::applyLibraries(const QList<LibraryChoice> &libraries)
+{
+    QVariantList before = this->libraries();
+    m_libraries = libraries;
+    if (this->libraries() != before)
+        emit librariesChanged();
+
+    const int saved = savedLibraryId();
+    const int chosen = chooseLibrary(libraries, m_libraryId > 0 ? m_libraryId : saved);
+    if (m_libraryId > 0) {
+        if (chosen != m_libraryId) {
+            switchToLibrary(chosen);
+            emit libraryFallback();
+        } else {
+            const QString label = m_libraryLabel;
+            setCurrentLibrary(chosen);
+            if (m_libraryLabel != label)
+                emit currentLibraryChanged();
         }
-        m_libraryId = libraries.first().toObject().value("id").toInt();
-        for (const auto &fn : queued)
-            fn();
-    }, [this]() { m_afterLibrary.clear(); });
+        return;
+    }
+
+    setCurrentLibrary(chosen);
+    if (saved != chosen)
+        m_database->setText(libraryPreferenceKey(m_serverUrl, m_username), QString::number(chosen));
+    emit currentLibraryChanged();
+    if (saved > 0 && chosen != saved) {
+        dropCachedLibraryRows();
+        emit libraryFallback();
+    }
+    const auto queued = std::exchange(m_afterLibrary, {});
+    const auto waiters = std::exchange(m_libraryWaiters, {});
+    for (const auto &fn : queued)
+        fn();
+    for (const LibraryWaiter &waiter : waiters)
+        waiter.then(m_libraryId);
+}
+
+void BookOrbitClient::setCurrentLibrary(int id)
+{
+    m_libraryId = id;
+    m_libraryLabel.clear();
+    for (const LibraryChoice &library : std::as_const(m_libraries)) {
+        if (library.id == id)
+            m_libraryLabel = library.label;
+    }
+}
+
+void BookOrbitClient::switchToLibrary(int id)
+{
+    m_libraryEpoch++;
+    m_librariesLoading = false;
+    m_libraryCacheTimer.stop();
+    setError(QString());
+    resetLibraryViews();
+    setCurrentLibrary(id);
+    m_database->setText(libraryPreferenceKey(m_serverUrl, m_username), QString::number(id));
+    emit currentLibraryChanged();
+    emit librarySwitched();
+    refreshBooks();
+}
+
+void BookOrbitClient::resetLibraryViews()
+{
+    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+        groups->generation++;
+        groups->rows.clear();
+        groups->cached.clear();
+        groups->jumpSections.clear();
+        groups->cacheRead = false;
+        groups->loaded = false;
+        groups->booksLoaded = false;
+        groups->local = false;
+        groups->loadingBooks = 0;
+        groups->model.reset(0);
+    }
+    for (PagedBooks *list : {&m_list, &m_search, &m_booksOf}) {
+        restartPages(*list);
+        list->listGeneration = -1;
+        list->total = 0;
+        list->model.reset(0);
+        list->sectionStarts.clear();
+        list->jumpSections.clear();
+    }
+    m_booksOfField.clear();
+    m_booksOfValues.clear();
+    m_booksOfCollectionIds.clear();
+    m_authorSeriesName.clear();
+    emit seriesListChanged();
+    emit authorsChanged();
+    emit authorSeriesChanged();
+    emit jumpSectionsChanged();
+    emit booksChanged();
+    emit searchChanged();
+    emit booksOfChanged();
+}
+
+void BookOrbitClient::dropCachedLibraryRows()
+{
+    if (!m_list.onlyListed) {
+        m_list.model.reset(0);
+        m_list.cached = false;
+        m_list.total = 0;
+        clearJumpSections(m_list);
+        emit booksChanged();
+    }
+    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+        if (groups->local)
+            continue;
+        groups->cached.clear();
+        groups->cacheRead = false;
+        showGroups(*groups);
+    }
 }
 
 // Lower-case letters and digits only, so "Carl’s" matches "Carl's" and "S.A." matches "S.
@@ -2008,10 +2220,11 @@ void BookOrbitClient::finishGroups(Groups &groups, bool complete)
 
 void BookOrbitClient::restoreGroups(Groups &groups)
 {
-    if (groups.cacheRead)
+    const QString name = cacheName(groups);
+    if (groups.cacheRead || name.isEmpty())
         return;
     groups.cacheRead = true;
-    for (const QVariant &row : m_database->listCache(cacheName(groups)).value("rows").toList())
+    for (const QVariant &row : m_database->listCache(name).value("rows").toList())
         groups.cached.append(row.toMap());
     if (!groups.cached.isEmpty())
         showGroups(groups);
@@ -2019,23 +2232,28 @@ void BookOrbitClient::restoreGroups(Groups &groups)
 
 QString BookOrbitClient::cacheName(const Groups &groups) const
 {
-    // Not an author's series: they change with each author shown
-    return &groups == &m_collections ? "collections"
-         : &groups == &m_series ? "series"
-         : &groups == &m_authors ? "authors" : QString();
+    // Not an author's series: they change with each author shown. Collections are the
+    // account's, the rest the library's.
+    if (&groups == &m_collections)
+        return "collections";
+    const int library = cacheLibraryId();
+    if (library <= 0)
+        return QString();
+    return &groups == &m_series ? QString("series:%1").arg(library)
+         : &groups == &m_authors ? QString("authors:%1").arg(library) : QString();
 }
 
 void BookOrbitClient::saveLibraryCache()
 {
     // Only a list from the server, and not one replaced since
-    if (m_list.onlyListed || m_list.listGeneration != m_list.queryGeneration)
+    if (m_list.onlyListed || m_list.listGeneration != m_list.queryGeneration || m_libraryId <= 0)
         return;
     QVariantList rows;
     for (int i = 0; i < qMin(m_list.model.count(), CACHED_LIBRARY_ROWS) && m_list.model.isLoaded(i); i++)
         rows.append(m_list.model.book(i));
     if (rows.isEmpty())
         return;
-    m_database->saveListCache("library", QVariantMap{
+    m_database->saveListCache(QString("library:%1").arg(m_libraryId), QVariantMap{
         {"query", m_list.query.toVariantMap()},
         {"total", m_list.total},
         {"jumpSections", m_list.jumpSections},
@@ -2045,8 +2263,11 @@ void BookOrbitClient::saveLibraryCache()
 
 void BookOrbitClient::restoreLibrary()
 {
+    const int library = cacheLibraryId();
+    if (library <= 0)
+        return;
     // Only for the same sort and filter
-    const QVariantMap cache = m_database->listCache("library");
+    const QVariantMap cache = m_database->listCache(QString("library:%1").arg(library));
     const QVariantList rows = cache.value("rows").toList();
     if (rows.isEmpty() || QJsonObject::fromVariantMap(cache.value("query").toMap()) != bookQuery(m_list))
         return;
@@ -2074,43 +2295,36 @@ void BookOrbitClient::request(const QByteArray &method, const QString &path, con
 
 void BookOrbitClient::withLibrary(std::function<void(int libraryId)> then, ErrorHandler onError)
 {
-    if (m_libraryId >= 0) {
+    if (m_libraryId > 0) {
         then(m_libraryId);
         return;
     }
-    // Like loadLibrary(), but leaves the error property alone
-    request("GET", "/libraries", QJsonDocument(),
-        [this, then, onError](const QByteArray &data) {
-            const QJsonArray libraries = QJsonDocument::fromJson(data).array();
-            if (libraries.isEmpty()) {
-                onError(0, "No libraries on this server");
-                return;
-            }
-            m_libraryId = libraries.first().toObject().value("id").toInt();
-            then(m_libraryId);
-        },
-        onError);
+    m_libraryWaiters.append({then, onError});
+    fetchLibraries();
 }
 
 void BookOrbitClient::callJson(const QByteArray &method, const QString &path, const QJsonDocument &body,
                                std::function<void(const QJsonDocument &)> onSuccess,
                                std::function<void()> onFailed)
 {
+    // A failure from before the library changed says nothing about the current one
+    const int epoch = m_libraryEpoch;
     call(method, path, body,
-        [this, onSuccess, onFailed](const QByteArray &data) {
+        [this, onSuccess, onFailed, epoch](const QByteArray &data) {
             QJsonParseError parseError;
             const QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
             if (parseError.error != QJsonParseError::NoError) {
-                setError("Unexpected response from server: " + parseError.errorString());
+                if (epoch == m_libraryEpoch)
+                    setError("Unexpected response from server: " + parseError.errorString());
                 if (onFailed)
                     onFailed();
                 return;
             }
             onSuccess(doc);
         },
-        [this, onFailed](int status, const QString &message) {
+        [this, onFailed, epoch](int status, const QString &message) {
             // Offline shows in the header instead
-            if (status != 0)
+            if (status != 0 && epoch == m_libraryEpoch)
                 setError(message);
             if (onFailed)
                 onFailed();
@@ -2118,12 +2332,15 @@ void BookOrbitClient::callJson(const QByteArray &method, const QString &path, co
 }
 
 void BookOrbitClient::call(const QByteArray &method, const QString &path, const QJsonDocument &body,
-                           DataHandler onSuccess, ErrorHandler onError, bool quiet, bool retried)
+                           DataHandler onSuccess, ErrorHandler onError, bool quiet, bool retried,
+                           int originEpoch)
 {
+    if (originEpoch < 0)
+        originEpoch = m_libraryEpoch;
     if (m_refreshing) {
         m_afterRefresh.append([=]() {
             if (m_signedIn)
-                call(method, path, body, onSuccess, onError, quiet, retried);
+                call(method, path, body, onSuccess, onError, quiet, retried, originEpoch);
         });
         return;
     }
@@ -2142,7 +2359,7 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
             if (!m_signedIn)
                 return;
             if (!m_accessToken.isEmpty())
-                call(method, path, body, onSuccess, onError, quiet, retried);
+                call(method, path, body, onSuccess, onError, quiet, retried, originEpoch);
             else if (!m_online)
                 onError(0, NO_CONNECTION);
         });
@@ -2153,9 +2370,15 @@ void BookOrbitClient::call(const QByteArray &method, const QString &path, const 
             // Access tokens last about 15 minutes: get a new one and try once more
             refreshSession([=]() {
                 if (m_signedIn)
-                    call(method, path, body, onSuccess, onError, quiet, true);
+                    call(method, path, body, onSuccess, onError, quiet, true, originEpoch);
             });
             return;
+        }
+        // The current library may have been taken away. A reply from before a switch, even
+        // back to the same id, says nothing about that.
+        if (status == 403 && originEpoch == m_libraryEpoch && m_libraryId > 0
+                && path.startsWith(QString("/libraries/%1/").arg(m_libraryId))) {
+            fetchLibraries();
         }
         onError(status, message);
     }, true, quiet);
@@ -2366,36 +2589,33 @@ void BookOrbitClient::clearSession()
     m_accessToken.clear();
     m_refreshToken.clear();
     m_database->remove("refreshToken");
+    m_libraryEpoch++;
+    m_librariesLoading = false;
+    const bool hadLibrary = m_libraryId > 0;
     m_libraryId = -1;
-    m_afterLibrary.clear();
+    m_libraryLabel.clear();
+    if (!m_libraries.isEmpty()) {
+        m_libraries.clear();
+        emit librariesChanged();
+    }
+    if (hadLibrary)
+        emit currentLibraryChanged();
     m_database->clearListCaches();
     m_libraryCacheTimer.stop();
-    for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
-        groups->generation++;
-        groups->rows.clear();
-        groups->cached.clear();
-        groups->cacheRead = false;
-        groups->loaded = false;
-        groups->model.reset(0);
-        groups->jumpSections.clear();
-    }
+    m_collections.generation++;
+    m_collections.rows.clear();
+    m_collections.cached.clear();
+    m_collections.cacheRead = false;
+    m_collections.loaded = false;
+    m_collections.booksLoaded = false;
+    m_collections.local = false;
+    m_collections.loadingBooks = 0;
+    m_collections.model.reset(0);
+    m_collections.jumpSections.clear();
     emit collectionsChanged();
-    emit seriesListChanged();
-    emit authorsChanged();
-    emit authorSeriesChanged();
-    for (PagedBooks *list : {&m_list, &m_search, &m_booksOf}) {
-        restartPages(*list);
-        list->listGeneration = -1;
-        list->total = 0;
-        list->model.reset(0);
-        list->sectionStarts.clear();
-        list->jumpSections.clear();
-    }
-    emit jumpSectionsChanged();
-    emit booksChanged();
-    emit searchChanged();
-    emit booksOfChanged();
+    resetLibraryViews();
     setSignedIn(false);
+    failLibraryWaiters(0, "Not signed in");
 }
 
 void BookOrbitClient::setSignedIn(bool signedIn)
