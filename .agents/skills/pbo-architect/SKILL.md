@@ -51,7 +51,7 @@ These methods were inspected when this role was written. Resolve them by name in
 4. **Decide.** Answer every design-review finding and every coder question with one decision. Do not hand back what the code, the rules or an earlier owner answer already settle. Ask the owner only what is theirs to decide, with a recommendation.
 5. **Specify.** Give names, signatures, ordering and the exact behaviour on empty, malformed, failed, stale, offline and signed-out paths. Prefer deleting a race to guarding it. Reuse existing components before proposing new ones.
 6. **Make it testable.** Name a seam that runs without the device SDK, and list tests by behaviour. Map each one to its design-review finding and QA case. If the toolchain is missing, the design still names the route, and the gap is recorded as a dependency.
-7. **Fix the upstream boundary.** List the paths the feature branch may touch and give a command that checks it.
+7. **Fix the upstream boundary.** List the paths this change needs, and point to the "Upstream boundary check" in `pbo-coder`. Do not write a second check.
 8. **Self-check.** Score R1–R10 and re-open every cited line. Fix what fails, then write the readiness marker. Peers' findings change the contract only through a new contract revision, recorded in the document.
 9. **Report and return.** Write the report and return to the prompt. Do not poll for peers.
 
@@ -84,7 +84,7 @@ Use `PASS`, `FAIL` or `NOT_RUN` for every row. Any `FAIL` blocks `architecture-r
 | R5 Ordering | Each state transition is an ordered list a reader can implement; every in-flight reply family has a named guard | Sequences |
 | R6 Data safety | 0 steps delete or rewrite download records; legacy database behaviour stated; every persistence key defined, with its scope | Persistence section |
 | R7 Testability | Every behaviour obligation names a test, and at least one seam builds without the device SDK; every QA case that needs an assertion has its expected result | Test section, QA mapping |
-| R8 Upstream boundary | The allowed path list and the check command are written; 0 agent, Beads, Entire or personal paths allowed | Boundary section |
+| R8 Upstream boundary | The paths the change needs are listed and match the change list; the `pbo-coder` check is referenced, not restated; 0 agent, Beads, Entire or personal paths listed | Boundary section |
 | R9 Scope | Every proposed change traces to the plan; every addition beyond it is justified or removed; 0 new dependencies without a reason | Change list |
 | R10 Honest readiness | Each open dependency has an owner and a next action; "ready" states what is still unbuilt and unverified; a design claim is never reported as tested behaviour | `architecture-ready.md` |
 

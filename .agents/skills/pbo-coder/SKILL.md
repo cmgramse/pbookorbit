@@ -58,7 +58,7 @@ These methods were inspected when this role was written. Resolve them by name in
 5. **Stay in scope.** Implement the contract. If it is wrong or silent, ask the architect through the shared report and record the answer: do not decide alone and do not widen the change. Bring code up to standard only where this change touches it. No reformatting, no opportunistic fixes.
 6. **Update the docs in the same change.** Update what the behaviour made false, such as `docs/technical.md`, `README.md` and `TODO.md`.
 7. **Check the boundary.** Run the check below after committing, and read the full staged diff before committing. A non-zero exit stops the handoff. Stage explicit paths only, never `git add -A` or `git add .`. Run `git diff --check`.
-8. **Commit.** Commit coherent changes on the feature branch. Do not stage `.beads/issues.jsonl` here: `BEADS.md` and `workflow.md` keep it on `project/governance`, which overrides the general line in `AGENTS.md` for this branch.
+8. **Commit.** Commit coherent changes on the feature branch. Do not stage `.beads/issues.jsonl` here: `BEADS.md` and `workflow.md` keep it on `project/governance`. `AGENTS.md` explicitly scopes that export rule to governance commits.
 9. **Verify the commit, not the working tree.** Confirm a clean status, then rerun the full test command at the committed SHA.
 10. **Hand off and return.** Write `implementation-ready.md` and update the issue. Return to the prompt.
 11. **Fixes.** For each accepted finding, add a failing test where it is behavioural, fix it, commit, and write a new `implementation-ready.md` with the new SHA. Earlier review and QA evidence does not carry over to the new SHA. History already handed off is not rewritten or force-pushed without the orchestrator.

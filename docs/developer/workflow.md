@@ -13,4 +13,4 @@ Upstream Makefile offers make setup, make pc, make arm, make run and make run-of
 Keep live worktrees and unresolved review evidence. At task close promote sanitised decisions into docs/developer/decisions, then remove only task-owned disposable files. Never run broad git clean. Inspect git status in each worktree before removing it. KEEP.md records retained evidence and cleanup trigger.
 
 ## Entire status
-CLI installed; integration not enabled yet. Enable only after the separately required owner confirmation. Use --skip-push-sessions; inspect effective settings and hook chaining before claiming acceptance. Never export private history to the public upstream or fork.
+Owner-approved integration enabled for Claude and Codex on 2026-11-07 with --skip-push-sessions and telemetry disabled. Existing Beads startup hook preserved. Fresh hooks/list readback confirms seven trusted project hooks and no errors. Fresh codex exec and claude -p smoke sessions were captured and read back by Entire. Earlier running sessions were not retroactively imported. Never export private history to the public upstream or fork.

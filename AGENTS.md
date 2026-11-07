@@ -38,7 +38,7 @@ The export staging rule applies to project/governance commits; product branches 
 7. For an upstream PR, branch from upstream/main and transfer only product code, tests and user/developer documentation needed by maintainers. Do not include our agent scaffolding, Beads database, Entire configuration, personal endpoints or session history. Audit the entire upstream diff.
 
 ## Entire
-The installed CLI is `entire` (not a file named entire.cli). Run entire agent-help, then entire agent-help <command> for current flags. Enabling is pending explicit confirmation required by the session's Entire integration instructions. Do not claim capture works until verified. Never publish session logs to this public fork; keep private capture separate. Manual checkpoints only on owner request.
+The installed CLI is `entire` (not a file named entire.cli). Run entire agent-help, then entire agent-help <command> for current flags. Owner approved enablement on 2026-11-07. Entire is enabled for Claude and Codex with automatic session uploads disabled. All seven Codex project hooks are trusted, with clean fresh hooks/list readback. Fresh codex exec and claude -p capture/readback passed; earlier running sessions were not retroactively imported. Never publish session logs to this public fork; keep private capture separate. Manual checkpoints only on owner request.
 
 ## Capability policy
 Project-local capability selection and fresh-runtime verification are tracked as an open setup issue. Until verified, invoke only tools relevant to this C++/Qt project; global installation is not project approval. Do not change global hook or plugin settings. Do not report this prose as enforced exclusions.

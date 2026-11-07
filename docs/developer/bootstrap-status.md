@@ -7,7 +7,7 @@ Verified on 2026-11-06 on the maintainer Mac:
 - Beads uses the root embedded Dolt store, pbo prefix, maintainer routing, export.auto=true and no Dolt remote. Dependency chain links architecture, implementation, review/QA and device/PR preparation. Native local backup synced successfully. JSONL is an issue export, not a complete backup.
 - Ignore checks passed for scratch, private data, generated build output, environment files, embedded DB and machine-local backup settings.
 - Project Codex configuration parses; fresh `codex mcp list --json` readback confirms unrelated MCP servers disabled and selected project/documentation tools enabled. Full personal-skill catalogue and all runtime entry points remain OPEN in pbo-2ee. Already-running runtimes predate this selection.
-- Entire CLI is installed but NOT enabled. pbo-bax tracks explicit enable confirmation, private session handling, hooks and fresh-runtime capture verification.
+- Entire was enabled after owner confirmation on 2026-11-07. Automatic session uploads and telemetry are disabled. All seven project Codex hooks are trusted; fresh hooks/list has no errors. Fresh codex exec and claude -p smoke sessions each appear in Entire with one captured turn/checkpoint. Earlier sessions were not retroactively imported. Generic client-data redactor patterns are present; local names remain ignored.
 - Product tests, emulator, ARM build and physical-device acceptance are NOT_RUN at bootstrap. QA identified unresolved kit access and SDK/ABI verification; these cannot be replaced by governance checks.
 
 The governance branch is excluded from upstream feature delivery. Review/QA reports live in the task scratch directory until their findings are distilled; unfinished evidence is retained with KEEP.md.

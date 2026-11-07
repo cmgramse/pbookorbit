@@ -1,6 +1,6 @@
 # Toolchain
 
-Verified installed: git, gh, bd 1.3.2, entire 0.12.2, cmux, Claude Code and Codex. Entire is NOT enabled. The shared Beads store uses embedded Dolt, no Dolt remote; see BEADS.md. No automatic setup/upgrade commands are implied.
+Verified installed: git, gh, bd 1.3.2, entire 0.12.2, cmux, Claude Code and Codex. Entire is enabled for Claude and Codex; session uploads are disabled. Seven Codex hooks are trusted; fresh codex exec and claude -p capture/readback passed. Existing pre-install sessions were not retroactively imported. The shared Beads store uses embedded Dolt, no Dolt remote; see BEADS.md. No automatic setup/upgrade commands are implied.
 
 Use scripts/team-session.sh ROLE from an existing terminal in the one PBookOrbit cmux workspace. It resolves the root from git, checks the role skill exists and launches the selected runtime with its complete seed. --print inspects the seed without launching.
 
