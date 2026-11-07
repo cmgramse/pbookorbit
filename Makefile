@@ -43,12 +43,13 @@ icons:
 	done
 	rsvg-convert -w 37 -h 37 src/icons/offline.svg | magick - -background white -flatten -type TrueColor "BMP3:src/icons/offline.bmp"
 
-# Host tests, with no device SDK: needs Qt 6 and libsqlite3 (see Tests in docs/technical.md)
+# Host tests, with no device SDK: needs Qt 6 and libsqlite3 (see Tests in the README)
 QMAKE ?= qmake6
 test:
 	mkdir -p build/tests
 	cd build/tests && $(QMAKE) ../../tests/tests.pro && $(MAKE) -j4
 	QT_QPA_PLATFORM=offscreen build/tests/client/client-tests
+	QT_QPA_PLATFORM=offscreen build/tests/qml/qml-tests
 
 # Shell in the build container
 shell:

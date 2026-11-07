@@ -14,6 +14,7 @@ one of the device's built-in apps rather than a port of something else.
   series. You can filter to ebooks or audiobooks, sort it a few ways, jump to a letter
   with the A-Z rail and page through with the page keys.
 - Tabs for collections, series and authors.
+- If your account has several libraries, choose one from the header menu.
 - Pages for each book and author, with links through to everything else by that author
   or in that series.
 - Search that updates as you type, and remembers recent searches.
@@ -73,6 +74,20 @@ make setup    # first time only: builds the container image and downloads the SD
 make run      # build and run in the emulator
 make run-offline   # the same, with no network
 make arm      # build for the device, into build/pbookorbit/<sdk>/arm/pbookorbit.app
+```
+
+### Tests
+
+`make test` runs the host tests in `tests/`: the real client against a fake server on
+loopback, and the selector's QML with Qt Quick Test. They need no SDK or device, just
+Qt 6.8 and SQLite. With neither installed:
+
+```sh
+docker run --rm -v "$PWD":/src -w /src debian:trixie sh -c 'apt-get update && \
+  apt-get install -y --no-install-recommends qt6-base-dev qt6-base-dev-tools \
+  qt6-declarative-dev qt6-qpa-plugins qml6-module-qttest qml6-module-qtquick \
+  qml6-module-qtquick-window qml6-module-qtquick-controls qml6-module-qtquick-templates \
+  qml6-module-qtqml-workerscript libsqlite3-dev g++ make && make test'
 ```
 
 The kit lives in `kit/` as a submodule. See its README for picking an SDK (use

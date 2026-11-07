@@ -73,7 +73,7 @@ struct FindFile {
         file.open(QIODevice::WriteOnly);
         file.write("synthetic");
     }
-    ~FindFile() { QDir(FLASHDIR).removeRecursively(); }
+    ~FindFile() { QDir(FLASHDIR "/Books").removeRecursively(); }
 };
 
 class LibraryTest : public QObject
@@ -128,6 +128,7 @@ private slots:
     void init()
     {
         QDir(FLASHDIR).removeRecursively();
+        QDir().mkpath(FLASHDIR);
         m_dir.reset(new QTemporaryDir);
         m_server.reset(new FakeServer);
         m_database.reset(new Database(m_dir->filePath("test.db")));
@@ -345,6 +346,69 @@ private slots:
         QTRY_COMPARE(client().error(), QString("Unexpected response from server"));
         QCOMPARE(client().currentLibraryId(), 2);
         QCOMPARE(database().text(key()), QString("2"));
+    }
+
+    // The list reloads by itself when libraries come back
+    void listsReloadWhenLibrariesComeBack()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        client().loadSeries();
+        QTRY_VERIFY(client().seriesLoaded());
+        server().route("GET", "/libraries", QJsonDocument(QJsonArray{}));
+        client().refreshLibraries();
+        QTRY_COMPARE(client().currentLibraryId(), -1);
+        QCOMPARE(client().books()->count(), 0);
+        QVERIFY(!client().error().isEmpty());
+
+        twoLibraries();
+        QSignalSpy switched(&client(), &BookOrbitClient::librarySwitched);
+        QSignalSpy fallback(&client(), &BookOrbitClient::libraryFallback);
+        client().refreshLibraries();
+        QTRY_COMPARE(client().currentLibraryId(), 1);
+        QTRY_COMPARE(titles(client().books()).value(0), QString("L1 book 1"));
+        QCOMPARE(client().error(), QString());
+        QCOMPARE(switched.count(), 1);   // so the visible series or authors tab reloads
+        QCOMPARE(fallback.count(), 0);
+    }
+    void listReloadsWhenAFailedFirstResolveIsRetried()
+    {
+        server().route("GET", "/libraries", 500, "{\"message\":\"Broken\"}");
+        client().signIn(server().url(), USER, "secret");
+        QTRY_VERIFY(client().error().contains("Broken"));
+        twoLibraries();
+        client().refreshLibraries();
+        QTRY_COMPARE(titles(client().books()).value(0), QString("L1 book 1"));
+        QCOMPARE(client().error(), QString());
+    }
+    void comingBackDoesNotDisturbALocalList()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        client().setLocalBooks({localBook(101, "Downloaded A")});
+        client().setBookQuery("title", false, {}, true);
+        server().route("GET", "/libraries", QJsonDocument(QJsonArray{}));
+        client().refreshLibraries();
+        QTRY_COMPARE(client().currentLibraryId(), -1);
+        twoLibraries();
+        server().clearRequests();
+        client().refreshLibraries();
+        QTRY_COMPARE(client().currentLibraryId(), 1);
+        QTRY_VERIFY(!client().busy());
+        QCOMPARE(titles(client().books()), QStringList{"Downloaded A"});
+        QCOMPARE(server().count("POST", "/libraries/1/books"), 0);
+        QCOMPARE(client().error(), QString());
+    }
+    void aFirstResolveWithNothingWaitingEmitsNoSwitch()
+    {
+        twoLibraries();
+        savedSession();
+        client().setLocalBooks({localBook(101, "Downloaded A")});
+        client().setBookQuery("title", false, {}, true);
+        QSignalSpy switched(&client(), &BookOrbitClient::librarySwitched);
+        client().start();
+        QTRY_COMPARE(client().currentLibraryId(), 1);
+        QCOMPARE(switched.count(), 0);
     }
 
     // Review finding AR3: local-only lists survive every resolution

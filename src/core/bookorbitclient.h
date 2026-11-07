@@ -435,8 +435,10 @@ private:
     // The one place that reads /libraries. Calls made while it's in flight share the reply.
     void fetchLibraries();
     void applyLibraries(const QList<LibraryChoice> &libraries);
-    // Drops what's waiting for a library, and tells BookFinder's request why
-    void failLibraryWaiters(int status, const QString &message);
+    // Drops what's waiting for a library, and tells BookFinder's request why. lost: a list
+    // waiting now has no way to load until there's a library.
+    void failLibraryWaiters(int status, const QString &message, bool lost);
+    void setLibraryError(const QString &message);
     // Changes the current library mid-session, leaving no sign of the old one's lists
     void switchToLibrary(int id);
     // Empties every list that belongs to a library. Not the collections or local books.
@@ -514,6 +516,11 @@ private:
     // Bumped whenever replies to earlier requests stop being about the current library
     int m_libraryEpoch = 0;
     bool m_librariesLoading = false;
+    // The server took away the libraries, or refused to list them while lists were waiting.
+    // Those lists are empty, so they reload once there's a library.
+    bool m_libraryLost = false;
+    // What the error property says because of the last /libraries reply, to clear with a good one
+    QString m_libraryError;
     // Waiting for a current library: list loads, then withLibrary()'s callers
     QList<std::function<void()>> m_afterLibrary;
     struct LibraryWaiter {

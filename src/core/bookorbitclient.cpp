@@ -528,7 +528,7 @@ void BookOrbitClient::fetchLibraries()
                 return;
             m_librariesLoading = false;
             if (m_accessToken.isEmpty())
-                failLibraryWaiters(0, m_online ? m_error : NO_CONNECTION);
+                failLibraryWaiters(0, m_online ? m_error : NO_CONNECTION, m_online);
             else
                 fetchLibraries();
         });
@@ -543,13 +543,14 @@ void BookOrbitClient::fetchLibraries()
             QList<LibraryChoice> libraries;
             if (!parseLibraries(QJsonDocument::fromJson(data), &libraries)) {
                 const QString message = "Unexpected response from server";
-                setError(message);
-                failLibraryWaiters(0, message);
+                setLibraryError(message);
+                failLibraryWaiters(0, message, true);
             } else if (!libraries.isEmpty()) {
                 applyLibraries(libraries);
             } else {
                 const QString message = "No libraries available to this account";
-                failLibraryWaiters(0, message);
+                failLibraryWaiters(0, message, true);
+                m_libraryLost = true;
                 if (m_libraryId > 0) {
                     m_libraryEpoch++;
                     resetLibraryViews();
@@ -564,7 +565,7 @@ void BookOrbitClient::fetchLibraries()
                     m_libraries.clear();
                     emit librariesChanged();
                 }
-                setError(message);
+                setLibraryError(message);
                 // Rebuilds from the local books, with no request
                 if (m_list.onlyListed)
                     refreshList(m_list);
@@ -574,15 +575,22 @@ void BookOrbitClient::fetchLibraries()
             if (epoch != m_libraryEpoch)
                 return;
             m_librariesLoading = false;
-            // Offline shows in the header instead
+            // Offline shows in the header instead, and going online reloads the lists
             if (status != 0)
-                setError(message);
-            failLibraryWaiters(status, message);
+                setLibraryError(message);
+            failLibraryWaiters(status, message, status != 0);
         });
 }
 
-void BookOrbitClient::failLibraryWaiters(int status, const QString &message)
+void BookOrbitClient::setLibraryError(const QString &message)
 {
+    m_libraryError = message;
+    setError(message);
+}
+
+void BookOrbitClient::failLibraryWaiters(int status, const QString &message, bool lost)
+{
+    m_libraryLost = m_libraryLost || (lost && !m_afterLibrary.isEmpty());
     m_afterLibrary.clear();
     const auto waiters = std::exchange(m_libraryWaiters, {});
     for (const LibraryWaiter &waiter : waiters)
@@ -595,6 +603,9 @@ void BookOrbitClient::applyLibraries(const QList<LibraryChoice> &libraries)
     m_libraries = libraries;
     if (this->libraries() != before)
         emit librariesChanged();
+    if (!m_libraryError.isEmpty() && m_error == m_libraryError)
+        setError(QString());
+    m_libraryError.clear();
 
     const int saved = savedLibraryId();
     const int chosen = chooseLibrary(libraries, m_libraryId > 0 ? m_libraryId : saved);
@@ -618,6 +629,11 @@ void BookOrbitClient::applyLibraries(const QList<LibraryChoice> &libraries)
     if (saved > 0 && chosen != saved) {
         dropCachedLibraryRows();
         emit libraryFallback();
+    }
+    // Replaces any waiting reload of the list, which its generation then drops
+    if (std::exchange(m_libraryLost, false)) {
+        emit librarySwitched();
+        refreshBooks();
     }
     const auto queued = std::exchange(m_afterLibrary, {});
     const auto waiters = std::exchange(m_libraryWaiters, {});
@@ -2591,6 +2607,8 @@ void BookOrbitClient::clearSession()
     m_database->remove("refreshToken");
     m_libraryEpoch++;
     m_librariesLoading = false;
+    m_libraryLost = false;
+    m_libraryError.clear();
     const bool hadLibrary = m_libraryId > 0;
     m_libraryId = -1;
     m_libraryLabel.clear();
@@ -2615,7 +2633,7 @@ void BookOrbitClient::clearSession()
     emit collectionsChanged();
     resetLibraryViews();
     setSignedIn(false);
-    failLibraryWaiters(0, "Not signed in");
+    failLibraryWaiters(0, "Not signed in", false);
 }
 
 void BookOrbitClient::setSignedIn(bool signedIn)
