@@ -1,9 +1,8 @@
 import QtQuick
 import QtTest
 
-// main.qml's selector wiring, against stand-ins for the C++ objects. Only the selector is
-// looked at, and the stand-ins leave the rest of the app empty, so only binding loops count
-// among its warnings.
+// main.qml's selector wiring, against stand-ins for the C++ objects. Any QML warning fails a
+// test.
 Item {
     TestCase {
         name: "MainWindow"
@@ -14,7 +13,7 @@ Item {
             warningLog.take()
         }
         function cleanup() {
-            verify(warningLog.take().indexOf("Binding loop") < 0)
+            compare(warningLog.take(), "")
         }
         function create() {
             const component = Qt.createComponent("../../src/qml/main.qml")
