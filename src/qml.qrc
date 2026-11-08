@@ -14,6 +14,9 @@
         <file>qml/SubToolbar.qml</file>
         <file>qml/MenuHeading.qml</file>
         <file>qml/RadioMenuItem.qml</file>
+        <file>qml/LibraryMenu.qml</file>
+        <file>qml/LibrarySwitchHandler.qml</file>
+        <file>qml/libraryui.js</file>
         <file>qml/SwitchMenuItem.qml</file>
         <file>qml/TabFooter.qml</file>
         <file>qml/BookRow.qml</file>

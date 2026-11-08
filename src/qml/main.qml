@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Window
 import "units.js" as Units
 import "night.js" as Night
+import "libraryui.js" as LibraryUi
 
 Window {
     id: root
@@ -36,6 +37,7 @@ Window {
 
     function openSearch() {
         menu.visible = false
+        libraryMenu.visible = false
         searching = true
         searchPage.open()
     }
@@ -68,6 +70,7 @@ Window {
     // Tapping the title scrolls the current list back to the top
     function backToTop() {
         menu.visible = false
+        libraryMenu.visible = false
         closeDropdowns()
         activeList.positionViewAtBeginning()
     }
@@ -90,7 +93,7 @@ Window {
         anchors.right: parent.right
         // "Orbit" in the user's BookOrbit accent colour
         title: "PocketBook × Book<font color=\"" + Night.color(bookOrbit.accentColor) + "\">Orbit</font>"
-        menuOpen: menu.visible
+        menuOpen: menu.visible || libraryMenu.visible
         offline: bookOrbit.signedIn && !bookOrbit.online
         showSearch: bookOrbit.signedIn
         // Only has Sign out
@@ -102,7 +105,12 @@ Window {
             diagnosticsDialog.visible = true
         }
         onSearchClicked: root.openSearch()
-        onMenuClicked: menu.visible = !menu.visible
+        onMenuClicked: {
+            if (libraryMenu.visible)
+                libraryMenu.visible = false
+            else
+                menu.visible = !menu.visible
+        }
     }
 
     // Signed out
@@ -256,6 +264,8 @@ Window {
     Connections {
         target: bookOrbit
         function onOnlineChanged() {
+            if (!bookOrbit.online)
+                libraryMenu.visible = false
             if (!libraryQuery.downloadedChosen)
                 libraryQuery.applied()
             if (showingBooksOf && !booksOfQuery.downloadedChosen)
@@ -303,7 +313,8 @@ Window {
                                                     : showingSeries ? seriesPage.pageButtons
                                                     : showingAuthors ? authorsPage.pageButtons
                                                     : pageButtons
-    readonly property bool overlayOpen: dropdownOpen || menu.visible || bookMenu.visible
+    readonly property bool overlayOpen: dropdownOpen || menu.visible || libraryMenu.visible || bookMenu.visible
+                                        || libraryFallbackDialog.visible
                                         || deleteDialog.visible || downloadDialog.visible
                                         || findBooksDialog.visible || bookInfoPage.menuOpen
 
@@ -428,11 +439,14 @@ Window {
         anchors.fill: bookList
         anchors.topMargin: bookList.headerItem ? bookList.headerItem.height : 0
         visible: bookList.visible && bookList.count === 0
-                 && (bookOrbit.error !== "" || (!bookOrbit.busy && libraryQuery.downloadedOnly))
+                 && (bookOrbit.error !== "" || (!bookOrbit.busy && libraryQuery.downloadedOnly)
+                     || (!bookOrbit.busy && bookOrbit.booksLoaded && bookOrbit.online))
         title: bookOrbit.error !== "" ? "Something went wrong"
+               : !libraryQuery.downloadedOnly ? LibraryUi.emptyTitle(libraryQuery.filterIndex)
                : ["No downloaded books", "No downloaded ebooks", "No downloaded audiobooks"][libraryQuery.filterIndex]
         text: bookOrbit.error !== "" ? bookOrbit.error
               : !bookOrbit.online ? offlineText
+              : !libraryQuery.downloadedOnly ? LibraryUi.emptyText(libraryQuery.filterIndex)
               : "Books you download show here, and can be read offline."
     }
 
@@ -641,7 +655,7 @@ Window {
         }
         // Tied to the content type, so the menu stays open for that choice too
         SwitchMenuItem {
-            text: "Downloaded only"
+            text: LibraryUi.downloadedLabel(bookOrbit.libraries.length, root.activeQuery === authorsQuery)
             checked: root.activeQuery.downloadedOnly
             // Always on offline
             enabled: bookOrbit.online
@@ -681,21 +695,36 @@ Window {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        visible: menu.visible
+        visible: menu.visible || libraryMenu.visible
         color: Qt.rgba(1, 1, 1, 0.6)
         MouseArea {
             anchors.fill: parent
-            onClicked: menu.visible = false
+            onClicked: {
+                menu.visible = false
+                libraryMenu.visible = false
+            }
         }
     }
     PopupMenu {
         id: menu
+        objectName: "headerMenu"
         visible: false
         anchors.top: header.bottom
         anchors.topMargin: Units.dp(1)
         anchors.right: parent.right
         anchors.rightMargin: Units.dp(9)
+        maxWidth: root.width - 2 * Units.dp(9)
 
+        // With a choice of libraries, shows which is current and opens the list
+        PopupMenuItem {
+            visible: LibraryUi.selectorVisible(bookOrbit.signedIn, bookOrbit.online, bookOrbit.libraries.length)
+            text: "Library: " + bookOrbit.currentLibraryLabel
+            onClicked: {
+                menu.visible = false
+                bookOrbit.refreshLibraries()
+                libraryMenu.visible = true
+            }
+        }
         // Offline: asks the system to connect
         PopupMenuItem {
             visible: bookOrbit.signedIn && !bookOrbit.online
@@ -995,6 +1024,55 @@ Window {
                   ? "Your device is restarting. This can take a minute."
                   : "PBookOrbit now has its own name and icon in your applications."
                     + " Restart your device to see them."
+            font.pointSize: 7.25
+            wrapMode: Text.Wrap
+        }
+    }
+    LibraryMenu {
+        id: libraryMenu
+        objectName: "libraryMenu"
+        client: bookOrbit
+        anchors.top: header.bottom
+        anchors.topMargin: Units.dp(1)
+        anchors.right: parent.right
+        anchors.rightMargin: Units.dp(9)
+        maxWidth: root.width - 2 * Units.dp(9)
+        availableHeight: root.height - header.height - Units.dp(10)
+    }
+    LibrarySwitchHandler {
+        client: bookOrbit
+        showingSeries: root.showingSeries
+        showingAuthors: root.showingAuthors
+        onCloseAll: {
+            root.closePages()
+            root.closeDropdowns()
+            menu.visible = false
+            libraryMenu.visible = false
+        }
+        onScrollToTop: {
+            bookList.positionViewAtBeginning()
+            seriesPage.list.positionViewAtBeginning()
+            authorsPage.list.positionViewAtBeginning()
+        }
+        onReloadSeries: bookOrbit.loadSeries()
+        onReloadAuthors: bookOrbit.loadAuthors()
+        onFallback: (label) => {
+            libraryFallbackDialog.label = label
+            libraryFallbackDialog.visible = true
+        }
+    }
+    SystemDialog {
+        id: libraryFallbackDialog
+        objectName: "libraryFallbackDialog"
+        property string label
+        anchors.fill: parent
+        icon: "icon_information"
+        buttons: [["Close", "close"]]
+        onPressed: visible = false
+
+        Text {
+            width: parent.width
+            text: "Your previous library is no longer available. Showing " + libraryFallbackDialog.label + "."
             font.pointSize: 7.25
             wrapMode: Text.Wrap
         }

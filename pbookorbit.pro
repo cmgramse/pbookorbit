@@ -13,6 +13,7 @@ SOURCES += \
     src/core/database.cpp \
     src/core/diagnostics.cpp \
     src/core/downloads.cpp \
+    src/core/libraryselection.cpp \
     src/ui/accents.cpp \
     src/ui/covers.cpp \
     src/ui/eink.cpp \
@@ -29,6 +30,7 @@ HEADERS += \
     src/core/diagnostics.h \
     src/core/downloads.h \
     src/core/formats.h \
+    src/core/libraryselection.h \
     src/ui/accents.h \
     src/ui/covers.h \
     src/ui/eink.h \

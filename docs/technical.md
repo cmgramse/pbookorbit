@@ -55,8 +55,9 @@ the emulator). Set `PBOOKORBIT_DB` to use a different file, for example in tests
 the device plugged in, `sqlite3 <mount>/system/config/pbookorbit.db` opens it from a PC.
 
 - `settings` is key/value: `serverUrl`, `username`, `refreshToken`, `accent` (the
-  BookOrbit accent colour), `recentSearches` (JSON array), `findBooksOffered` (0/1) and
-  `diagnosticsLogging` (0/1).
+  BookOrbit accent colour), `recentSearches` (JSON array), `findBooksOffered` (0/1),
+  `diagnosticsLogging` (0/1) and the chosen library for each account (see
+  [Libraries and books](#libraries-and-books)).
 - `books` caches BookOrbit books by id. `data` holds the book's list entry as JSON, so
   new fields don't need a schema change. `title` and `series` are generated columns for
   querying; more can be added with
@@ -90,7 +91,9 @@ library. Ebooks open in the system reader and audiobooks in the Audiobooks app
 
 "Find books on this device" in the header menu scans Books, Audio Books and Downloads for
 files the app hasn't recorded (books downloaded with KOReader, for instance) and marks the
-ones in the library as downloaded. A file matches a library book if, checked in order:
+ones in the library as downloaded. It searches the library selected when it starts and
+finishes there even if you switch, so books in another library need another run after
+selecting it. A file matches a library book if, checked in order:
 
 1. KOReader's BookOrbit plugin (if installed) lists it for this server in its state file
    (`bookorbit_sync_state*.lua` in `applications/koreader/settings`), and the file
@@ -177,8 +180,19 @@ On a 401 the client refreshes and retries the request once.
 
 ### Libraries and books
 
-- `GET /libraries` returns the user's libraries, `[{id, name, bookCount, ...}]`. The app
-  uses the first one.
+- `GET /libraries` returns the user's libraries, `[{id, name, bookCount, ...}]`. With more
+  than one, the header menu lets you choose. The choice is saved per server and username
+  (setting `selectedLibrary|<server>|<lowercased username>`), and stays when you sign out.
+  If it's no longer listed, the app says so and uses the first. Only this list shows a
+  library is usable: books return 403 for one you can't access, series and authors an
+  empty list.
+- Each library has its own list caches, named `library:<id>`, `series:<id>` and
+  `authors:<id>`. Collections belong to the account, so they stay as they are when you
+  switch. Their books can be in any library you can access; merging an ebook and audiobook
+  pair only looks in the selected one.
+- The downloaded lists cover the whole device, whichever library is selected: offline,
+  and with "Downloaded, all libraries" on. Authors with "Downloaded only" on is the
+  exception online, showing the selected library's authors who have books on the device.
 - `POST /libraries/:id/books` takes a `BookQuery` (`packages/types/src/query.ts`) and
   returns a page of books:
 

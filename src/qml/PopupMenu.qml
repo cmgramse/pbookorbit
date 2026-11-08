@@ -14,10 +14,12 @@ Rectangle {
     // "", "topLeft" or "topRight": the corner that joins a tab
     property string joinedCorner: ""
     property int sidePadding: padding
+    // Long rows elide rather than widen the menu past this
+    property real maxWidth: Infinity
 
     // At least as wide as the Sudoku menu (whose rows are short), otherwise as wide as the
     // widest visible row (the library menu)
-    width: Math.max(Units.dp(222), contentWidth + 2 * (border.width + sidePadding))
+    width: Math.min(maxWidth, Math.max(Units.dp(222), contentWidth + 2 * (border.width + sidePadding)))
     readonly property real contentWidth: {
         let widest = 0
         for (const row of column.children) {

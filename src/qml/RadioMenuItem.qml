@@ -28,6 +28,8 @@ Item {
     Text {
         id: label
         x: Units.dp(66)
+        width: item.width - x - Units.dp(15)
+        elide: Text.ElideRight
         anchors.verticalCenter: parent.verticalCenter
         color: mouse.pressed ? "white" : "black"
         font.pointSize: 8

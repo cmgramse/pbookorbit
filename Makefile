@@ -3,7 +3,7 @@
 PB_KIT ?= kit
 PB := $(if $(wildcard $(PB_KIT)/pb.sh),$(PB_KIT)/pb.sh,pb)
 
-.PHONY: setup run run-offline pc arm release shell clean icons
+.PHONY: setup run run-offline pc arm release shell clean icons test
 
 # Fetch the kit, its SDK and the container image
 setup:
@@ -42,6 +42,14 @@ icons:
 		rsvg-convert "$$svg" | magick - -colorspace Gray -type Palette -depth 8 -compress None "BMP3:$${svg%.svg}.bmp" || exit 1; \
 	done
 	rsvg-convert -w 37 -h 37 src/icons/offline.svg | magick - -background white -flatten -type TrueColor "BMP3:src/icons/offline.bmp"
+
+# Host tests, with no device SDK: needs Qt 6 and libsqlite3 (see Tests in the README)
+QMAKE ?= qmake6
+test:
+	mkdir -p build/tests
+	cd build/tests && $(QMAKE) ../../tests/tests.pro && $(MAKE) -j4
+	QT_QPA_PLATFORM=offscreen build/tests/client/client-tests
+	QT_QPA_PLATFORM=offscreen build/tests/qml/qml-tests
 
 # Shell in the build container
 shell:
