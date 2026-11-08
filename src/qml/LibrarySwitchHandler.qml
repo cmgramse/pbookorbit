@@ -7,10 +7,12 @@ Item {
     property var client
     property bool showingSeries: false
     property bool showingAuthors: false
+    property bool showingGenres: false
     signal closeAll()
     signal scrollToTop()
     signal reloadSeries()
     signal reloadAuthors()
+    signal reloadGenres()
     signal fallback(string label)
 
     Connections {
@@ -25,6 +27,8 @@ Item {
                     handler.reloadSeries()
                 if (handler.showingAuthors)
                     handler.reloadAuthors()
+                if (handler.showingGenres)
+                    handler.reloadGenres()
             }
         }
         function onLibraryFallback() {

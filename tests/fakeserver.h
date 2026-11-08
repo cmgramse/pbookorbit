@@ -75,6 +75,12 @@ public:
     }
     // Series and authors of every library, answered by the libraryId in the query
     void routeGroups() { m_groups = true; }
+    // Answers matching requests from answer(request), ahead of the routes and of earlier
+    // routeWhen() answers
+    void routeWhen(Predicate predicate, std::function<Reply(const Request &)> answer)
+    {
+        m_dynamic.prepend({predicate, answer});
+    }
 
     // Replies to matching requests wait for release(), until clearHolds()
     void hold(Predicate predicate) { m_holds.append(predicate); }
@@ -201,8 +207,44 @@ private:
         }
     }
 
+    // A filter rule's value as BookOrbit's validator takes it (group-rule.validator.ts):
+    // absent, a string, a number, or 1-20 non-empty strings or numbers. null is refused.
+    static bool validRuleValues(const QJsonObject &group)
+    {
+        for (const QJsonValue &part : group.value("rules").toArray()) {
+            const QJsonObject rule = part.toObject();
+            if (rule.value("type").toString() == "group") {
+                if (!validRuleValues(rule))
+                    return false;
+                continue;
+            }
+            if (!rule.contains("value"))
+                continue;
+            const QJsonValue value = rule.value("value");
+            if (value.isString() || value.isDouble())
+                continue;
+            if (!value.isArray())
+                return false;
+            const QJsonArray list = value.toArray();
+            if (list.isEmpty() || list.size() > 20)
+                return false;
+            const bool strings = list.first().isString();
+            for (const QJsonValue &item : list) {
+                if (strings ? !item.isString() || item.toString().isEmpty() : !item.isDouble())
+                    return false;
+            }
+        }
+        return true;
+    }
+
     Reply replyFor(const Request &request) const
     {
+        if (request.body.contains("filter") && !validRuleValues(request.body.value("filter").toObject()))
+            return Reply{400, R"({"statusCode":400,"message":"Bad Request Exception"})"};
+        for (const auto &dynamic : m_dynamic) {
+            if (dynamic.first(request))
+                return dynamic.second(request);
+        }
         const QString bare = request.path.section('?', 0, 0);
         if (m_groups && request.method == "GET" && (bare == "/series" || bare == "/authors")) {
             const QString query = request.path.section('?', 1);
@@ -252,6 +294,7 @@ private:
     QHash<QTcpSocket *, QByteArray> m_buffers;
     QList<Predicate> m_holds;
     QList<Held> m_held;
+    QList<QPair<Predicate, std::function<Reply(const Request &)>>> m_dynamic;
     bool m_groups = false;
     quint16 m_port = 0;
 };

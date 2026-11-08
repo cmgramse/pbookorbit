@@ -186,8 +186,8 @@ On a 401 the client refreshes and retries the request once.
   If it's no longer listed, the app says so and uses the first. Only this list shows a
   library is usable: books return 403 for one you can't access, series and authors an
   empty list.
-- Each library has its own list caches, named `library:<id>`, `series:<id>` and
-  `authors:<id>`. Collections belong to the account, so they stay as they are when you
+- Each library has its own list caches, named `library:<id>`, `series:<id>`,
+  `authors:<id>` and `genres:<id>`. Collections belong to the account, so they stay as they are when you
   switch. Their books can be in any library you can access; merging an ebook and audiobook
   pair only looks in the selected one.
 - The downloaded lists cover the whole device, whichever library is selected: offline,
@@ -229,6 +229,24 @@ On a 401 the client refreshes and retries the request once.
 - `GET /series?libraryId=&author=<text>` lists series with any author whose name contains
   the text, ignoring case. `author=Martin` matches every Martin, so the client filters to
   series whose `authors` include the exact name.
+
+### Genres
+
+- The server has no list of a library's genres: `GET /metadata/genres?q=` needs a search
+  term and covers every library, and `GET /statistics/genre-distribution` stops at 25. So
+  the Genres tab pages `POST /libraries/:id/books` with the filter
+  `{"type": "rule", "field": "genre", "operator": "isNotEmpty"}`, sorted by title, 200 books
+  a page, and gathers each item's `genres` (exact names, so "Sci-Fi" and "sci-fi" are two
+  genres). An ebook and its audiobook count as one book.
+- The list is cached as `genres:<id>` only once every page has loaded (`total` reached). A
+  page that fails, isn't `{items: [...], total: n}`, or comes back empty before the total
+  leaves the genres incomplete: the pages that loaded show with a note, or the last complete
+  list stays. Tapping Genres again, opening the tab, a library switch or going back online
+  loads them again.
+- A genre's books are the library's matching `{"field": "genre", "operator": "includesAny",
+  "value": [name]}`. Offline, the genres are those of the downloaded books saved with a
+  `genres` list; books saved before then show under no genre until they're refreshed
+  online.
 
 ### Preferences
 

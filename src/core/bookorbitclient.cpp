@@ -35,10 +35,14 @@ static const int MIN_SEARCH_LENGTH = 3;
 // Recent searches kept
 static const int MAX_RECENT_SEARCHES = 10;
 
-// Filter parts for BookOrbit's book queries
-static QJsonObject rule(const QString &field, const QString &op, const QJsonValue &value)
+// Filter parts for BookOrbit's book queries. Without a value (as for isNotEmpty) the rule
+// has none: the server refuses "value": null.
+static QJsonObject rule(const QString &field, const QString &op, const QJsonValue &value = QJsonValue::Undefined)
 {
-    return QJsonObject{{"type", "rule"}, {"field", field}, {"operator", op}, {"value", value}};
+    QJsonObject rule{{"type", "rule"}, {"field", field}, {"operator", op}};
+    if (!value.isUndefined())
+        rule.insert("value", value);
+    return rule;
 }
 
 static QJsonObject group(const QString &join, const QJsonArray &rules)
@@ -380,9 +384,12 @@ QVariantList BookOrbitClient::localBooksOf() const
             wanted = m_booksOfCollectionIds.contains(book.value("id"));
         } else if (m_booksOfField == "series") {
             wanted = m_booksOfValues.contains(book.value("seriesName").toString());
-        } else {
+        } else if (m_booksOfField == "author") {
             for (const QString &author : book.value("authors").toStringList())
                 wanted = wanted || m_booksOfValues.contains(author);
+        } else if (m_booksOfField == "genre") {
+            for (const QVariant &genre : book.value("genres").toList())
+                wanted = wanted || m_booksOfValues.contains(genre.toString());
         }
         if (wanted)
             books.append(book);
@@ -457,7 +464,7 @@ void BookOrbitClient::setOnline(bool online)
     diagnostics::log(QString(online ? "online, " : "offline, ") + diagnostics::networkState());
     // Rows built offline stay on screen until the server's arrive
     if (online) {
-        for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries}) {
+        for (Groups *groups : {&m_collections, &m_series, &m_authors, &m_authorSeries, &m_genres}) {
             if (groups->local)
                 groups->loaded = false;
         }
@@ -465,6 +472,7 @@ void BookOrbitClient::setOnline(bool online)
         emit seriesListChanged();
         emit authorsChanged();
         emit authorSeriesChanged();
+        emit genresChanged();
     }
     emit onlineChanged();
     // So the choice of libraries appears even if no list needed the server
@@ -669,7 +677,7 @@ void BookOrbitClient::switchToLibrary(int id)
 
 void BookOrbitClient::resetLibraryViews()
 {
-    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries, &m_genres}) {
         groups->generation++;
         groups->rows.clear();
         groups->cached.clear();
@@ -693,9 +701,17 @@ void BookOrbitClient::resetLibraryViews()
     m_booksOfValues.clear();
     m_booksOfCollectionIds.clear();
     m_authorSeriesName.clear();
+    m_genreBooks.clear();
+    m_genreCovers.clear();
+    m_genresReceived = 0;
+    m_genresTotal = -1;
+    m_genresStatus = "idle";
+    m_genresComplete = false;
+    m_genresError.clear();
     emit seriesListChanged();
     emit authorsChanged();
     emit authorSeriesChanged();
+    emit genresChanged();
     emit jumpSectionsChanged();
     emit booksChanged();
     emit searchChanged();
@@ -711,7 +727,12 @@ void BookOrbitClient::dropCachedLibraryRows()
         clearJumpSections(m_list);
         emit booksChanged();
     }
-    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries}) {
+    // The genres shown from the cache are rows, not cached ones
+    if (m_genresComplete) {
+        m_genres.rows.clear();
+        m_genresComplete = false;
+    }
+    for (Groups *groups : {&m_series, &m_authors, &m_authorSeries, &m_genres}) {
         if (groups->local)
             continue;
         groups->cached.clear();
@@ -1789,6 +1810,8 @@ void BookOrbitClient::setLocalBooks(const QVariantList &books)
         showLocalAuthors();
     if (m_collections.local)
         showLocalCollections();
+    if (m_genres.local)
+        showLocalGenres();
 }
 
 void BookOrbitClient::showLocalSeries(Groups &groups)
@@ -2211,6 +2234,8 @@ void BookOrbitClient::showGroups(Groups &groups)
         emit seriesListChanged();
     else if (&groups == &m_authorSeries)
         emit authorSeriesChanged();
+    else if (&groups == &m_genres)
+        emit genresChanged();
     else
         emit authorsChanged();
 }
@@ -2256,7 +2281,8 @@ QString BookOrbitClient::cacheName(const Groups &groups) const
     if (library <= 0)
         return QString();
     return &groups == &m_series ? QString("series:%1").arg(library)
-         : &groups == &m_authors ? QString("authors:%1").arg(library) : QString();
+         : &groups == &m_authors ? QString("authors:%1").arg(library)
+         : &groups == &m_genres ? QString("genres:%1").arg(library) : QString();
 }
 
 void BookOrbitClient::saveLibraryCache()
@@ -2650,4 +2676,232 @@ void BookOrbitClient::setError(const QString &error)
         return;
     m_error = error;
     emit errorChanged();
+}
+
+void BookOrbitClient::loadGenres()
+{
+    const int generation = ++m_genres.generation;
+    // A new load replaces the last one's error, but not another view's
+    if (!m_genresError.isEmpty() && m_error == m_genresError)
+        setError(QString());
+    m_genresError.clear();
+    if (!m_online) {
+        showLocalGenres();
+        return;
+    }
+    // The last complete list, even an empty one, shows until this load completes, so a
+    // failure leaves it. Its rows stand in for the new ones until then.
+    const QString cache = cacheName(m_genres);
+    const QVariantMap saved = cache.isEmpty() ? QVariantMap() : m_database->listCache(cache);
+    m_genresComplete = saved.contains("rows");
+    if (m_genresComplete) {
+        m_genres.rows.clear();
+        for (const QVariant &row : saved.value("rows").toList())
+            m_genres.rows.append(row.toMap());
+        m_genres.local = false;
+        m_genres.loaded = true;
+        showGroups(m_genres);
+    }
+    m_genresReceived = 0;
+    m_genresTotal = -1;
+    setGenresStatus("loading");
+    withLibrary(
+        [this, generation](int libraryId) {
+            if (generation != m_genres.generation)
+                return;
+            if (libraryId <= 0) {
+                m_genres.rows.clear();
+                m_genres.cached.clear();
+                m_genresComplete = false;
+                m_genresStatus = "idle";
+                showGroups(m_genres);
+                return;
+            }
+            loadGenresPage(0, generation, libraryId);
+        },
+        // The library list's error is already shown
+        [this, generation](int, const QString &) {
+            if (generation == m_genres.generation)
+                settleFailedGenres();
+        });
+}
+
+void BookOrbitClient::loadGenresPage(int page, int generation, int libraryId)
+{
+    // The library's books with any genre: their genres are the list, as the server has
+    // no list of a library's genres
+    const QJsonObject query{
+        {"filter", group("AND", {rule("genre", "isNotEmpty")})},
+        {"sort", QJsonArray{QJsonObject{{"field", "title"}, {"dir", "asc"}}}},
+        {"pagination", QJsonObject{{"page", page}, {"size", SERIES_NUMBERS_PAGE_SIZE}}},
+    };
+    // Quiet, so that only this load's failures show an error
+    request("POST", QString("/libraries/%1/books").arg(libraryId), QJsonDocument(query),
+        [this, page, generation, libraryId](const QByteArray &data) {
+            if (generation != m_genres.generation || libraryId != m_libraryId)
+                return;
+            const QJsonDocument doc = QJsonDocument::fromJson(data);
+            const QJsonValue itemsValue = doc.object().value("items");
+            const QJsonValue totalValue = doc.object().value("total");
+            const double total = totalValue.toDouble(-1);
+            // In int range before converting: past it the conversions are undefined
+            if (!doc.isObject() || !itemsValue.isArray() || !totalValue.isDouble() || total < 0
+                || total > double(std::numeric_limits<int>::max()) || total != double(qint64(total))) {
+                m_genresError = "Unexpected response from server";
+                setError(m_genresError);
+                settleFailedGenres();
+                return;
+            }
+            const QJsonArray items = itemsValue.toArray();
+            updateSavedBooks(items);
+            if (page == 0) {
+                m_genreBooks.clear();
+                m_genreCovers.clear();
+                m_genres.local = false;
+            }
+            for (const QJsonValue &item : items) {
+                const QVariantMap book = item.toObject().toVariantMap();
+                const QString key = companionKey(book);
+                const QStringList formats = ownFormats(book);
+                // Exact names; anything that isn't one is skipped
+                for (const QJsonValue &genre : item.toObject().value("genres").toArray()) {
+                    if (!genre.isString() || genre.toString().trimmed().isEmpty())
+                        continue;
+                    QStringList &bookFormats = m_genreBooks[genre.toString()][key];
+                    for (const QString &format : formats) {
+                        if (!bookFormats.contains(format))
+                            bookFormats.append(format);
+                    }
+                    QVariantList &covers = m_genreCovers[genre.toString()];
+                    const QVariantMap cover{{"id", book.value("id").toInt()}, {"coverVersion", book.value("coverVersion").toString()}};
+                    if (covers.size() < 2 && !covers.contains(cover))
+                        covers.append(cover);
+                }
+            }
+            m_genresReceived += int(items.size());
+            m_genresTotal = int(total);
+            m_genres.loaded = true;
+            if (m_genresReceived >= m_genresTotal) {
+                if (!m_genresError.isEmpty() && m_error == m_genresError)
+                    setError(QString());
+                m_genresError.clear();
+                buildGenreRows();
+                m_genresComplete = false;
+                m_genres.booksLoaded = true;
+                m_genresStatus = "complete";
+                finishGroups(m_genres, true);
+            } else if (!items.isEmpty()) {
+                // Rows show page by page, unless the last complete list is showing
+                if (!m_genresComplete) {
+                    buildGenreRows();
+                    showGroups(m_genres);
+                }
+                emit genresChanged();
+                loadGenresPage(page + 1, generation, libraryId);
+            } else {
+                // Fewer books than the total said: not the whole list
+                settleFailedGenres();
+            }
+        },
+        [this, generation, libraryId](int status, const QString &message) {
+            if (generation != m_genres.generation || libraryId != m_libraryId)
+                return;
+            // Offline shows in the header instead
+            if (status != 0) {
+                m_genresError = message;
+                setError(message);
+            }
+            settleFailedGenres();
+        });
+}
+
+void BookOrbitClient::buildGenreRows()
+{
+    m_genres.rows.clear();
+    for (auto it = m_genreBooks.constBegin(); it != m_genreBooks.constEnd(); ++it) {
+        QVariantMap books;   // companion key -> formats
+        QStringList formats;
+        for (auto book = it.value().constBegin(); book != it.value().constEnd(); ++book) {
+            books.insert(book.key(), book.value());
+            for (const QString &format : book.value()) {
+                if (!formats.contains(format))
+                    formats.append(format);
+            }
+        }
+        sortFormats(formats);
+        m_genres.rows.append(QVariantMap{
+            {"id", int(m_genres.rows.size())},
+            {"name", it.key()},
+            {"bookCount", int(it.value().size())},
+            {"serverCount", int(it.value().size())},
+            {"covers", m_genreCovers.value(it.key())},
+            {"authors", QStringList()},
+            {"formats", formats},
+            {"books", books},
+            {"readProgress", 0.0},
+        });
+    }
+}
+
+void BookOrbitClient::settleFailedGenres()
+{
+    m_genres.loaded = true;
+    // The last complete list stays, and so does its cache
+    if (m_genresComplete) {
+        m_genresStatus = "stale";
+        emit genresChanged();
+        return;
+    }
+    m_genresStatus = m_genres.rows.isEmpty() ? "failed" : "incomplete";
+    finishGroups(m_genres, false);
+}
+
+void BookOrbitClient::setGenresStatus(const QString &status)
+{
+    if (m_genresStatus == status)
+        return;
+    m_genresStatus = status;
+    emit genresChanged();
+}
+
+void BookOrbitClient::showLocalGenres()
+{
+    QMap<QString, QList<QVariantMap>> booksOf;   // genre -> books
+    for (const QVariant &value : std::as_const(m_localBooks)) {
+        const QVariantMap book = value.toMap();
+        for (const QVariant &genre : book.value("genres").toList()) {
+            if (genre.typeId() == QMetaType::QString && !genre.toString().trimmed().isEmpty())
+                booksOf[genre.toString()].append(book);
+        }
+    }
+    m_genreBooks.clear();
+    m_genreCovers.clear();
+    for (auto it = booksOf.constBegin(); it != booksOf.constEnd(); ++it) {
+        QHash<QString, QStringList> &books = m_genreBooks[it.key()];
+        QVariantList &covers = m_genreCovers[it.key()];
+        for (const QVariantMap &book : it.value()) {
+            QStringList &formats = books[companionKey(book)];
+            for (const QString &format : book.value("downloadedFormats").toStringList()) {
+                if (!formats.contains(format))
+                    formats.append(format);
+            }
+            if (covers.size() < 2 && book.value("hasCover").toBool())
+                covers.append(QVariantMap{{"id", book.value("id")}, {"coverVersion", book.value("coverVersion")}});
+        }
+    }
+    buildGenreRows();
+    m_genres.cached.clear();
+    m_genresComplete = false;
+    m_genres.local = true;
+    m_genres.loaded = true;
+    m_genres.booksLoaded = true;
+    m_genresStatus = "local";
+    showGroups(m_genres);
+}
+
+void BookOrbitClient::setGenreSort(const QString &field, bool descending)
+{
+    m_genres.sort = field;
+    m_genres.descending = descending;
+    showGroups(m_genres);
 }

@@ -75,16 +75,23 @@ Window {
         activeList.positionViewAtBeginning()
     }
 
-    // Footer views: Library, Collections, Series or Authors
+    // Footer views: Library, Collections, Series, Authors or Genres
     readonly property bool showingCollections: footer.currentIndex === 1
     readonly property bool showingSeries: footer.currentIndex === 2
     readonly property bool showingAuthors: footer.currentIndex === 3
+    readonly property bool showingGenres: footer.currentIndex === 4
+    // Whether the genre list needs loading: always offline, where it's the downloaded
+    // books', and online unless it's complete or on its way
+    readonly property bool genresNeedLoading: !bookOrbit.online
+                                              || (bookOrbit.genresStatus !== "complete"
+                                                  && bookOrbit.genresStatus !== "loading")
     // The list whose sub-toolbar menus are in use
     readonly property ListView activeList: showingBooksOf ? booksOfPage.list
                                            : showingAuthorSeries ? authorSeriesPage.list
                                            : showingCollections ? collectionsPage.list
                                            : showingSeries ? seriesPage.list
-                                           : showingAuthors ? authorsPage.list : bookList
+                                           : showingAuthors ? authorsPage.list
+                                           : showingGenres ? genresPage.list : bookList
 
     AppHeader {
         id: header
@@ -185,6 +192,18 @@ Window {
             authorsPage.list.positionViewAtBeginning()
         }
     }
+    // Genres A-Z, or most books first
+    ListQuery {
+        id: genresQuery
+        sortOptions: ["Name", "Book count"]
+        sortFields: ["name", "bookCount"]
+        sortDescendingByDefault: [false, true]
+        hasFilter: false
+        onApplied: {
+            bookOrbit.setGenreSort(sortFields[sortIndex], descending())
+            genresPage.list.positionViewAtBeginning()
+        }
+    }
     // An author's series: the Series view's sorts, kept between authors
     ListQuery {
         id: authorSeriesQuery
@@ -209,6 +228,7 @@ Window {
     property var booksOfValues: []
     readonly property ListQuery booksOfQuery: booksOfField === "series" ? seriesBooksQuery
                                               : booksOfField === "collection" ? collectionBooksQuery
+                                              : booksOfField === "genre" ? genreBooksQuery
                                               : authorBooksQuery
     function openBooksOf(kind, name, field, values) {
         booksOfPage.kind = kind
@@ -236,6 +256,15 @@ Window {
         sortDescendingByDefault: libraryQuery.sortDescendingByDefault
         sortIndex: 1
         onApplied: root.applyBooksOf(authorBooksQuery)
+    }
+    // A genre's books use the library's sorts, by title first
+    ListQuery {
+        id: genreBooksQuery
+        sortOptions: libraryQuery.sortOptions
+        sortFields: libraryQuery.sortFields
+        sortDescendingByDefault: libraryQuery.sortDescendingByDefault
+        sortIndex: 1
+        onApplied: root.applyBooksOf(genreBooksQuery)
     }
     // A series' books: series order first, then the library's sorts
     ListQuery {
@@ -282,6 +311,8 @@ Window {
                 bookOrbit.loadAuthors()
             if (showingCollections)
                 bookOrbit.loadCollections()
+            if (showingGenres && genresNeedLoading)
+                bookOrbit.loadGenres()
         }
     }
     Component.onCompleted: {
@@ -297,7 +328,8 @@ Window {
                                              : showingAuthorSeries ? authorSeriesQuery
                                              : showingCollections ? collectionsQuery
                                              : showingSeries ? seriesQuery
-                                             : showingAuthors ? authorsQuery : libraryQuery
+                                             : showingAuthors ? authorsQuery
+                                             : showingGenres ? genresQuery : libraryQuery
     readonly property bool dropdownOpen: filterMenu.visible || sortMenu.visible
 
     // The page-turn keys (sent as Page Up/Page Down) page the front list or info page, like
@@ -312,6 +344,7 @@ Window {
                                                     : showingCollections ? collectionsPage.pageButtons
                                                     : showingSeries ? seriesPage.pageButtons
                                                     : showingAuthors ? authorsPage.pageButtons
+                                                    : showingGenres ? genresPage.pageButtons
                                                     : pageButtons
     readonly property bool overlayOpen: dropdownOpen || menu.visible || libraryMenu.visible || bookMenu.visible
                                         || libraryFallbackDialog.visible
@@ -354,6 +387,7 @@ Window {
     ListView {
         id: bookList
         visible: bookOrbit.signedIn && !root.showingCollections && !root.showingSeries && !root.showingAuthors
+                 && !root.showingGenres
         anchors.top: header.bottom
         anchors.bottom: footer.top
         anchors.left: parent.left
@@ -576,8 +610,52 @@ Window {
         }
     }
 
+    GroupsPage {
+        id: genresPage
+        objectName: "genresPage"
+        visible: bookOrbit.signedIn && root.showingGenres
+        model: bookOrbit.genresList
+        jumpSections: bookOrbit.genreJumpSections
+        loaded: bookOrbit.genresLoaded
+        emptyTitle: "No genres"
+        emptyText: bookOrbit.online ? "Genres show here once the library's books have genres."
+                                    : "You're currently offline, only genres of downloaded books can be shown."
+        // Until the list is complete, its counts may be short
+        notice: {
+            const status = bookOrbit.genresStatus
+            if (status === "loading" && bookOrbit.genresCached)
+                return "Updating genres"
+            if (status === "loading")
+                return bookOrbit.genresTotal < 0 ? "Loading genres"
+                       : "Loading genres: " + bookOrbit.genresProgress + " of " + bookOrbit.genresTotal + " books"
+            if (status === "incomplete")
+                return "Some genres are missing. Tap Genres to try again."
+            if (status === "stale")
+                return "Couldn't update genres. Showing the last complete list. Tap Genres to try again."
+            return ""
+        }
+        anchors.top: header.bottom
+        anchors.bottom: footer.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        sortText: "By " + genresQuery.sortOptions[genresQuery.sortIndex]
+        sortReversed: genresQuery.sortReversed
+        descending: genresQuery.sortDescending
+        // Jump rail aligned and spaced like the library's
+        jumpRailTop: libraryRail.entriesY - y
+        jumpRailPitch: libraryRail.pitch
+        sortOpen: sortMenu.visible
+        tabOverhang: sortMenu.border.width - 1
+        onSortClicked: root.toggleDropdown(sortMenu)
+        onSortIconClicked: genresQuery.reverseSort()
+        // Loaded when the view opens, unless the list is complete (see genresNeedLoading)
+        onVisibleChanged: if (visible && root.genresNeedLoading) bookOrbit.loadGenres()
+        onGroupClicked: (genre) => root.openBooksOf("Genre", genre.name, "genre", [genre.name])
+    }
+
     TabFooter {
         id: footer
+        objectName: "footer"
         visible: bookOrbit.signedIn
         anchors.bottom: parent.bottom
         anchors.left: parent.left
@@ -587,11 +665,17 @@ Window {
             { label: "Library", icon: "overdrive_library" },
             { label: "Collections", icon: "e3_filter_bookshelf" },
             { label: "Series", icon: "e3_filter_seria_bold" },
-            { label: "Authors", icon: "e3_filter_author" }
+            { label: "Authors", icon: "e3_filter_author" },
+            { label: "Genres", icon: "e3_filter_bookshelf" }
         ]
         onTabClicked: (index) => {
-            // Tapping the current tab again scrolls its list to the top
-            if (index === currentIndex) {
+            // Tapping the current tab again scrolls its list to the top, or tries again for
+            // genres that didn't all load
+            const status = bookOrbit.genresStatus
+            if (index === currentIndex && root.showingGenres
+                    && (status === "incomplete" || status === "stale" || status === "failed")) {
+                bookOrbit.loadGenres()
+            } else if (index === currentIndex) {
                 root.activeList.positionViewAtBeginning()
             } else {
                 root.closeDropdowns()
@@ -1043,6 +1127,7 @@ Window {
         client: bookOrbit
         showingSeries: root.showingSeries
         showingAuthors: root.showingAuthors
+        showingGenres: root.showingGenres
         onCloseAll: {
             root.closePages()
             root.closeDropdowns()
@@ -1053,9 +1138,11 @@ Window {
             bookList.positionViewAtBeginning()
             seriesPage.list.positionViewAtBeginning()
             authorsPage.list.positionViewAtBeginning()
+            genresPage.list.positionViewAtBeginning()
         }
         onReloadSeries: bookOrbit.loadSeries()
         onReloadAuthors: bookOrbit.loadAuthors()
+        onReloadGenres: bookOrbit.loadGenres()
         onFallback: (label) => {
             libraryFallbackDialog.label = label
             libraryFallbackDialog.visible = true

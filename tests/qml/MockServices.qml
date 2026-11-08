@@ -31,6 +31,17 @@ QtObject {
     property bool authorsLoaded: true
     property bool authorBooksLoaded: true
     property bool authorSeriesLoaded: true
+    property var genreJumpSections: []
+    property bool genresLoaded: true
+    property string genresStatus: "idle"
+    property int genresProgress: 0
+    property int genresTotal: -1
+    property bool genresCached: false
+    property ListModel genresList: ListModel {}
+    // What the genre tests look at
+    property int genreLoads: 0
+    property var genreSort: []
+    property var booksOfShown: []
     property ListModel books: ListModel {}
     property ListModel searchResults: ListModel {}
     property ListModel booksOf: ListModel {}
@@ -55,6 +66,9 @@ QtObject {
     function setAuthorSeriesSort() {}
     function refreshLibraries() {}
     function loadSeries() {}
+    function loadGenres() { genreLoads++ }
+    function setGenreSort(field, descending) { genreSort = [field, descending] }
+    function showBooksOf(field, values) { booksOfShown = [field, values] }
     function loadAuthors() {}
     function loadCollections() {}
     function loadBooks() {}

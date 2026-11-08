@@ -93,6 +93,22 @@ class BookOrbitClient : public QObject
     Q_PROPERTY(BookListModel *authorSeriesList READ authorSeriesList CONSTANT)
     Q_PROPERTY(QVariantList authorSeriesJumpSections READ authorSeriesJumpSections NOTIFY authorSeriesChanged)
     Q_PROPERTY(bool authorSeriesLoaded READ authorSeriesLoaded NOTIFY authorSeriesChanged)
+    // The library's genres, from its books' genres: {id, name (exact), bookCount (an ebook and
+    // its audiobook count once), covers (first two books), formats, books (key -> formats),
+    // readProgress (always 0)}
+    Q_PROPERTY(BookListModel *genresList READ genresList CONSTANT)
+    Q_PROPERTY(QVariantList genreJumpSections READ genreJumpSections NOTIFY genresChanged)
+    // Whether there's something to show in place of the spinner
+    Q_PROPERTY(bool genresLoaded READ genresLoaded NOTIFY genresChanged)
+    // "idle", "loading", "complete" (all pages, cached), "incomplete" (failed, showing the
+    // pages that loaded), "stale" (failed, showing the last complete list), "failed" (nothing
+    // to show) or "local" (offline, the downloaded books')
+    Q_PROPERTY(QString genresStatus READ genresStatus NOTIFY genresChanged)
+    // Books looked up so far, and the library's books with genres (-1 until known)
+    Q_PROPERTY(int genresProgress READ genresProgress NOTIFY genresChanged)
+    Q_PROPERTY(int genresTotal READ genresTotal NOTIFY genresChanged)
+    // Whether the rows are the last complete list, shown while a load runs or after it failed
+    Q_PROPERTY(bool genresCached READ genresCached NOTIFY genresChanged)
     // Jump sections for booksOf: letters for an author's books, series numbers for a
     // series (e.g. [{label: "12", index: 11}, ...])
     Q_PROPERTY(QVariantList booksOfJumpSections READ booksOfJumpSections NOTIFY jumpSectionsChanged)
@@ -144,6 +160,13 @@ public:
     BookListModel *authorSeriesList() { return &m_authorSeries.model; }
     bool authorSeriesLoaded() const { return m_authorSeries.loaded; }
     QVariantList authorSeriesJumpSections() const { return m_authorSeries.jumpSections; }
+    BookListModel *genresList() { return &m_genres.model; }
+    QVariantList genreJumpSections() const { return m_genres.jumpSections; }
+    bool genresLoaded() const { return m_genres.loaded; }
+    QString genresStatus() const { return m_genresStatus; }
+    int genresProgress() const { return m_genresReceived; }
+    int genresTotal() const { return m_genresTotal; }
+    bool genresCached() const { return m_genresComplete; }
     QStringList recentSearches() const { return m_recentSearches; }
     QColor accentColor() const;
     QColor accentTextColor() const;
@@ -219,6 +242,11 @@ public:
     Q_INVOKABLE void showAuthorSeries(const QString &author);
     // Same fields as setSeriesSort()
     Q_INVOKABLE void setAuthorSeriesSort(const QString &field, bool descending);
+    // Lists the library's genres from its books with any, 200 a page (see genresStatus).
+    // Offline, the downloaded books' genres.
+    Q_INVOKABLE void loadGenres();
+    // Sorts genres by "name" or "bookCount"
+    Q_INVOKABLE void setGenreSort(const QString &field, bool descending);
     // The author's unfiltered row from authorsList, or empty if not listed
     Q_INVOKABLE QVariantMap authorRow(int authorId) const;
     // Placeholder for a missing author photo, as BookOrbit draws it: initials ("AT" for
@@ -275,6 +303,7 @@ signals:
     void seriesListChanged();
     void authorsChanged();
     void authorSeriesChanged();
+    void genresChanged();
     void authorDetails(int authorId, const QVariantMap &details);
     void bookDetails(int bookId, const QVariantMap &details);
     void recentSearchesChanged();
@@ -394,6 +423,15 @@ private:
     // books, as though looked up
     void showLocalSeries(Groups &groups);
     void showLocalAuthors();
+    // A page of the genre list from page onwards, for load generation in libraryId
+    void loadGenresPage(int page, int generation, int libraryId);
+    // The rows of the genres seen so far in this load
+    void buildGenreRows();
+    // Ends a genre load that failed: keeps the last complete list or the rows that loaded
+    void settleFailedGenres();
+    void setGenresStatus(const QString &status);
+    // Rows from the local books' genres, while offline
+    void showLocalGenres();
     // Offline: the saved collections with local books, counting only those
     void showLocalCollections();
     // Updates the saved entries of any of these books (see Database::updateBooks)
@@ -545,6 +583,20 @@ private:
     Groups m_authorSeries;
     // Author whose series m_authorSeries holds
     QString m_authorSeriesName;
+    Groups m_genres;
+    // See genresStatus, genresProgress and genresTotal
+    QString m_genresStatus = "idle";
+    int m_genresReceived = 0;
+    int m_genresTotal = -1;
+    // The genres of the books loaded so far: name -> companion key -> formats, and cover ids
+    // in order
+    QMap<QString, QHash<QString, QStringList>> m_genreBooks;
+    QMap<QString, QVariantList> m_genreCovers;
+    // The error the last genre page set, so a later success clears only that
+    QString m_genresError;
+    // The rows are the last complete list, read from the cache when a load started (it may
+    // be empty)
+    bool m_genresComplete = false;
     QStringList m_recentSearches;
     QVariantList m_localBooks;
     QString m_accent;   // BookOrbit accent name, e.g. "teal"; empty for the default

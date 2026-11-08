@@ -64,6 +64,48 @@ static QVariantMap localBook(int id, const QString &title)
     return QVariantMap{{"id", id}, {"title", title}, {"authors", QStringList{"Local Author"}}};
 }
 
+// A genre list page request: the library's books with any genre
+static bool isGenreList(const Request &request, int library)
+{
+    if (request.path != QString("/libraries/%1/books").arg(library))
+        return false;
+    const QJsonObject first = request.body.value("filter").toObject().value("rules").toArray().at(0).toObject();
+    return first.value("field").toString() == "genre" && first.value("operator").toString() == "isNotEmpty";
+}
+static int pageOf(const Request &request)
+{
+    return request.body.value("pagination").toObject().value("page").toInt();
+}
+// A book list item with genres (any JSON value, as the server might send) and one file
+static QJsonObject genreBook(int id, const QString &title, const QJsonValue &genres,
+                             const QString &format = "epub", const QString &author = "Genre Author")
+{
+    QJsonObject book{{"id", id}, {"title", title}, {"authors", QJsonArray{author}},
+                     {"files", QJsonArray{QJsonObject{{"id", id * 10}, {"role", "primary"}, {"format", format}}}}};
+    if (!genres.isUndefined())
+        book.insert("genres", genres);
+    return book;
+}
+static Reply genrePage(const QJsonArray &items, int total)
+{
+    return Reply{200, QJsonDocument(QJsonObject{{"items", items}, {"total", total}}).toJson(QJsonDocument::Compact)};
+}
+static QVariantMap rowNamed(BookListModel *model, const QString &name)
+{
+    for (int i = 0; i < model->count(); i++) {
+        if (model->book(i).value("name").toString() == name)
+            return model->book(i);
+    }
+    return QVariantMap();
+}
+static QStringList cachedNames(const QVariantMap &cache)
+{
+    QStringList found;
+    for (const QVariant &row : cache.value("rows").toList())
+        found.append(row.toMap().value("name").toString());
+    return found;
+}
+
 // An unrecorded book for BookFinder to look for, in the stub's scratch folder
 struct FindFile {
     FindFile()
@@ -107,6 +149,16 @@ class LibraryTest : public QObject
         server().addLibrary(2);
     }
     void newClient() { m_client.reset(new BookOrbitClient(m_database.data())); }
+    // Answers library's genre list pages from pages, by page number; later pages are empty
+    void routeGenres(int library, const QList<Reply> &pages)
+    {
+        server().routeWhen([library](const Request &r) { return isGenreList(r, library); },
+            [pages](const Request &r) { return pages.value(pageOf(r), genrePage({}, 0)); });
+    }
+    bool genresSettled()
+    {
+        return client().genresStatus() != "loading" && client().genresStatus() != "idle";
+    }
     // A session saved by an earlier run, with the client constructed but not started
     void savedSession()
     {
@@ -1163,6 +1215,427 @@ private slots:
         QTRY_COMPARE(client().libraries().size(), 2);
         QCOMPARE(client().currentLibraryId(), 1);
         QCOMPARE(titles(client().books()), QStringList{"Downloaded A"});
+    }
+
+    // Genres (category-browser contract T1-T21)
+
+    // T1: the selected library's books with genres, a page at a time, as one row per genre
+    void genresListTheSelectedLibrarysGenres()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        client().selectLibrary(2);
+        QTRY_COMPARE(titles(client().books()).value(0), QString("L2 book 1"));
+        // An ebook and its audiobook, then another book
+        routeGenres(2, {genrePage({genreBook(1, "Dune", QJsonArray{"Sci-Fi", "Classic"}),
+                                   genreBook(2, "Dune", QJsonArray{"Sci-Fi"}, "m4b")}, 3),
+                        genrePage({genreBook(3, "Emma", QJsonArray{"Classic"})}, 3)});
+        server().clearRequests();
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), (QStringList{"Classic", "Sci-Fi"}));
+        const QVariantMap sciFi = rowNamed(client().genresList(), "Sci-Fi");
+        QCOMPARE(sciFi.value("bookCount").toInt(), 1);
+        QCOMPARE(rowNamed(client().genresList(), "Classic").value("bookCount").toInt(), 2);
+        QStringList formats = sciFi.value("formats").toStringList();
+        formats.sort();
+        QCOMPARE(formats, (QStringList{"epub", "m4b"}));
+        QCOMPARE(sciFi.value("readProgress").toDouble(), 0.0);
+        QCOMPARE(client().genresProgress(), 3);
+        QCOMPARE(client().genresTotal(), 3);
+        QVERIFY(client().genresLoaded());
+        QList<Request> pages;
+        for (const Request &request : std::as_const(server().requests)) {
+            QVERIFY(!isGenreList(request, 1));
+            if (isGenreList(request, 2))
+                pages.append(request);
+        }
+        QCOMPARE(pages.size(), 2);
+        QCOMPARE(pageOf(pages.at(1)), 1);
+        const QJsonObject body = pages.at(0).body;
+        // As sent: BookOrbit's validator refuses "value": null, so isNotEmpty has no value
+        const QJsonObject filter{{"type", "group"}, {"join", "AND"},
+            {"rules", QJsonArray{QJsonObject{{"type", "rule"}, {"field", "genre"}, {"operator", "isNotEmpty"}}}}};
+        QCOMPARE(body.value("filter").toObject(), filter);
+        QCOMPARE(body.value("pagination").toObject().value("size").toInt(), 200);
+        QCOMPARE(body.value("sort").toArray().at(0).toObject().value("field").toString(), QString("title"));
+        QCOMPARE(body.value("sort").toArray().at(0).toObject().value("dir").toString(), QString("asc"));
+        QStringList cached = cachedNames(database().listCache("genres:2"));
+        cached.sort();
+        QCOMPARE(cached, (QStringList{"Classic", "Sci-Fi"}));
+        client().setGenreSort("bookCount", true);
+        QCOMPARE(names(client().genresList()), (QStringList{"Classic", "Sci-Fi"}));
+        client().setGenreSort("name", true);
+        QCOMPARE(names(client().genresList()), (QStringList{"Sci-Fi", "Classic"}));
+    }
+
+    // T2: a genre's books are the library's with exactly that genre
+    void openingAGenreQueriesItsExactName()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        server().clearRequests();
+        client().showBooksOf("genre", {"Sci-Fi"}, "title", false);
+        const auto genreRule = [this] {
+            for (const Request &request : std::as_const(server().requests)) {
+                const QJsonObject first = request.body.value("filter").toObject().value("rules").toArray().at(0).toObject();
+                if (request.path == "/libraries/1/books" && first.value("field") == "genre")
+                    return first;
+            }
+            return QJsonObject();
+        };
+        QTRY_VERIFY(!genreRule().isEmpty());
+        QCOMPARE(genreRule().value("operator").toString(), QString("includesAny"));
+        QCOMPARE(genreRule().value("value").toArray(), QJsonArray{"Sci-Fi"});
+    }
+
+    // T3: offline, a genre's books are the downloaded books with it, never an author's
+    void offlineGenreBooksMatchGenresOnly()
+    {
+        qputenv("PBOOKORBIT_OFFLINE", "1");
+        savedSession();
+        QVariantMap genred = localBook(101, "Has the genre");
+        genred.insert("genres", QStringList{"Sci-Fi"});
+        QVariantMap byAuthor = localBook(102, "Author named like it");
+        byAuthor.insert("authors", QStringList{"Sci-Fi"});
+        const QVariantMap noKey = localBook(103, "Saved without genres");
+        client().setLocalBooks({genred, byAuthor, noKey});
+        client().start();
+        client().showBooksOf("genre", {"Sci-Fi"}, "title", false, {}, true);
+        QCOMPARE(titles(client().booksOf()), QStringList{"Has the genre"});
+        client().showBooksOf("author", {"Sci-Fi"}, "title", false, {}, true);
+        QCOMPARE(titles(client().booksOf()), QStringList{"Author named like it"});
+        client().showBooksOf("publisher", {"Sci-Fi"}, "title", false, {}, true);
+        QCOMPARE(titles(client().booksOf()), QStringList());
+    }
+
+    // T4, T18: offline, the downloaded books' genres, kept up to date as downloads change
+    void offlineGenresAreTheDownloadedBooks()
+    {
+        qputenv("PBOOKORBIT_OFFLINE", "1");
+        savedSession();
+        QVariantMap first = localBook(101, "First");
+        first.insert("genres", QStringList{"Sci-Fi"});
+        first.insert("downloadedFormats", QStringList{"epub"});
+        const QVariantMap noKey = localBook(102, "Saved without genres");
+        client().setLocalBooks({first, noKey});
+        client().start();
+        client().loadGenres();
+        QCOMPARE(client().genresStatus(), QString("local"));
+        QVERIFY(client().genresLoaded());
+        QCOMPARE(names(client().genresList()), QStringList{"Sci-Fi"});
+        QCOMPARE(rowNamed(client().genresList(), "Sci-Fi").value("bookCount").toInt(), 1);
+
+        QVariantMap second = localBook(103, "Second");
+        second.insert("genres", QStringList{"Poetry"});
+        client().setLocalBooks({first, noKey, second});
+        QCOMPARE(names(client().genresList()), (QStringList{"Poetry", "Sci-Fi"}));
+        client().setLocalBooks({noKey, second});
+        QCOMPARE(names(client().genresList()), QStringList{"Poetry"});
+        settle();
+        QVERIFY(server().requests.isEmpty());
+    }
+
+    // T6: per-library caches, written only when complete, cleared on sign-out
+    void genreCachesBelongToTheirLibrary()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        routeGenres(1, {genrePage({genreBook(1, "A1", QJsonArray{"Only in A"})}, 1)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(cachedNames(database().listCache("genres:1")), QStringList{"Only in A"});
+
+        routeGenres(2, {genrePage({genreBook(2, "B1", QJsonArray{"Only in B"})}, 1)});
+        server().holdOnce([](const Request &r) { return isGenreList(r, 2); });
+        client().selectLibrary(2);
+        QCOMPARE(client().genresStatus(), QString("idle"));
+        QCOMPARE(client().genresList()->count(), 0);
+        client().loadGenres();
+        QVERIFY(!names(client().genresList()).contains("Only in A"));
+        QTRY_COMPARE(server().heldCount(), 1);
+        server().releaseAll();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Only in B"});
+        QCOMPARE(cachedNames(database().listCache("genres:1")), QStringList{"Only in A"});
+
+        client().signOut();
+        QTRY_VERIFY(!client().signedIn());
+        QVERIFY(database().listCache("genres:1").isEmpty());
+        QVERIFY(database().listCache("genres:2").isEmpty());
+        QCOMPARE(client().genresList()->count(), 0);
+    }
+
+    // T8: names are exact; a book counts once per genre; entries that aren't names are skipped
+    void genreNamesAreExactAndCountedOncePerBook()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        routeGenres(1, {genrePage({genreBook(1, "One", QJsonArray{"Sci-Fi", "sci-fi", "Sci-Fi", QJsonValue(),
+                                                                     7, QJsonObject{}, "", "  ", " Sci-Fi"}),
+                                   genreBook(2, "Two", QJsonObject{{"Sci-Fi", true}}),
+                                   genreBook(3, "Three", QJsonValue::Undefined)}, 3)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QStringList found = names(client().genresList());
+        found.sort();
+        QCOMPARE(found, (QStringList{" Sci-Fi", "Sci-Fi", "sci-fi"}));
+        QCOMPARE(rowNamed(client().genresList(), "Sci-Fi").value("bookCount").toInt(), 1);
+        QCOMPARE(rowNamed(client().genresList(), "sci-fi").value("bookCount").toInt(), 1);
+    }
+
+    // T12: an empty page before the total is reached isn't the end of the list
+    void anEarlyEmptyPageLeavesGenresIncomplete()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        QJsonArray items;
+        for (int i = 0; i < 200; i++)
+            items.append(genreBook(1000 + i, QString("Book %1").arg(i), QJsonArray{"Sci-Fi"}));
+        routeGenres(1, {genrePage(items, 500), genrePage({}, 500)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("incomplete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Sci-Fi"});
+        QCOMPARE(client().genresProgress(), 200);
+        QCOMPARE(client().genresTotal(), 500);
+        QVERIFY(database().listCache("genres:1").isEmpty());
+    }
+
+    // T24: no books with genres is a complete, empty list
+    void noGenresIsACompleteEmptyList()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        routeGenres(1, {genrePage({}, 0)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(client().genresList()->count(), 0);
+        QVERIFY(client().genresLoaded());
+        QVERIFY(database().listCache("genres:1").contains("rows"));
+    }
+
+    // T13: a page that isn't a valid list fails, once, and isn't cached
+    void invalidGenrePagesFail_data()
+    {
+        QTest::addColumn<QByteArray>("body");
+        QTest::addRow("not JSON") << QByteArray("not json");
+        QTest::addRow("array") << QByteArray("[]");
+        QTest::addRow("items not an array") << QByteArray("{\"items\":{},\"total\":1}");
+        QTest::addRow("items null") << QByteArray("{\"items\":null,\"total\":1}");
+        QTest::addRow("total missing") << QByteArray("{\"items\":[]}");
+        QTest::addRow("total negative") << QByteArray("{\"items\":[],\"total\":-1}");
+        QTest::addRow("total text") << QByteArray("{\"items\":[],\"total\":\"3\"}");
+        QTest::addRow("total fractional") << QByteArray("{\"items\":[],\"total\":1.5}");
+        QTest::addRow("total above int") << QByteArray("{\"items\":[],\"total\":2147483648}");
+        QTest::addRow("total huge") << QByteArray("{\"items\":[],\"total\":1e300}");
+    }
+    void invalidGenrePagesFail()
+    {
+        QFETCH(QByteArray, body);
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        QTRY_VERIFY(!client().busy());
+        routeGenres(1, {Reply{200, body}});
+        QSignalSpy errors(&client(), &BookOrbitClient::errorChanged);
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("failed"));
+        QCOMPARE(client().error(), QString("Unexpected response from server"));
+        QCOMPARE(errors.count(), 1);
+        QCOMPARE(client().genresList()->count(), 0);
+        QVERIFY(client().genresLoaded());
+        QVERIFY(database().listCache("genres:1").isEmpty());
+    }
+
+    // T14: replies to a load that a newer one replaced change nothing
+    void supersededGenreLoadsAreIgnored()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        QTRY_VERIFY(!client().busy());
+        routeGenres(1, {genrePage({genreBook(1, "New", QJsonArray{"Newest"})}, 1)});
+        server().holdOnce([](const Request &r) { return isGenreList(r, 1); });
+        server().holdOnce([](const Request &r) { return isGenreList(r, 1); });
+        client().loadGenres();
+        client().loadGenres();
+        QTRY_COMPARE(server().heldCount(), 2);
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Newest"});
+        const Reply failure{500, "{\"message\":\"Late failure\"}"};
+        const Reply malformed{200, "{\"items\":7}"};
+        QVERIFY(server().release("/libraries/1/books", &failure));
+        QVERIFY(server().release("/libraries/1/books", &malformed));
+        settle();
+        QCOMPARE(client().error(), QString());
+        QCOMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Newest"});
+        QCOMPARE(cachedNames(database().listCache("genres:1")), QStringList{"Newest"});
+    }
+
+    // T15: a reply held across A -> B -> A belongs to the first visit only
+    void aGenreReplyFromAnEarlierVisitIsIgnored()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        routeGenres(1, {genrePage({genreBook(1, "Fresh", QJsonArray{"Fresh"})}, 1)});
+        routeGenres(2, {genrePage({genreBook(2, "B", QJsonArray{"B genre"})}, 1)});
+        server().holdOnce([](const Request &r) { return isGenreList(r, 1); });
+        client().loadGenres();
+        QTRY_COMPARE(server().heldCount(), 1);
+        client().selectLibrary(2);
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        client().selectLibrary(1);
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Fresh"});
+        const Reply stale = genrePage({genreBook(9, "Stale", QJsonArray{"Stale"})}, 1);
+        QVERIFY(server().release("/libraries/1/books", &stale));
+        settle();
+        QCOMPARE(names(client().genresList()), QStringList{"Fresh"});
+        QCOMPARE(cachedNames(database().listCache("genres:1")), QStringList{"Fresh"});
+        QCOMPARE(cachedNames(database().listCache("genres:2")), QStringList{"B genre"});
+    }
+
+    // T16, T21: a failed page leaves the rows that loaded; a retry completes and clears its
+    // error, but not someone else's
+    void aPartialGenreListRetries()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        QTRY_VERIFY(!client().busy());
+        const Reply first = genrePage({genreBook(1, "One", QJsonArray{"First page"})}, 2);
+        routeGenres(1, {first, Reply{500, "{\"message\":\"Genre failure\"}"}});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("incomplete"));
+        QCOMPARE(names(client().genresList()), QStringList{"First page"});
+        QVERIFY(client().error().contains("Genre failure"));
+        QVERIFY(database().listCache("genres:1").isEmpty());
+
+        routeGenres(1, {first, genrePage({genreBook(2, "Two", QJsonArray{"Second page"})}, 2)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), (QStringList{"First page", "Second page"}));
+        QCOMPARE(client().error(), QString());
+        QCOMPARE(cachedNames(database().listCache("genres:1")).size(), 2);
+
+        // Another view's error, set after the genres', stays
+        routeGenres(1, {Reply{500, "{\"message\":\"Genre failure\"}"}});
+        client().loadGenres();
+        QTRY_VERIFY(genresSettled());
+        QVERIFY(client().error().contains("Genre failure"));
+        server().routeWhen([](const Request &r) { return r.path.startsWith("/series"); },
+            [](const Request &) { return Reply{500, "{\"message\":\"Series failure\"}"}; });
+        client().loadSeries();
+        QTRY_VERIFY(client().error().contains("Series failure"));
+        routeGenres(1, {genrePage({genreBook(1, "One", QJsonArray{"First page"})}, 1)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QVERIFY(client().error().contains("Series failure"));
+    }
+
+    // T17: a failed reload keeps the last complete list on screen and on disk
+    void aFailedReloadKeepsTheCompleteList()
+    {
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        const QVariantMap cache{{"rows", QVariantList{QVariantMap{{"id", 0}, {"name", "Cached"}, {"bookCount", 4}}}}};
+        database().saveListCache("genres:1", cache);
+        routeGenres(1, {Reply{500, "{\"message\":\"Genre failure\"}"}});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("stale"));
+        QCOMPARE(names(client().genresList()), QStringList{"Cached"});
+        QCOMPARE(database().listCache("genres:1"), cache);
+
+        // Also after a complete load this session
+        routeGenres(1, {genrePage({genreBook(1, "One", QJsonArray{"Loaded"})}, 1)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        routeGenres(1, {Reply{500, "{\"message\":\"Genre failure\"}"}});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("stale"));
+        QCOMPARE(names(client().genresList()), QStringList{"Loaded"});
+        QCOMPARE(cachedNames(database().listCache("genres:1")), QStringList{"Loaded"});
+    }
+
+    // Review R1: a complete empty list is a complete list too, kept while reloading and when
+    // the reload fails
+    void anEmptyCompleteListSurvivesAFailedReload_data()
+    {
+        QTest::addColumn<bool>("firstPageFails");
+        QTest::addRow("first page fails") << true;
+        QTest::addRow("later page fails") << false;
+    }
+    void anEmptyCompleteListSurvivesAFailedReload()
+    {
+        QFETCH(bool, firstPageFails);
+        twoLibraries();
+        QVERIFY(signInAndLoad());
+        routeGenres(1, {genrePage({}, 0)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        const QVariantMap empty = database().listCache("genres:1");
+        QVERIFY(empty.contains("rows"));
+
+        const Reply failure{500, "{\"message\":\"Genre failure\"}"};
+        const Reply partial = genrePage({genreBook(1, "One", QJsonArray{"Partial"})}, 2);
+        routeGenres(1, {firstPageFails ? failure : partial, failure});
+        server().holdOnce([](const Request &r) { return isGenreList(r, 1) && pageOf(r) == 1; });
+        client().loadGenres();
+        QCOMPARE(client().genresStatus(), QString("loading"));
+        QVERIFY(client().genresCached());
+        if (!firstPageFails) {
+            // The first page's rows wait for the rest, behind the complete empty list
+            QTRY_COMPARE(server().heldCount(), 1);
+            QCOMPARE(client().genresList()->count(), 0);
+            QVERIFY(client().genresCached());
+            server().releaseAll();
+        }
+        QTRY_COMPARE(client().genresStatus(), QString("stale"));
+        QVERIFY(client().genresCached());
+        QCOMPARE(client().genresList()->count(), 0);
+        QCOMPARE(database().listCache("genres:1"), empty);
+
+        // A reload that completes replaces it
+        server().clearHolds();
+        routeGenres(1, {partial, genrePage({genreBook(2, "Two", QJsonArray{"More"})}, 2)});
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QVERIFY(!client().genresCached());
+        QCOMPARE(names(client().genresList()), (QStringList{"More", "Partial"}));
+        QCOMPARE(cachedNames(database().listCache("genres:1")).size(), 2);
+    }
+
+    // T20: a failed or empty library list settles the genres without their own error, and
+    // they load once libraries come back
+    void genresSettleWhenLibrariesFail_data()
+    {
+        QTest::addColumn<bool>("empty");
+        QTest::addRow("server error") << false;
+        QTest::addRow("no libraries") << true;
+    }
+    void genresSettleWhenLibrariesFail()
+    {
+        QFETCH(bool, empty);
+        if (empty)
+            server().route("GET", "/libraries", QJsonDocument(QJsonArray{}));
+        else
+            server().route("GET", "/libraries", 500, "{\"message\":\"Broken\"}");
+        client().signIn(server().url(), USER, "secret");
+        QTRY_VERIFY(!client().error().isEmpty());
+        const QString libraryError = client().error();
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("failed"));
+        QCOMPARE(client().error(), libraryError);
+        QVERIFY(client().genresLoaded());
+
+        twoLibraries();
+        routeGenres(1, {genrePage({genreBook(1, "One", QJsonArray{"Back"})}, 1)});
+        client().refreshLibraries();
+        QTRY_COMPARE(client().currentLibraryId(), 1);
+        client().loadGenres();
+        QTRY_COMPARE(client().genresStatus(), QString("complete"));
+        QCOMPARE(names(client().genresList()), QStringList{"Back"});
     }
 };
 

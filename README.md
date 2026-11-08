@@ -13,7 +13,7 @@ one of the device's built-in apps rather than a port of something else.
 - The library is laid out like the PocketBook's own library app, with covers, authors and
   series. You can filter to ebooks or audiobooks, sort it a few ways, jump to a letter
   with the A-Z rail and page through with the page keys.
-- Tabs for collections, series and authors.
+- Tabs for collections, series, authors and genres.
 - If your account has several libraries, choose one from the header menu.
 - Pages for each book and author, with links through to everything else by that author
   or in that series.

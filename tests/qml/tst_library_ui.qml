@@ -96,6 +96,22 @@ Item {
             compare(series.count, 1)
             compare(authors.count, 1)
         }
+        // Genres T9
+        function test_switchReloadsTheVisibleGenresTab() {
+            const handler = createTemporaryObject(handlerComponent, root, {showingGenres: true})
+            const genres = spy(handler, "reloadGenres")
+            const series = spy(handler, "reloadSeries")
+            mockClient.librarySwitched()
+            compare(genres.count, 1)
+            compare(series.count, 0)
+            mockClient.currentLibraryId = -1
+            mockClient.librarySwitched()
+            mockClient.currentLibraryId = 1
+            compare(genres.count, 1)
+            handler.showingGenres = false
+            mockClient.librarySwitched()
+            compare(genres.count, 1)
+        }
         function test_noReloadWithoutALibrary() {
             const handler = createTemporaryObject(handlerComponent, root, {showingSeries: true, showingAuthors: true})
             const series = spy(handler, "reloadSeries")

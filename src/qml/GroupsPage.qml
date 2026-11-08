@@ -1,8 +1,8 @@
 import QtQuick
 import "units.js" as Units
 
-// The Collections or Series view: one GroupRow per group (bookOrbit.collections or
-// seriesList) under a sort-only sub-toolbar, with a jump rail when sorted by name. Sits
+// The Collections, Series, Authors or Genres view: one GroupRow per group (e.g.
+// bookOrbit.collections or seriesList) under a sort-only sub-toolbar, with a jump rail when sorted by name. Sits
 // between the header and footer; main.qml owns the sort menu, as for the library.
 Item {
     id: page
@@ -28,6 +28,9 @@ Item {
     property bool loaded: false
     property string emptyTitle
     property string emptyText
+    // A line about the list as a whole, e.g. that it's still loading. Static text, changed
+    // only as pages arrive, for e-ink.
+    property string notice
     readonly property alias list: groupList
 
     signal filterClicked()
@@ -49,7 +52,7 @@ Item {
         // The sort bar and any status line scroll with the rows, as in the library
         header: Column {
             width: ListView.view.width
-            bottomPadding: status.visible ? Units.dp(8) : 0
+            bottomPadding: status.visible || notice.visible ? Units.dp(8) : 0
 
             SubToolbar {
                 width: parent.width
@@ -63,6 +66,17 @@ Item {
                 tabOverhang: page.tabOverhang
                 onSortClicked: page.sortClicked()
                 onSortIconClicked: page.sortIconClicked()
+            }
+            Text {
+                id: notice
+                objectName: "groupsNotice"
+                x: Units.dp(26)
+                width: parent.width - 2 * x
+                visible: page.notice !== ""
+                topPadding: Units.dp(8)
+                text: page.notice
+                font.pointSize: 8
+                wrapMode: Text.Wrap
             }
             // An error over rows already shown
             Text {
