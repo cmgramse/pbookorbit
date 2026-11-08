@@ -18,8 +18,8 @@ Installed and checksum-verified on the owner-connected InkPad4 on 2026-11-07 at1
 
 ## Physical acceptance
 
-PENDING owner verification: restart device, open app, select each accessible library, reopen app and confirm saved choice. Host renders, builds and installation checks do not substitute for this. pbo-kox.4 and the delivery epic remain open until evidence arrives.
+Owner accepted the installed feature on 2026-11-08: “its working great”. This is owner-reported physical success, distinct from independently executed host checks; no additional detailed manual-test matrix was reported.
 
 Rollback: restore the preserved original executable only; do not overwrite the settings DB unless recovery explicitly needs it. No user book files were modified.
 
-Upstream PR submission has not occurred. The clean feature branch is ready for submission after physical acceptance; team reports, Beads, runtime configuration and private data remain excluded.
+Upstream PR submitted: https://github.com/cooperaj/pbookorbit/pull/2 — Add persistent library selection. Readback confirms OPEN, not draft, base main and head contrib/library-selector at e80c8e96f65fd47781f238deeeb459cbb4b4e5e1. The new one-commit contribution removes internal session-link trailers while preserving co-author credit. Only the README device note differs from the tested source; application, tests and build inputs are identical. The original tested feature branch is preserved. Team reports, Beads, runtime configuration and private data remain excluded. Fresh 2026-11-08 QA reran the 73-client/22-QML suites without failures, skips or warnings, and independent contribution review approved the exact PR branch and body.
